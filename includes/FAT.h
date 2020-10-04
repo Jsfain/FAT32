@@ -83,6 +83,7 @@ typedef struct //FatCurrentDirectory
 #define ALL ( CREATION | LAST_ACCESS | LAST_MODIFIED )
 
 
+
 /******************************************************************************
  * DESCRIPTION 
  * Sets currentDirectory to newDirectory, if found, by updating the members of

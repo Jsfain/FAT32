@@ -1,25 +1,26 @@
 /******************************************************************************
+ * Copyright (c) 2020 Joshua Fain
+ * 
+ * 
  * SD_SPI_BASE.H
- *  
- * TARGET
- * ATmega 1280
+ * 
  *
  * DESCRIPTION
  * Base-level SD card function declarations and struct and macro definitions  
  * that will be used to handle the basic physical interaction with an SD card
  * operating in SPI Mode.
+ *
  * 
- * "PUBLIC" FUNCTION LIST
- * 1) uint32_t  uint32_t SD_InitializeSPImode(CardTypeVersion *ctv)
- * 2) void      SD_SendByteSPI(uint8_t byte)
- * 3) uint8_t   SD_ReceiveByteSPI(void)
- * 4) void      SD_SendCommand(uint8_t cmd, uint32_t arg)
- * 5) uint8_t   SD_GetR1(void)
- * 6) void      SD_PrintR1(uint8_t r1)
- * 7) void      SD_PrintInitError(uint32_t err)
+ * TARGET
+ * ATmega 1280 
  * 
- * Author: Joshua Fain
- * Date:   9/24/2020
+ * 
+ * VERSION
+ * 0.0.0.1
+ * 
+ *
+ * LICENSE
+ * Licensed under the GNU GPL v3
  * ***************************************************************************/
 
 
@@ -38,8 +39,8 @@
 #define HCS 1  // 0 = host only supports SDSC. 
                // 1 = host also supports SDHC or SDXC.
               
-// Data Block Length. Currently only supports values of 512.
-#define DATA_BLOCK_LEN 512
+// Block Length. Currently only supports values of 512.
+#define BLOCK_LEN 512
 
 // Asserting / deasserting the (CS) pin.
 #define CS_LOW    SPI_PORT &= ~(1<<SS);  // Assert
@@ -101,6 +102,7 @@
 
 // Initialization Error Responses returned by initialization function.
 // The lowest byte is zero to accommodate the R1 response.
+#define INIT_SUCCESS            0x00000
 #define FAILED_GO_IDLE_STATE    0x00100   //CMD0
 #define FAILED_SEND_IF_COND     0x00200   //CMD8
 #define UNSUPPORTED_CARD_TYPE   0x00400
@@ -110,8 +112,6 @@
 #define OUT_OF_IDLE_TIMEOUT     0x04000
 #define FAILED_READ_OCR         0x08000   //CMD58
 #define POWER_UP_NOT_COMPLETE   0x10000
-#define FAILED_SET_BLOCKLEN     0x20000   // not currently used
-#define FAILED_SEND_CSD         0x40000   // not currently used
 
 
 
@@ -128,7 +128,7 @@ typedef struct {
 } CardTypeVersion;
 
 
-/************************************************************s******************
+/******************************************************************************
  *                           FUNCTION DECLARATIONS
 ******************************************************************************/
 

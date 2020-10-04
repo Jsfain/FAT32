@@ -557,8 +557,11 @@ uint8_t PrintFatCurrentDirectoryContents(
     uint32_t cluster = currentDirectory->FATFirstCluster;
     uint32_t dataRegionFirstSector = GetFatRsvdSecCnt() + (GetFatNumFATs() * GetFatFATSz32()); // Data Region First Sector 
     
-    uint8_t currentSectorContents[bytsPerSec]; 
-    uint8_t nextSectorContents[bytsPerSec];
+    //uint8_t currentSectorContents[bytsPerSec]; 
+    //uint8_t nextSectorContents[bytsPerSec];
+
+    uint8_t currentSectorContents[512]; 
+    uint8_t nextSectorContents[512];
 
     uint16_t shortNamePosCS = 0;   //position of short name in currentSectorContents
     uint16_t shortNamePosNS = 0; //position of short name in nextSectorContents
@@ -592,6 +595,7 @@ uint8_t PrintFatCurrentDirectoryContents(
         {
             // read in next sector's contents into currentSectorContents[] array 
             physicalSectorNumber = clusterSectorNumber + dataRegionFirstSector + ( (cluster - 2) * secPerClus );
+            print_str("\n\rREADING SECTOR");
             fat_ReadSingleSector( bytsPerSec * physicalSectorNumber, currentSectorContents );
 
             for(int entry = 0; entry < bytsPerSec; entry = entry + 32)
@@ -1325,7 +1329,12 @@ void PrintFatError(uint8_t err)
 uint16_t GetFatBytsPerSec()
 {
     uint8_t BootSector[512];
-    fat_ReadSingleSector(0,BootSector);
+    uint32_t bootSectorLocation = fat_FindBootSector();
+    if(bootSectorLocation != 0xFFFFFFFF)
+    {
+        fat_ReadSingleSector(bootSectorLocation,BootSector);
+    }
+    else return CORRUPT_BOOT_SECTOR; // update to Boot Sector Not Found
 
     //confirm boot signature is present
     if((BootSector[510] == 0x55) && (BootSector[511]==0xAA))
@@ -1347,7 +1356,12 @@ uint16_t GetFatBytsPerSec()
 uint8_t GetFatSecPerClus()
 {
     uint8_t BootSector[512];
-    fat_ReadSingleSector(0,BootSector);
+    uint32_t bootSectorLocation = fat_FindBootSector();
+    if(bootSectorLocation != 0xFFFFFFFF)
+    {
+        fat_ReadSingleSector(bootSectorLocation,BootSector);
+    }
+    else return CORRUPT_BOOT_SECTOR; // update to Boot Sector Not Found
 
     //confirm boot signature is present
     if((BootSector[510] == 0x55) && (BootSector[511]==0xAA))
@@ -1372,7 +1386,12 @@ uint8_t GetFatSecPerClus()
 uint16_t GetFatRsvdSecCnt()
 {
     uint8_t BootSector[512];
-    fat_ReadSingleSector(0,BootSector);
+    uint32_t bootSectorLocation = fat_FindBootSector();
+    if(bootSectorLocation != 0xFFFFFFFF)
+    {
+        fat_ReadSingleSector(bootSectorLocation,BootSector);
+    }
+    else return CORRUPT_BOOT_SECTOR; // update to Boot Sector Not Found
     
     //confirm boot signature is present
     if((BootSector[510] == 0x55) && (BootSector[511]==0xAA))
@@ -1392,7 +1411,12 @@ uint16_t GetFatRsvdSecCnt()
 uint8_t GetFatNumFATs()
 {
     uint8_t BootSector[512];
-    fat_ReadSingleSector(0,BootSector);
+    uint32_t bootSectorLocation = fat_FindBootSector();
+    if(bootSectorLocation != 0xFFFFFFFF)
+    {
+        fat_ReadSingleSector(bootSectorLocation,BootSector);
+    }
+    else return CORRUPT_BOOT_SECTOR; // update to Boot Sector Not Found
     
     //confirm boot signature is present
     if((BootSector[510] == 0x55) && (BootSector[511]==0xAA))
@@ -1411,7 +1435,12 @@ uint8_t GetFatNumFATs()
 uint32_t GetFatFATSz32()
 {
     uint8_t BootSector[512];
-    fat_ReadSingleSector(0,BootSector);
+    uint32_t bootSectorLocation = fat_FindBootSector();
+    if(bootSectorLocation != 0xFFFFFFFF)
+    {
+        fat_ReadSingleSector(bootSectorLocation,BootSector);
+    }
+    else return CORRUPT_BOOT_SECTOR; // update to Boot Sector Not Found
 
     //confirm boot signature is present
     if((BootSector[510] == 0x55) && (BootSector[511]==0xAA))
@@ -1437,7 +1466,12 @@ uint32_t GetFatFATSz32()
 uint32_t GetFatRootClus()
 {
     uint8_t BootSector[512];
-    fat_ReadSingleSector(0,BootSector);
+    uint32_t bootSectorLocation = fat_FindBootSector();
+    if(bootSectorLocation != 0xFFFFFFFF)
+    {
+        fat_ReadSingleSector(bootSectorLocation,BootSector);
+    }
+    else return CORRUPT_BOOT_SECTOR; // update to Boot Sector Not Found
     
     //confirm boot signature is present
     if((BootSector[510] == 0x55) && (BootSector[511]==0xAA))

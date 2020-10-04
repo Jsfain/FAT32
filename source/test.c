@@ -16,6 +16,7 @@
 #include "../includes/sd_spi_base.h"
 #include "../includes/sd_spi_data_access.h"
 #include "../includes/fat.h"
+#include "../includes/fattosd.h"
 
 
 uint32_t enterBlockNumber();
@@ -25,47 +26,54 @@ int main(void)
 {
     USART_Init();
     SPI_MasterInit();
+
+
+    // ******************* SD CARD INITILIAIZATION ****************
+    //
+    // Initializing ctv. These members will be set by the SD card's
+    // initialization routine. They should only be set there.
     
+    CardTypeVersion ctv;
+
     uint32_t initResponse;
 
-    // Initializing crv
-    CardTypeVersion ctv = {.version = 0, .type = 0};
-    
-    //attempt to initialize sd card.
-    for(int i = 0; i<2; i++)
+    // Attempt, up to 10 times, to initialize the SD card.
+    for(int i = 0; i < 10; i++)
     {
-        print_str("\n\n\rSD Card Initialization Attempt: ");
-        print_dec(i);
+        print_str("\n\n\r SD Card Initialization Attempt # "); print_dec(i);
         initResponse = SD_InitializeSPImode(&ctv);
-        if(initResponse != OUT_OF_IDLE) // If response is anything other than 0 (OUT_OF_IDLE) then initialization failed.
+        if( ( (initResponse & 0xFF) != OUT_OF_IDLE) && 
+            ( (initResponse & 0xFFF00) != INIT_SUCCESS ) )
         {    
-            print_str("\n\rSD INIT FAILED RESPONSE = 0x");
-            print_hex(initResponse);
+            print_str("\n\n\r FAILED INITIALIZING SD CARD");
+            print_str("\n\r Initialization Error Response: "); 
             SD_PrintInitError(initResponse);
+            print_str("\n\r R1 Response: "); SD_PrintR1(initResponse);
         }
         else
-        {   
-            print_str("\n\rSD Card Successfully Initialized\n\r");
+        {   print_str("\n\r SUCCESSFULLY INITIALIZED SD CARD");
             break;
         }
     }
 
-    print_str("\n\rPrinting R1 Response for init = "); SD_PrintR1((uint8_t)(0x000FF&initResponse));
-    print_str("\n\rinitialization response = "); SD_PrintInitError(initResponse);
-    
-    
+
     if(initResponse==OUT_OF_IDLE) // initialization successful
     {          
         print_str("\n\r");
-        
+        uint32_t bootSectorLocation;
+        bootSectorLocation = fat_FindBootSector();
+        print_str("\n\r boot sector is at block number "); print_dec(bootSectorLocation);
         //initialize current working directory to the root directory
         FatCurrentDirectory cwd = {"/","","/","", GetFatRootClus()};
-        
+        uint16_t err = 0;
+        PrintFatCurrentDirectoryContents(&cwd, LONG_NAME);
+        PrintFatError(err);
+
+    /*    
         int quit = 0;   
         int len = 64;
         char str[len];
         char temp;
-
         int p;
         int s;
 
@@ -77,8 +85,9 @@ int main(void)
         int noa = 0; //num of arguements
         int loc[len];
         int i = 0;
-        int err = 0;
-        
+        uint16_t err = 0;
+
+
         do
         {
             flag = 0;
@@ -157,7 +166,7 @@ int main(void)
 
                     for(int t = 0; t < noa; t++)
                     {
-                             if (strcmp(&a[loc[t]],"/LN") == 0  ) flag |= LONG_NAME;
+                             if (strcmp(&a[loc[t]],"/LN") == 0 ) flag |= LONG_NAME;
                         else if (strcmp(&a[loc[t]],"/SN") == 0 ) flag |= SHORT_NAME;
                         else if (strcmp(&a[loc[t]],"/A")  == 0 ) flag |= ALL;
                         else if (strcmp(&a[loc[t]],"/H")  == 0 ) flag |= HIDDEN;
@@ -196,35 +205,51 @@ int main(void)
             for (int k = 0; k < 10; k++) UDR0; // ensure USART Data Register is cleared of any remaining garbage bytes.
         
         }while (quit == 0);      
+    */
 
-
-        uint32_t start_sector;
-        uint32_t start_address;
-        uint32_t nos;
-       
+        uint32_t startBlockNumber;
+        uint32_t numberOfBlocks;
         uint8_t answer;
         do{
             do{
-                print_str("\n\rEnter Start Sector\n\r");
-                start_sector = enterBlockNumber();
-                print_str("\n\rhow many sectors do you want to print?\n\r");
-                nos = enterBlockNumber();
-                print_str("\n\rYou want to print "); print_dec(nos);
-                print_str(" sectors beginning at sector "); print_dec(start_sector);
-                print_str("\n\ris this correct? (y/n)");
+                print_str("\n\n\n\rEnter Start Block\n\r");
+                startBlockNumber = enterBlockNumber();
+                print_str("\n\rHow many blocks do you want to print?\n\r");
+                numberOfBlocks = enterBlockNumber();
+                print_str("\n\rYou have selected to print "); print_dec(numberOfBlocks);
+                print_str(" blocks beginning at block number "); print_dec(startBlockNumber);
+                print_str("\n\rIs this correct? (y/n)");
                 answer = USART_Receive();
                 USART_Transmit(answer);
                 print_str("\n\r");
             }while(answer != 'y');
 
+            // READ amd PRINT post write
+            if (ctv.type == SDHC) // SDHC is block addressable
+                err = SD_PrintMultipleBlocks(startBlockNumber,numberOfBlocks);
+            else // SDSC byte addressable
+                err = SD_PrintMultipleBlocks(
+                                startBlockNumber * BLOCK_LEN, 
+                                numberOfBlocks);
+            
+            if(err != READ_SUCCESS)
+            { 
+                print_str("\n\r >> SD_PrintMultipleBlocks() returned ");
+                if(err & R1_ERROR)
+                {
+                    print_str("R1 error: ");
+                    SD_PrintR1(err);
+                }
+                else 
+                { 
+                    print_str(" error "); 
+                    SD_PrintReadError(err);
+                }
+            }
 
-            start_address = DATA_BLOCK_LEN * start_sector;
-            SD_PrintMultipleDataBlocks(start_address,nos);
-
-            print_str("\n\r press 'q' to quit and any other key to go again: ");
+            print_str("\n\rPress 'q' to quit: ");
             answer = USART_Receive();
             USART_Transmit(answer);
-
         }while(answer != 'q');
     }
     
@@ -237,28 +262,41 @@ int main(void)
 
 
 
+
+// local function for taking user input to specify a block
+// number. If nothing is entered then the block number is 0.
 uint32_t enterBlockNumber()
 {
     uint8_t x;
     uint8_t c;
-    uint32_t sector = 0;
+    uint32_t blockNumber = 0;
 
-    //print_str("Specify data block (data block = 512 bytes) and press enter\n\r");
     c = USART_Receive();
     
     while(c!='\r')
     {
-        x = c - '0';
-        sector = sector*10;
-        sector += x;
-        print_str("\r");
-        print_dec(sector);
-        c = USART_Receive();
-        if(sector >= 4194304)
+        if( (c >= '0') && (c <= '9') )
         {
-            sector = 0;
-            print_str("sector value is too large.\n\rEnter value < 4194304\n\r");
+            x = c - '0';
+            blockNumber = blockNumber * 10;
+            blockNumber += x;
         }
+        else if ( c == 127) // backspace
+        {
+            print_str("\b ");
+            blockNumber = blockNumber/10;
+        }
+
+        print_str("\r");
+        print_dec(blockNumber);
+        
+        if(blockNumber >= 4194304)
+        {
+            blockNumber = 0;
+            print_str("\n\rblock number is too large.");
+            print_str("\n\rEnter value < 4194304\n\r");
+        }
+        c = USART_Receive();
     }
-    return sector;
+    return blockNumber;
 }
