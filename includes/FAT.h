@@ -58,7 +58,6 @@ typedef struct //FatCurrentDirectory
 } FatCurrentDirectory;
 
 
-
 //FAT Error Flags
 #define SUCCESS             0x00
 #define INVALID_FILE_NAME   0x01
@@ -82,6 +81,12 @@ typedef struct //FatCurrentDirectory
 #define LAST_MODIFIED  0x20
 #define ALL ( CREATION | LAST_ACCESS | LAST_MODIFIED )
 
+
+// INTERFACE ERROR
+// These errors are to be applied by the phyiscal interface.
+#define READ_SECTOR_ERROR       0x01
+#define READ_SECTOR_TIMEOUT     0x02
+#define READ_SECTOR_SUCCESSFUL  0x04
 
 
 /******************************************************************************

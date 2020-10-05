@@ -60,16 +60,17 @@ int main(void)
     if(initResponse==OUT_OF_IDLE) // initialization successful
     {          
         print_str("\n\r");
-        uint32_t bootSectorLocation;
-        bootSectorLocation = fat_FindBootSector();
-        print_str("\n\r boot sector is at block number "); print_dec(bootSectorLocation);
+        //uint32_t bootSectorLocation;
+        //bootSectorLocation = fat_FindBootSector();
+        //print_str("\n\r boot sector is at block number "); print_dec(bootSectorLocation);
         //initialize current working directory to the root directory
         FatCurrentDirectory cwd = {"/","","/","", GetFatRootClus()};
-        uint16_t err = 0;
-        PrintFatCurrentDirectoryContents(&cwd, LONG_NAME);
-        PrintFatError(err);
+        //uint16_t err = 0;
+        //PrintFatCurrentDirectoryContents(&cwd, LONG_NAME|HIDDEN);
+        //PrintFatError(err);
 
-    /*    
+        //print_str("\n\rGetFatRootClus() = "); print_dec(GetFatRootClus());
+        
         int quit = 0;   
         int len = 64;
         char str[len];
@@ -205,7 +206,7 @@ int main(void)
             for (int k = 0; k < 10; k++) UDR0; // ensure USART Data Register is cleared of any remaining garbage bytes.
         
         }while (quit == 0);      
-    */
+    
 
         uint32_t startBlockNumber;
         uint32_t numberOfBlocks;

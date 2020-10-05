@@ -3,7 +3,7 @@
 
 #include <avr/io.h>
 
-void fat_ReadSingleSector( uint32_t address, uint8_t * arr );
+uint8_t fat_ReadSingleSector( uint32_t address, uint8_t * arr );
 
 uint32_t fat_FindBootSector();
 

@@ -119,7 +119,7 @@ uint8_t SetFatCurrentDirectory(
         uint32_t parentDirectoryFirstCluster;
 
         physicalSectorNumber = dataRegionFirstSector + ( (cluster-2) * secPerClus);
-        fat_ReadSingleSector( bytsPerSec * physicalSectorNumber, currentSectorContents);
+        fat_ReadSingleSector( physicalSectorNumber, currentSectorContents);
 
         parentDirectoryFirstCluster = currentSectorContents[53];
         parentDirectoryFirstCluster <<= 8;
@@ -175,7 +175,7 @@ uint8_t SetFatCurrentDirectory(
         {         
             // get currentSectorContents[]
             physicalSectorNumber = clusterSectorNumber + dataRegionFirstSector + ( (cluster - 2) * secPerClus );
-            fat_ReadSingleSector( bytsPerSec * physicalSectorNumber, currentSectorContents );
+            fat_ReadSingleSector( physicalSectorNumber, currentSectorContents );
 
             for(int entry = 0; entry < 512; entry = entry+32)
             {
@@ -251,7 +251,7 @@ uint8_t SetFatCurrentDirectory(
                                 if (clusterSectorNumber >= secPerClus - 1) 
                                     { nextSec = dataRegionFirstSector + ( (pvt_GetNextCluster(cluster) - 2) * secPerClus ); }
                                 else nextSec = 1 + physicalSectorNumber;
-                                fat_ReadSingleSector( bytsPerSec * nextSec, nextSectorContents);
+                                fat_ReadSingleSector( nextSec, nextSectorContents);
 
                                 // short name start position in the next sector
                                 shortNamePosNS = shortNamePosCS - bytsPerSec;
@@ -555,13 +555,10 @@ uint8_t PrintFatCurrentDirectoryContents(
     uint8_t  secPerClus = GetFatSecPerClus();
     uint32_t physicalSectorNumber;  // absolute (phyiscal) sector number
     uint32_t cluster = currentDirectory->FATFirstCluster;
-    uint32_t dataRegionFirstSector = GetFatRsvdSecCnt() + (GetFatNumFATs() * GetFatFATSz32()); // Data Region First Sector 
-    
-    //uint8_t currentSectorContents[bytsPerSec]; 
-    //uint8_t nextSectorContents[bytsPerSec];
+    uint32_t dataRegionFirstSector = fat_FindBootSector() + GetFatRsvdSecCnt() + (GetFatNumFATs() * GetFatFATSz32());
 
-    uint8_t currentSectorContents[512]; 
-    uint8_t nextSectorContents[512];
+    uint8_t currentSectorContents[bytsPerSec]; 
+    uint8_t nextSectorContents[bytsPerSec];
 
     uint16_t shortNamePosCS = 0;   //position of short name in currentSectorContents
     uint16_t shortNamePosNS = 0; //position of short name in nextSectorContents
@@ -595,8 +592,8 @@ uint8_t PrintFatCurrentDirectoryContents(
         {
             // read in next sector's contents into currentSectorContents[] array 
             physicalSectorNumber = clusterSectorNumber + dataRegionFirstSector + ( (cluster - 2) * secPerClus );
-            print_str("\n\rREADING SECTOR");
-            fat_ReadSingleSector( bytsPerSec * physicalSectorNumber, currentSectorContents );
+
+            fat_ReadSingleSector( physicalSectorNumber, currentSectorContents );
 
             for(int entry = 0; entry < bytsPerSec; entry = entry + 32)
             {
@@ -675,7 +672,7 @@ uint8_t PrintFatCurrentDirectoryContents(
                                 nextSec = dataRegionFirstSector + ( (pvt_GetNextCluster(cluster) - 2) * secPerClus );
                             }
                             else nextSec = 1 + physicalSectorNumber;
-                            fat_ReadSingleSector( bytsPerSec * nextSec, nextSectorContents);
+                            fat_ReadSingleSector( nextSec, nextSectorContents);
     
                             // short name position in the next sector
                             shortNamePosNS = shortNamePosCS - bytsPerSec;
@@ -941,7 +938,7 @@ uint8_t PrintFatFileContents(
         for(int clusterSectorNumber = 0; clusterSectorNumber < secPerClus; clusterSectorNumber++)
         {     
             physicalSectorNumber = clusterSectorNumber + dataRegionFirstSector + ( (cluster - 2) * secPerClus );
-            fat_ReadSingleSector( bytsPerSec * physicalSectorNumber, currentSectorContents );
+            fat_ReadSingleSector( physicalSectorNumber, currentSectorContents );
 
             for(int entry = 0; entry < bytsPerSec; entry = entry + 32)
             { 
@@ -1019,7 +1016,7 @@ uint8_t PrintFatFileContents(
                                 else nextSec = 1 + physicalSectorNumber;
 
                                 // read next sector into nextSectorContents
-                                fat_ReadSingleSector( bytsPerSec * nextSec, nextSectorContents);
+                                fat_ReadSingleSector( nextSec, nextSectorContents);
 
                                 // short name position in the next sector
                                 shortNamePosNS = shortNamePosCS - bytsPerSec;
@@ -1526,7 +1523,7 @@ uint32_t pvt_GetNextCluster(uint32_t CurrentCluster)
 
     uint8_t SectorContents[bytsPerSector];
 
-    fat_ReadSingleSector( bytsPerSector * AbsSectorToRead, SectorContents );
+    fat_ReadSingleSector( AbsSectorToRead, SectorContents );
     cluster = SectorContents[FATClusterIndxStartByte+3];
     cluster <<= 8;
     cluster |= SectorContents[FATClusterIndxStartByte+2];
@@ -1757,7 +1754,7 @@ void pvt_PrintFatFile(uint16_t entry, uint8_t *fileSector)
         {
             physicalSectorNumber = clusterSectorNumber + dataRegionFirstSector + ( (cluster - 2) * secPerClus );
 
-            fat_ReadSingleSector( bytsPerSec * physicalSectorNumber, fileSector);
+            fat_ReadSingleSector( physicalSectorNumber, fileSector);
             for(int k = 0; k < bytsPerSec; k++)  
             {
                 if (fileSector[k] == '\n') print_str("\n\r");
