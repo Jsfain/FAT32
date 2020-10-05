@@ -59,7 +59,19 @@ int main(void)
 
     if(initResponse==OUT_OF_IDLE) // initialization successful
     {          
-        print_str("\n\r");
+        print_str("\n\rGetting BPB");
+        BiosParameterBlock bpb;
+        uint16_t err;
+        err = FAT_GetBiosParameterBlock(&bpb);
+
+        print_str("\n\n\r **** BIOS PARAMTERS ****");
+        print_str("\n\r bytesPerSector    = "); print_dec(bpb.bytesPerSector);
+        print_str("\n\r sectorsPerCluster = "); print_dec(bpb.sectorsPerCluster);
+        print_str("\n\r reservedSectorCount = "); print_dec(bpb.reservedSectorCount);
+        print_str("\n\r numberOfFats = "); print_dec(bpb.numberOfFats);
+        print_str("\n\r fatSize32 = "); print_dec(bpb.fatSize32);
+        print_str("\n\r rootCluster = "); print_dec(bpb.rootCluster);
+        
         //uint32_t bootSectorLocation;
         //bootSectorLocation = fat_FindBootSector();
         //print_str("\n\r boot sector is at block number "); print_dec(bootSectorLocation);
@@ -86,7 +98,7 @@ int main(void)
         int noa = 0; //num of arguements
         int loc[len];
         int i = 0;
-        uint16_t err = 0;
+        //uint16_t err = 0;
 
 
         do

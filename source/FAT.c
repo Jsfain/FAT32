@@ -93,7 +93,8 @@ uint16_t SetFatCurrentDirectory(
     print_str("\n\r bytsPerSec = 0x");print_hex(bytsPerSec);
     if( bytsPerSec != SECTOR_LEN ) return INVALID_BYTES_PER_SECTOR;
 
-    uint8_t  secPerClus = GetFatSecPerClus();
+    uint8_t  secPerClus;
+    GetFatSecPerClus(&secPerClus);
     if( (secPerClus != 1 ) && (secPerClus != 2  ) && (secPerClus != 4 ) && 
         (secPerClus != 8 ) && (secPerClus != 16 ) && (secPerClus != 32) && 
         (secPerClus != 64) && (secPerClus != 128) )
@@ -570,7 +571,8 @@ uint16_t PrintFatCurrentDirectoryContents(
     print_str("\n\r bytsPerSec = 0x");print_hex(bytsPerSec);
     if( bytsPerSec != SECTOR_LEN ) return INVALID_BYTES_PER_SECTOR;
 
-    uint8_t  secPerClus = GetFatSecPerClus();
+    uint8_t  secPerClus;
+    GetFatSecPerClus(&secPerClus);
     if( (secPerClus != 1 ) && (secPerClus != 2  ) && (secPerClus != 4 ) && 
         (secPerClus != 8 ) && (secPerClus != 16 ) && (secPerClus != 32) && 
         (secPerClus != 64) && (secPerClus != 128) )
@@ -937,7 +939,8 @@ uint16_t PrintFatFileContents(
     print_str("\n\r bytsPerSec = 0x");print_hex(bytsPerSec);
     if( bytsPerSec != SECTOR_LEN ) return INVALID_BYTES_PER_SECTOR;
 
-    uint8_t  secPerClus = GetFatSecPerClus();
+    uint8_t  secPerClus;
+    GetFatSecPerClus(&secPerClus);
     if( (secPerClus != 1 ) && (secPerClus != 2  ) && (secPerClus != 4 ) && 
         (secPerClus != 8 ) && (secPerClus != 16 ) && (secPerClus != 32) && 
         (secPerClus != 64) && (secPerClus != 128) )
@@ -1349,12 +1352,6 @@ void PrintFatError(uint16_t err)
         case END_OF_FILE:
                 print_str("\n\rEND_OF_FILE");
                 break;
-        case INVALID_BYTES_PER_SECTOR:
-                print_str("\n\rINVALID_BYTES_PER_SECTOR");
-                break;
-        case INVALID_SECTORS_PER_CLUSTER:
-                print_str("\n\rINVALID_SECTORS_PER_CLUSTER");
-                break;
         default:
                 print_str("\n\rUNKNOWN_ERROR");
                 break;
@@ -1364,6 +1361,61 @@ void PrintFatError(uint16_t err)
 
 // **** Boot Sector/BIOS Parameter Block GET Functions ****
 
+
+uint16_t FAT_GetBiosParameterBlock(BiosParameterBlock * bpb)
+{
+    uint8_t BootSector[512];
+    uint32_t bootSectorLocation = fat_FindBootSector();
+    if(bootSectorLocation != 0xFFFFFFFF)
+    {
+        fat_ReadSingleSector(bootSectorLocation,BootSector);
+    }
+    else return BOOT_SECTOR_NOT_FOUND;
+
+    if((BootSector[510] == 0x55) && (BootSector[511]==0xAA))
+    {
+        bpb->bytesPerSector = BootSector[12];
+        bpb->bytesPerSector <<= 8;
+        bpb->bytesPerSector |= BootSector[11];
+        
+        if(bpb->bytesPerSector != 512) return INVALID_BYTES_PER_SECTOR;
+
+        // secPerClus
+        bpb->sectorsPerCluster = BootSector[13];
+
+        if((bpb->sectorsPerCluster != 1 ) && (bpb->sectorsPerCluster != 2  ) &&
+           (bpb->sectorsPerCluster != 4 ) && (bpb->sectorsPerCluster != 8  ) &&
+           (bpb->sectorsPerCluster != 16) && (bpb->sectorsPerCluster != 32 ) &&
+           (bpb->sectorsPerCluster != 64) && (bpb->sectorsPerCluster != 128)) 
+        {
+            return INVALID_SECTORS_PER_CLUSTER;
+        }
+
+        bpb->reservedSectorCount =  BootSector[15];
+        bpb->reservedSectorCount <<= 8;
+        bpb->reservedSectorCount |= BootSector[14];
+
+        bpb->numberOfFats = BootSector[16];
+
+        bpb->fatSize32 =  BootSector[39];
+        bpb->fatSize32 <<= 8;
+        bpb->fatSize32 |= BootSector[38];
+        bpb->fatSize32 <<= 8;
+        bpb->fatSize32 |= BootSector[37];
+        bpb->fatSize32 <<= 8;
+        bpb->fatSize32 |= BootSector[36];
+
+        bpb->rootCluster =  BootSector[47];
+        bpb->rootCluster <<= 8;
+        bpb->rootCluster |= BootSector[46];
+        bpb->rootCluster <<= 8;
+        bpb->rootCluster |= BootSector[45];
+        bpb->rootCluster <<= 8;
+        bpb->rootCluster |= BootSector[44];
+    }
+    else return NOT_BOOT_SECTOR;
+    return BOOT_SECTOR_VALID;
+}
 
 // Gets the number of 'bytes per sector'
 // from the fat boot sector/BPB. (must be 512).
@@ -1395,7 +1447,7 @@ uint16_t GetFatBytsPerSec(uint16_t *bps)
 // Gets the number of 'sectors per cluster' from the 
 // fat boot sector/BPB. Must be a power of 2 [1, 128].
 // Returns the SecPerClus value.
-uint8_t GetFatSecPerClus()
+uint16_t GetFatSecPerClus(uint8_t *spc)
 {
     uint8_t BootSector[512];
     uint32_t bootSectorLocation = fat_FindBootSector();
@@ -1416,7 +1468,8 @@ uint8_t GetFatSecPerClus()
         if(BPS != 512) { return CORRUPT_BOOT_SECTOR; }
 
         // secPerClus
-        return BootSector[13];
+        *spc = BootSector[13];
+        return 1;
     }
     else { return CORRUPT_BOOT_SECTOR; }
 }
@@ -1563,7 +1616,9 @@ uint32_t pvt_GetNextCluster(uint32_t CurrentCluster)
     print_str("\n\r bytsPerSec = 0x");print_hex(bytsPerSec);
     if( bytsPerSec != SECTOR_LEN ) return INVALID_BYTES_PER_SECTOR;
 
-    uint8_t  secPerClus = GetFatSecPerClus();
+    uint8_t  secPerClus;
+    
+    GetFatSecPerClus(&secPerClus);
     if( (secPerClus != 1 ) && (secPerClus != 2  ) && (secPerClus != 4 ) && 
         (secPerClus != 8 ) && (secPerClus != 16 ) && (secPerClus != 32) && 
         (secPerClus != 64) && (secPerClus != 128) )
@@ -1795,15 +1850,18 @@ void pvt_PrintFatFile(uint16_t entry, uint8_t *fileSector)
     //print_str("\n\r bytsPerSec = 0x");print_hex(bytsPerSec);
     //if( bytsPerSec != SECTOR_LEN ) return INVALID_BYTES_PER_SECTOR;
 
-    uint8_t  secPerClus = GetFatSecPerClus();
-    /*
+    uint8_t  secPerClus;
+
+    GetFatSecPerClus(&secPerClus);
+    
     if( (secPerClus != 1 ) && (secPerClus != 2  ) && (secPerClus != 4 ) && 
         (secPerClus != 8 ) && (secPerClus != 16 ) && (secPerClus != 32) && 
         (secPerClus != 64) && (secPerClus != 128) )
     {
-        return INVALID_SECTORS_PER_CLUSTER;
+        //return INVALID_SECTORS_PER_CLUSTER;
+        print_str("\n\r invalid sectors per cluster");
     }
-    */
+    
     
     //uint16_t bytsPerSec = GetFatBytsPerSec();  // Must be 512
     //uint8_t  secPerClus = GetFatSecPerClus();

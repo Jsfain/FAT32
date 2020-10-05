@@ -69,9 +69,7 @@ typedef struct //FatCurrentDirectory
 #define END_OF_FILE                      0x010
 #define END_OF_DIRECTORY                 0x020
 #define CORRUPT_FAT_ENTRY                0x040
-#define CORRUPT_BOOT_SECTOR              0x080
-#define INVALID_BYTES_PER_SECTOR         0x100
-#define INVALID_SECTORS_PER_CLUSTER      0x200
+
 
 
 //ENTRY FLAGS
@@ -90,6 +88,28 @@ typedef struct //FatCurrentDirectory
 #define READ_SECTOR_ERROR       0x01
 #define READ_SECTOR_TIMEOUT     0x02
 #define READ_SECTOR_SUCCESSFUL  0x04
+
+
+// BOOT SECTOR ERROR FLAGS
+#define CORRUPT_BOOT_SECTOR              0x0001
+#define NOT_BOOT_SECTOR                  0x0002
+#define INVALID_BYTES_PER_SECTOR         0x0004
+#define INVALID_SECTORS_PER_CLUSTER      0x0008
+#define BOOT_SECTOR_NOT_FOUND            0x0010
+#define BOOT_SECTOR_VALID                0x0020
+
+
+typedef struct {
+    uint16_t bytesPerSector;
+    uint8_t  sectorsPerCluster;
+    uint16_t reservedSectorCount;
+    uint8_t  numberOfFats;
+    uint32_t fatSize32;
+    uint32_t rootCluster;
+}BiosParameterBlock;
+
+uint16_t FAT_GetBiosParameterBlock(BiosParameterBlock * bpb);
+
 
 
 /******************************************************************************
@@ -180,7 +200,7 @@ uint16_t GetFatBytsPerSec(uint16_t * bps);
  * RETURNS
  * value of SecPerClus
 ******************************************************************************/
-uint8_t  GetFatSecPerClus();
+uint16_t  GetFatSecPerClus(uint8_t *spc);
 
 
 
