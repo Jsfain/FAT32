@@ -58,17 +58,20 @@ typedef struct //FatCurrentDirectory
 } FatCurrentDirectory;
 
 
-//FAT Error Flags
-#define SUCCESS             0x00
-#define INVALID_FILE_NAME   0x01
-#define INVALID_DIR_NAME    0x02
-#define FILE_NOT_FOUND      0x04
-#define DIR_NOT_FOUND       0x08
-#define END_OF_FILE         0x10
-#define END_OF_DIRECTORY    0x20
-#define CORRUPT_FAT_ENTRY   0x40
-#define CORRUPT_BOOT_SECTOR 0x80
+#define SECTOR_LEN 512
 
+//FAT Error Flags
+#define SUCCESS                          0x000
+#define INVALID_FILE_NAME                0x001
+#define INVALID_DIR_NAME                 0x002
+#define FILE_NOT_FOUND                   0x004
+#define DIR_NOT_FOUND                    0x008
+#define END_OF_FILE                      0x010
+#define END_OF_DIRECTORY                 0x020
+#define CORRUPT_FAT_ENTRY                0x040
+#define CORRUPT_BOOT_SECTOR              0x080
+#define INVALID_BYTES_PER_SECTOR         0x100
+#define INVALID_SECTORS_PER_CLUSTER      0x200
 
 
 //ENTRY FLAGS
@@ -104,7 +107,7 @@ typedef struct //FatCurrentDirectory
  * RETURNS 
  * FAT Error Flag. This can be read by passing it to PrintFatError(ErrorFlag).
 ******************************************************************************/
-uint8_t SetFatCurrentDirectory(
+uint16_t SetFatCurrentDirectory(
                 FatCurrentDirectory *currentDirectory, 
                 char *newDirectory);
 
@@ -121,7 +124,7 @@ uint8_t SetFatCurrentDirectory(
  * RETURNS 
  * FAT Error Flag. This can be read by passing it to PrintFatError(ErrorFlag).
 ******************************************************************************/
-uint8_t PrintFatCurrentDirectoryContents(
+uint16_t PrintFatCurrentDirectoryContents(
                 FatCurrentDirectory *currentDirectory, 
                 uint8_t ENTRY_FLAG);
 
@@ -140,7 +143,7 @@ uint8_t PrintFatCurrentDirectoryContents(
  * RETURNS 
  * FAT Error Flag. This can be read by passing it to PrintFatError(ErrorFlag).
 ******************************************************************************/
-uint8_t PrintFatFileContents(
+uint16_t PrintFatFileContents(
                 FatCurrentDirectory *currentDirectory, 
                 char *file);
 
@@ -153,7 +156,7 @@ uint8_t PrintFatFileContents(
  * ARGUMENT
  * err : uin8_t value which is the error to be printed by the function.
 ******************************************************************************/
-void PrintFatError(uint8_t err);
+void PrintFatError(uint16_t err);
 
 
 
@@ -165,7 +168,7 @@ void PrintFatError(uint8_t err);
  * RETURNS
  * value of BytsPerSec
 ******************************************************************************/
-uint16_t GetFatBytsPerSec();
+uint16_t GetFatBytsPerSec(uint16_t * bps);
 
 
 

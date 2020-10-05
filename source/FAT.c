@@ -54,17 +54,17 @@ void pvt_PrintFatFile(uint16_t entry, uint8_t *byte);
 
 // Set currentDirectory to newDirectory if found.
 // Return a Fat Error Flag
-uint8_t SetFatCurrentDirectory(
+uint16_t SetFatCurrentDirectory(
                 FatCurrentDirectory *currentDirectory, 
                 char *newDirectory)
 {
-    uint8_t ndlen = strlen(newDirectory);
+    uint8_t newDirStrLen = strlen(newDirectory);
     
-    // *** SECTION: Verify newDirectory is a legal directory name ***
+    // *** SECTION: Verify newDirectory is a legal directory name
     if ((strcmp(newDirectory,"") == 0) ) return INVALID_DIR_NAME;
     if ( newDirectory[0] == ' ') return INVALID_DIR_NAME;
     
-    for (uint8_t k = 0; k < ndlen; k++)
+    for (uint8_t k = 0; k < newDirStrLen; k++)
     {       
         if( ( newDirectory[k] == 92 /* '\' */) || 
             ( newDirectory[k] == '/' ) ||
@@ -80,7 +80,7 @@ uint8_t SetFatCurrentDirectory(
         }
     }
     uint8_t allSpaces = 1;
-    for (uint8_t k = 0; k < ndlen; k++) 
+    for (uint8_t k = 0; k < newDirStrLen; k++) 
     { 
         if(newDirectory[k] != ' ') {  allSpaces = 0;  break; }
     }
@@ -88,8 +88,20 @@ uint8_t SetFatCurrentDirectory(
     // *** END SECTION: legal name verification ***
 
 
-    uint16_t bytsPerSec = GetFatBytsPerSec(); // Must be 512
+    uint16_t bytsPerSec;
+    GetFatBytsPerSec(&bytsPerSec); // must be 512
+    print_str("\n\r bytsPerSec = 0x");print_hex(bytsPerSec);
+    if( bytsPerSec != SECTOR_LEN ) return INVALID_BYTES_PER_SECTOR;
+
     uint8_t  secPerClus = GetFatSecPerClus();
+    if( (secPerClus != 1 ) && (secPerClus != 2  ) && (secPerClus != 4 ) && 
+        (secPerClus != 8 ) && (secPerClus != 16 ) && (secPerClus != 32) && 
+        (secPerClus != 64) && (secPerClus != 128) )
+    {
+        return INVALID_SECTORS_PER_CLUSTER;
+    }
+
+
     uint32_t physicalSectorNumber;
     uint32_t cluster = currentDirectory->FATFirstCluster;
     uint32_t dataRegionFirstSector = GetFatRsvdSecCnt() + (GetFatNumFATs() * GetFatFATSz32());
@@ -493,7 +505,7 @@ uint8_t SetFatCurrentDirectory(
                         if( !(attributeByte&0x10) );
 
                         // newDirectory is too long for a short name
-                        else if(ndlen > 8);
+                        else if(newDirStrLen > 8);
 
                         else 
                         {                   
@@ -502,8 +514,8 @@ uint8_t SetFatCurrentDirectory(
                             char tempDir[9];
                             strcpy(tempDir,newDirectory);
 
-                            for(int k = 0; k < ndlen; k++)  {  SN[k] = currentSectorContents[k+entry];  }
-                            SN[ndlen] = '\0';
+                            for(int k = 0; k < newDirStrLen; k++)  {  SN[k] = currentSectorContents[k+entry];  }
+                            SN[newDirStrLen] = '\0';
 
                             // if match, then update currentDirectory members
                             if(!strcmp(tempDir,SN)) 
@@ -545,14 +557,29 @@ uint8_t SetFatCurrentDirectory(
 // Prints long and/or short name entries found in the current directory as well
 // as prints the entry's associated fields as specified by FLAG.
 // Returns a Fat Error Flag
-uint8_t PrintFatCurrentDirectoryContents(
+uint16_t PrintFatCurrentDirectoryContents(
                 FatCurrentDirectory *currentDirectory, 
                 uint8_t FLAG)
 {
-    print_str("\n\rCurrent Directory: "); print_str(currentDirectory->longName);
+    print_str("\n\rCurrent Directory: "); 
+    print_str(currentDirectory->longName);
 
-    uint16_t bytsPerSec = GetFatBytsPerSec();  // Must be 512
+
+    uint16_t bytsPerSec;
+    GetFatBytsPerSec(&bytsPerSec); // must be 512
+    print_str("\n\r bytsPerSec = 0x");print_hex(bytsPerSec);
+    if( bytsPerSec != SECTOR_LEN ) return INVALID_BYTES_PER_SECTOR;
+
     uint8_t  secPerClus = GetFatSecPerClus();
+    if( (secPerClus != 1 ) && (secPerClus != 2  ) && (secPerClus != 4 ) && 
+        (secPerClus != 8 ) && (secPerClus != 16 ) && (secPerClus != 32) && 
+        (secPerClus != 64) && (secPerClus != 128) )
+    {
+        return INVALID_SECTORS_PER_CLUSTER;
+    }
+
+    //uint16_t bytsPerSec = GetFatBytsPerSec(); // Must be 512
+    //uint8_t  secPerClus = GetFatSecPerClus();
     uint32_t physicalSectorNumber;  // absolute (phyiscal) sector number
     uint32_t cluster = currentDirectory->FATFirstCluster;
     uint32_t dataRegionFirstSector = fat_FindBootSector() + GetFatRsvdSecCnt() + (GetFatNumFATs() * GetFatFATSz32());
@@ -871,7 +898,7 @@ uint8_t PrintFatCurrentDirectoryContents(
 
 // Prints the contents of file specified by *fileName to the screen.
 // Returns a Fat Error Flag
-uint8_t PrintFatFileContents(
+uint16_t PrintFatFileContents(
                 FatCurrentDirectory *currentDirectory, 
                 char *fileName)
 {
@@ -905,9 +932,21 @@ uint8_t PrintFatFileContents(
     if ( allSpaces == 1 ) return INVALID_FILE_NAME;
     // *** END SECTION: legal name verification ***
 
+    uint16_t bytsPerSec;
+    GetFatBytsPerSec(&bytsPerSec); // must be 512
+    print_str("\n\r bytsPerSec = 0x");print_hex(bytsPerSec);
+    if( bytsPerSec != SECTOR_LEN ) return INVALID_BYTES_PER_SECTOR;
 
-    uint16_t bytsPerSec = GetFatBytsPerSec();  // Must be 512
     uint8_t  secPerClus = GetFatSecPerClus();
+    if( (secPerClus != 1 ) && (secPerClus != 2  ) && (secPerClus != 4 ) && 
+        (secPerClus != 8 ) && (secPerClus != 16 ) && (secPerClus != 32) && 
+        (secPerClus != 64) && (secPerClus != 128) )
+    {
+        return INVALID_SECTORS_PER_CLUSTER;
+    }
+
+    //uint16_t bytsPerSec = GetFatBytsPerSec();  // Must be 512
+    //uint8_t  secPerClus = GetFatSecPerClus();
     uint32_t physicalSectorNumber;  // absolute (phyiscal) sector number
     uint32_t cluster = currentDirectory->FATFirstCluster;
     uint32_t dataRegionFirstSector = GetFatRsvdSecCnt() + (GetFatNumFATs() * GetFatFATSz32()); // Data Region First Sector 
@@ -1282,7 +1321,7 @@ uint8_t PrintFatFileContents(
 
 
 // Prints an error code returned by a fat function.
-void PrintFatError(uint8_t err)
+void PrintFatError(uint16_t err)
 {  
     switch(err)
     {
@@ -1290,28 +1329,34 @@ void PrintFatError(uint8_t err)
                 print_str("\n\rSUCCESS");
                 break;
         case END_OF_DIRECTORY:
-                print_str("\n\rEND OF DIRECTORY");
+                print_str("\n\rEND_OF_DIRECTORY");
                 break;
         case INVALID_FILE_NAME:
-                print_str("\n\rINVALID FILE NAME");
+                print_str("\n\rINVALID_FILE_NAME");
                 break;
         case FILE_NOT_FOUND:
-                print_str("\n\rFILE NOT FOUND");
+                print_str("\n\rFILE_NOT_FOUND");
                 break;
         case INVALID_DIR_NAME:
-                print_str("\n\rINVALID DIR NAME");
+                print_str("\n\rINVALID_DIR_NAME");
                 break;
         case DIR_NOT_FOUND:
-                print_str("\n\rDIR NOT FOUND");
+                print_str("\n\rDIR_NOT_FOUND");
                 break;
         case CORRUPT_FAT_ENTRY:
-                print_str("\n\rCORRUPT SECTOR");
+                print_str("\n\rCORRUPT_SECTOR");
                 break;
         case END_OF_FILE:
-                print_str("\n\rEND OF FILE");
+                print_str("\n\rEND_OF_FILE");
+                break;
+        case INVALID_BYTES_PER_SECTOR:
+                print_str("\n\rINVALID_BYTES_PER_SECTOR");
+                break;
+        case INVALID_SECTORS_PER_CLUSTER:
+                print_str("\n\rINVALID_SECTORS_PER_CLUSTER");
                 break;
         default:
-                print_str("\n\rUNKNOWN ERROR");
+                print_str("\n\rUNKNOWN_ERROR");
                 break;
     }
 }
@@ -1323,7 +1368,7 @@ void PrintFatError(uint8_t err)
 // Gets the number of 'bytes per sector'
 // from the fat boot sector/BPB. (must be 512).
 // Returns the BytsPerSector value.
-uint16_t GetFatBytsPerSec()
+uint16_t GetFatBytsPerSec(uint16_t *bps)
 {
     uint8_t BootSector[512];
     uint32_t bootSectorLocation = fat_FindBootSector();
@@ -1336,12 +1381,12 @@ uint16_t GetFatBytsPerSec()
     //confirm boot signature is present
     if((BootSector[510] == 0x55) && (BootSector[511]==0xAA))
     {
-        uint16_t BPS = BootSector[12];
-                 BPS <<= 8;
-                 BPS |= BootSector[11];
+        *bps = BootSector[12];
+        *bps <<= 8;
+        *bps |= BootSector[11];
         
-        if(BPS != 512) return CORRUPT_BOOT_SECTOR;
-        return BPS;
+        if(*bps != 512) return CORRUPT_BOOT_SECTOR;
+        return *bps;
     }
     return CORRUPT_BOOT_SECTOR;
 }
@@ -1511,9 +1556,23 @@ uint32_t GetFatRootClus()
 uint32_t pvt_GetNextCluster(uint32_t CurrentCluster)
 {
     uint32_t FATStartSector = GetFatRsvdSecCnt();
-    uint16_t bytsPerSector = GetFatBytsPerSec();
+    //uint16_t bytsPerSector = GetFatBytsPerSec();
+
+    uint16_t bytsPerSec;
+    GetFatBytsPerSec(&bytsPerSec); // must be 512
+    print_str("\n\r bytsPerSec = 0x");print_hex(bytsPerSec);
+    if( bytsPerSec != SECTOR_LEN ) return INVALID_BYTES_PER_SECTOR;
+
+    uint8_t  secPerClus = GetFatSecPerClus();
+    if( (secPerClus != 1 ) && (secPerClus != 2  ) && (secPerClus != 4 ) && 
+        (secPerClus != 8 ) && (secPerClus != 16 ) && (secPerClus != 32) && 
+        (secPerClus != 64) && (secPerClus != 128) )
+    {
+        return INVALID_SECTORS_PER_CLUSTER;
+    }
+
     uint8_t  BytesPerClusterIndx = 4;
-    uint16_t IndxdClustersPerFATSector = bytsPerSector/BytesPerClusterIndx; // = 128
+    uint16_t IndxdClustersPerFATSector = bytsPerSec/BytesPerClusterIndx; // = 128
 
     uint32_t FATClusterIndxSector = CurrentCluster/IndxdClustersPerFATSector;
     uint32_t FATClusterIndxStartByte = 4 * (CurrentCluster%IndxdClustersPerFATSector);
@@ -1521,7 +1580,7 @@ uint32_t pvt_GetNextCluster(uint32_t CurrentCluster)
 
     uint32_t AbsSectorToRead = FATClusterIndxSector + FATStartSector;
 
-    uint8_t SectorContents[bytsPerSector];
+    uint8_t SectorContents[bytsPerSec];
 
     fat_ReadSingleSector( AbsSectorToRead, SectorContents );
     cluster = SectorContents[FATClusterIndxStartByte+3];
@@ -1731,8 +1790,23 @@ void pvt_PrintShortNameAndType(uint8_t *byte, uint16_t entry, uint8_t attr)
 *******************************************************************************/
 void pvt_PrintFatFile(uint16_t entry, uint8_t *fileSector)
 {
-    uint16_t bytsPerSec = GetFatBytsPerSec();  // Must be 512
+    uint16_t bytsPerSec;
+    GetFatBytsPerSec(&bytsPerSec); // must be 512
+    //print_str("\n\r bytsPerSec = 0x");print_hex(bytsPerSec);
+    //if( bytsPerSec != SECTOR_LEN ) return INVALID_BYTES_PER_SECTOR;
+
     uint8_t  secPerClus = GetFatSecPerClus();
+    /*
+    if( (secPerClus != 1 ) && (secPerClus != 2  ) && (secPerClus != 4 ) && 
+        (secPerClus != 8 ) && (secPerClus != 16 ) && (secPerClus != 32) && 
+        (secPerClus != 64) && (secPerClus != 128) )
+    {
+        return INVALID_SECTORS_PER_CLUSTER;
+    }
+    */
+    
+    //uint16_t bytsPerSec = GetFatBytsPerSec();  // Must be 512
+    //uint8_t  secPerClus = GetFatSecPerClus();
     uint32_t physicalSectorNumber;  // absolute (phyiscal) sector number
     uint32_t dataRegionFirstSector = GetFatRsvdSecCnt() + (GetFatNumFATs() * GetFatFATSz32()); // Data Region First Sector 
     uint32_t cluster;
