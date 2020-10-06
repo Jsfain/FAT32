@@ -99,13 +99,18 @@ typedef struct //FatCurrentDirectory
 #define BOOT_SECTOR_VALID                0x0020
 
 
-typedef struct {
+typedef struct BiosParameterBlock{
     uint16_t bytesPerSector;
     uint8_t  sectorsPerCluster;
     uint16_t reservedSectorCount;
     uint8_t  numberOfFats;
     uint32_t fatSize32;
     uint32_t rootCluster;
+
+    uint32_t bootSectorAddress;
+    uint32_t dataRegionFirstSector;
+
+
 }BiosParameterBlock;
 
 uint16_t FAT_GetBiosParameterBlock(BiosParameterBlock * bpb);
@@ -129,7 +134,8 @@ uint16_t FAT_GetBiosParameterBlock(BiosParameterBlock * bpb);
 ******************************************************************************/
 uint16_t SetFatCurrentDirectory(
                 FatCurrentDirectory *currentDirectory, 
-                char *newDirectory);
+                char *newDirectory,
+                BiosParameterBlock * bpb);
 
 
 
@@ -146,7 +152,8 @@ uint16_t SetFatCurrentDirectory(
 ******************************************************************************/
 uint16_t PrintFatCurrentDirectoryContents(
                 FatCurrentDirectory *currentDirectory, 
-                uint8_t ENTRY_FLAG);
+                uint8_t ENTRY_FLAG, 
+                BiosParameterBlock * bpb);
 
 
 
@@ -164,8 +171,9 @@ uint16_t PrintFatCurrentDirectoryContents(
  * FAT Error Flag. This can be read by passing it to PrintFatError(ErrorFlag).
 ******************************************************************************/
 uint16_t PrintFatFileContents(
-                FatCurrentDirectory *currentDirectory, 
-                char *file);
+                FatCurrentDirectory * currentDirectory, 
+                char * file,
+                BiosParameterBlock * bpb);
 
 
 
@@ -178,76 +186,5 @@ uint16_t PrintFatFileContents(
 ******************************************************************************/
 void PrintFatError(uint16_t err);
 
-
-
-/******************************************************************************
- * DESRIPTION
- * Gets the number of Bytes Per FAT Sector from the BytsPerSec field in the 
- * FAT boot sector/BPB.
- * 
- * RETURNS
- * value of BytsPerSec
-******************************************************************************/
-uint16_t GetFatBytsPerSec(uint16_t * bps);
-
-
-
-/******************************************************************************
- * DESRIPTION
- * Gets the number of Sectors Per FAT Cluster from the SecPerClus field in the 
- * FAT boot sector/BPB.
- * 
- * RETURNS
- * value of SecPerClus
-******************************************************************************/
-uint16_t  GetFatSecPerClus(uint8_t *spc);
-
-
-
-/******************************************************************************
- * DESRIPTION
- * Gets the number of physical sectors before the first FAT on the volume from 
- * the RsvdSecCnt field in the FAT boot sector/BPB.
- * 
- * RETURNS
- * value of RsvdSecCnt
-******************************************************************************/
-uint16_t GetFatRsvdSecCnt();
-
-
-
-
-/******************************************************************************
- * DESRIPTION
- * Gets the number of FATs from the NumFATs field in the FAT boot sector/BPB.
- * 
- * RETURNS
- * value of NumFATs
-******************************************************************************/
-uint8_t  GetFatNumFATs();
-
-
-
-/******************************************************************************
- * DESRIPTION
- * Gets the number of sectors in a single FAT from the FATSz32 field in the 
- * FAT boot sector/BPB.
- * 
- * RETURNS
- * value of FATSz32
-******************************************************************************/
-uint32_t GetFatFATSz32();
-
-
-
-/******************************************************************************
- * DESRIPTION
- * Gets the FAT index of the Root Directory's first cluster from from the 
- * RootClus field in the FAT boot sector/BPB.
- * 
- * RETURNS
- * value of RootClus
-******************************************************************************/
-uint32_t GetFatRootClus();
 
 #endif //FAT_H

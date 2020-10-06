@@ -71,12 +71,15 @@ int main(void)
         print_str("\n\r numberOfFats = "); print_dec(bpb.numberOfFats);
         print_str("\n\r fatSize32 = "); print_dec(bpb.fatSize32);
         print_str("\n\r rootCluster = "); print_dec(bpb.rootCluster);
-        
+
+        print_str("\n\r bootSectorAddress = "); print_dec(bpb.bootSectorAddress);
+        print_str("\n\r dataRegionFirstSector = "); print_dec(bpb.dataRegionFirstSector);
+
         //uint32_t bootSectorLocation;
         //bootSectorLocation = fat_FindBootSector();
         //print_str("\n\r boot sector is at block number "); print_dec(bootSectorLocation);
         //initialize current working directory to the root directory
-        FatCurrentDirectory cwd = {"/","","/","", GetFatRootClus()};
+        FatCurrentDirectory cwd = {"/","","/","", bpb.rootCluster};
         //uint16_t err = 0;
         //PrintFatCurrentDirectoryContents(&cwd, LONG_NAME|HIDDEN);
         //PrintFatError(err);
@@ -155,7 +158,7 @@ int main(void)
             {
                 if(!strcmp(c,"cd"))
                 {   
-                    err = SetFatCurrentDirectory(&cwd, a);
+                    err = SetFatCurrentDirectory(&cwd, a, &bpb);
                     PrintFatError(err);
                 }
                 
@@ -191,13 +194,13 @@ int main(void)
                     }
                     
                     if((flag&SHORT_NAME) != SHORT_NAME) { flag |= LONG_NAME; } //long name is default
-                    err = PrintFatCurrentDirectoryContents(&cwd, flag);
+                    err = PrintFatCurrentDirectoryContents(&cwd, flag, &bpb);
                     PrintFatError(err);
                 }
                 
                 else if (!strcmp(c,"open")) 
                 { 
-                    err = PrintFatFileContents(&cwd,a);
+                    err = PrintFatFileContents(&cwd,a,&bpb);
                     PrintFatError(err);
                 }
                 else if (!strcmp(c,"cwd"))
