@@ -59,6 +59,15 @@ typedef struct //FatCurrentDirectory
 
 
 #define SECTOR_LEN 512
+#define ENTRY_LEN  32
+
+// FAT specific flags / tokens
+#define LONG_NAME_ATTR_MASK 0x0F
+#define LONG_NAME_LAST_ENTRY_FLAG 0x40
+#define LONG_NAME_ORDINAL_MASK    0x3F
+#define LONG_NAME_MAX_LEN    64
+#define DIRECTORY_ENTRY_FLAG 0x10
+#define END_OF_CLUSTER 0x0FFFFFFF
 
 //FAT Error Flags
 #define SUCCESS                          0x000
