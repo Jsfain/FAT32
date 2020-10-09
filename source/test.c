@@ -55,7 +55,8 @@ int main(void)
             break;
         }
     }
-
+    int t = -1;
+    print_str("\n\n\r integer test"); print_dec(t);
 
     if(initResponse==OUT_OF_IDLE) // initialization successful
     {          
@@ -63,7 +64,7 @@ int main(void)
         BiosParameterBlock bpb;
         uint16_t err;
         err = FAT_GetBiosParameterBlock(&bpb);
-
+      /*
         print_str("\n\n\r **** BIOS PARAMTERS ****");
         print_str("\n\r bytesPerSector    = "); print_dec(bpb.bytesPerSector);
         print_str("\n\r sectorsPerCluster = "); print_dec(bpb.sectorsPerCluster);
@@ -74,7 +75,7 @@ int main(void)
 
         print_str("\n\r bootSectorAddress = "); print_dec(bpb.bootSectorAddress);
         print_str("\n\r dataRegionFirstSector = "); print_dec(bpb.dataRegionFirstSector);
-
+      */
         //uint32_t bootSectorLocation;
         //bootSectorLocation = fat_FindBootSector();
         //print_str("\n\r boot sector is at block number "); print_dec(bootSectorLocation);
