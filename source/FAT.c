@@ -30,6 +30,9 @@
 uint32_t 
 pvt_GetNextCluster (uint32_t currentCluster, BiosParameterBlock * bpb);
 
+uint8_t
+pvt_CheckIllegalName (char * fileName);
+
 void 
 pvt_PrintEntryFields (uint8_t *byte, uint16_t entry, uint8_t entryFilter);
 
@@ -55,7 +58,9 @@ FAT_SetCurrentDirectory (FatCurrentDirectory * currentDirectory, char * newDirec
 {
   uint8_t newDirStrLen = strlen (newDirectoryStr);
     
+  if ( pvt_CheckIllegalName(newDirectoryStr) ) return INVALID_DIR_NAME;
   // *** BEGIN: Legal name verification
+  /*
   char illegalCharacters[] = {'\\','/',':','*','?','"','<','>','|'};
 
   if ((strcmp (newDirectoryStr, "") == 0)) return INVALID_DIR_NAME;
@@ -70,7 +75,7 @@ FAT_SetCurrentDirectory (FatCurrentDirectory * currentDirectory, char * newDirec
             return INVALID_DIR_NAME;
         }
     }
-
+  */
   /*
    for (uint8_t k = 0; k < newDirStrLen; k++)
     {      
@@ -82,7 +87,7 @@ FAT_SetCurrentDirectory (FatCurrentDirectory * currentDirectory, char * newDirec
         }
     }
     */
-
+  /*
   uint8_t allSpacesFlag = 1;
   for (uint8_t k = 0; k < newDirStrLen; k++)  
     {
@@ -93,6 +98,7 @@ FAT_SetCurrentDirectory (FatCurrentDirectory * currentDirectory, char * newDirec
         }
     }  
   if ( allSpacesFlag == 1 ) return INVALID_DIR_NAME;
+  */
   // *** END: Legal name verification
 
   // *** BEGIN: define variables
@@ -1458,6 +1464,39 @@ FAT_GetBiosParameterBlock (BiosParameterBlock * bpb)
  *                                          "PRIVATE" FUNCTION DEFINITIONS
 ***********************************************************************************************************************
 */
+
+
+
+uint8_t
+pvt_CheckIllegalName (char * nameStr)
+{
+    if ((strcmp (nameStr, "") == 0)) return 1;
+    if (nameStr[0] == ' ') return 1;
+
+    
+    char illegalCharacters[] = {'\\','/',':','*','?','"','<','>','|'};
+    for (uint8_t k = 0; k < strlen (nameStr); k++)
+      {       
+        for (uint8_t j = 0; j < 9; j++)
+          {
+            if (nameStr[k] == illegalCharacters[j])
+              return 1;
+          }
+      }
+
+    //uint8_t allSpacesFlag = 1;
+    for (uint8_t k = 0; k < strlen (nameStr); k++)  
+      {
+        if (nameStr[k] != ' ') 
+          { 
+            return 1;
+            //allSpacesFlag = 0;  
+            //break; 
+          }
+      }  
+  //if ( allSpacesFlag == 1 ) return INVALID_DIR_NAME;
+    return 0;
+}
 
 
 /*
