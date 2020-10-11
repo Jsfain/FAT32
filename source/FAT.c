@@ -56,10 +56,24 @@ FAT_SetCurrentDirectory (FatCurrentDirectory * currentDirectory, char * newDirec
   uint8_t newDirStrLen = strlen (newDirectoryStr);
     
   // *** BEGIN: Legal name verification
+  char illegalCharacters[] = {'\\','/',':','*','?','"','<','>','|'};
+
   if ((strcmp (newDirectoryStr, "") == 0)) return INVALID_DIR_NAME;
   if (newDirectoryStr[0] == ' ') return INVALID_DIR_NAME;
+
+
   for (uint8_t k = 0; k < newDirStrLen; k++)
     {       
+      for (uint8_t j = 0; j < 9; j++)
+        {
+          if (newDirectoryStr[k] == illegalCharacters[j])
+            return INVALID_DIR_NAME;
+        }
+    }
+
+  /*
+   for (uint8_t k = 0; k < newDirStrLen; k++)
+    {      
       if ((    newDirectoryStr[k] == '\\') || (newDirectoryStr[k] == '/') || (newDirectoryStr[k] == ':') 
            || (newDirectoryStr[k] == '*')  || (newDirectoryStr[k] == '?') || (newDirectoryStr[k] == '"')
            || (newDirectoryStr[k] == '<')  || (newDirectoryStr[k] == '>') || (newDirectoryStr[k] == '|'))
@@ -67,6 +81,8 @@ FAT_SetCurrentDirectory (FatCurrentDirectory * currentDirectory, char * newDirec
           return INVALID_DIR_NAME;
         }
     }
+    */
+
   uint8_t allSpacesFlag = 1;
   for (uint8_t k = 0; k < newDirStrLen; k++)  
     {
@@ -1363,9 +1379,9 @@ FAT_GetBiosParameterBlock (BiosParameterBlock * bpb)
     {
       fat_ReadSingleSector (bpb->bootSectorAddress, BootSector);
     }
-  else return 
+  else
     {
-      BOOT_SECTOR_NOT_FOUND;
+      return BOOT_SECTOR_NOT_FOUND;
     }
 
   // last two bytes of Boot Sector should be signature bytes.
