@@ -145,7 +145,7 @@ FAT_SetCurrentDirectory (FatCurrentDirectory * currentDirectory, char * newDirec
 ***********************************************************************************************************************
 */
 uint16_t 
-PrintFatCurrentDirectoryContents (FatCurrentDirectory *currentDirectory, uint8_t entryFilterFlag, BiosParameterBlock * bpb);
+FAT_PrintCurrentDirectory (FatCurrentDirectory *currentDirectory, uint8_t entryFilterFlag, BiosParameterBlock * bpb);
 
 
 
@@ -165,7 +165,7 @@ PrintFatCurrentDirectoryContents (FatCurrentDirectory *currentDirectory, uint8_t
 ***********************************************************************************************************************
 */
 uint16_t 
-PrintFatFileContents (FatCurrentDirectory * currentDirectory, char * file, BiosParameterBlock * bpb);
+FAT_PrintFile (FatCurrentDirectory * currentDirectory, char * file, BiosParameterBlock * bpb);
 
 
 

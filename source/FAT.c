@@ -599,9 +599,7 @@ FAT_SetCurrentDirectory (FatCurrentDirectory * currentDirectory, char * newDirec
 // as prints the entry's associated fields as specified by entryFilter.
 // Returns a Fat Error Flag
 uint16_t 
-PrintFatCurrentDirectoryContents (FatCurrentDirectory * currentDirectory, 
-                                  uint8_t entryFilter, 
-                                  BiosParameterBlock * bpb)
+FAT_PrintCurrentDirectory (FatCurrentDirectory * currentDirectory, uint8_t entryFilter, BiosParameterBlock * bpb)
 {
   uint32_t absoluteSectorNumber;
   uint32_t cluster = currentDirectory->FATFirstCluster;
@@ -915,9 +913,7 @@ PrintFatCurrentDirectoryContents (FatCurrentDirectory * currentDirectory,
 // Prints the contents of file specified by *fileNameStr to the screen.
 // Returns a Fat Error Flag
 uint16_t 
-PrintFatFileContents (FatCurrentDirectory * currentDirectory, 
-                      char * fileNameStr, 
-                      BiosParameterBlock * bpb)
+FAT_PrintFile (FatCurrentDirectory * currentDirectory, char * fileNameStr, BiosParameterBlock * bpb)
 {
   uint8_t fileNameStrLen = strlen(fileNameStr);
 
