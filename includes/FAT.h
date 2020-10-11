@@ -73,6 +73,7 @@
 #define READ_SECTOR_TIMEOUT     0x02
 #define READ_SECTOR_SUCCESSFUL  0x04
 
+
 // Struct to hold certain parameters of the Boot Sector / BIOS Parameter Block as well as some calculated values
 typedef struct
 {
@@ -179,7 +180,7 @@ FAT_PrintFile (FatCurrentDirectory * currentDirectory, char * file, BiosParamete
 ***********************************************************************************************************************
 */
 void 
-PrintFatError(uint16_t err);
+FAT_PrintError(uint16_t err);
 
 
 

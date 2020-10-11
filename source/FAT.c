@@ -1314,7 +1314,7 @@ FAT_PrintFile (FatCurrentDirectory * currentDirectory, char * fileNameStr, BiosP
 
 // Prints an error code returned by a fat function.
 void 
-PrintFatError (uint16_t err)
+FAT_PrintError (uint16_t err)
 {  
   switch(err)
   {
@@ -1356,75 +1356,87 @@ uint16_t
 FAT_GetBiosParameterBlock (BiosParameterBlock * bpb)
 {
   uint8_t BootSector[SECTOR_LEN];
+
   bpb->bootSectorAddress = fat_FindBootSector();
-  if(bpb->bootSectorAddress != 0xFFFFFFFF)
-  {
-    fat_ReadSingleSector(bpb->bootSectorAddress,BootSector);
-  }
-  else return BOOT_SECTOR_NOT_FOUND;
-
-  // last two bytes of Boot Sector should be signature bytes.
-  if((BootSector[SECTOR_LEN - 2] == 0x55) && (BootSector[SECTOR_LEN - 1] == 0xAA))
-  {
-    bpb->bytesPerSector = BootSector[12];
-    bpb->bytesPerSector <<= 8;
-    bpb->bytesPerSector |= BootSector[11];
-    
-    if(bpb->bytesPerSector != SECTOR_LEN) return INVALID_BYTES_PER_SECTOR;
-
-    // secPerClus
-    bpb->sectorsPerCluster = BootSector[13];
-
-    if((bpb->sectorsPerCluster != 1 ) && (bpb->sectorsPerCluster != 2  ) &&
-       (bpb->sectorsPerCluster != 4 ) && (bpb->sectorsPerCluster != 8  ) &&
-       (bpb->sectorsPerCluster != 16) && (bpb->sectorsPerCluster != 32 ) &&
-       (bpb->sectorsPerCluster != 64) && (bpb->sectorsPerCluster != 128)) 
+  
+  if (bpb->bootSectorAddress != 0xFFFFFFFF)
     {
-      return INVALID_SECTORS_PER_CLUSTER;
+      fat_ReadSingleSector (bpb->bootSectorAddress, BootSector);
+    }
+  else return 
+    {
+      BOOT_SECTOR_NOT_FOUND;
     }
 
-    bpb->reservedSectorCount = BootSector[15];
-    bpb->reservedSectorCount <<= 8;
-    bpb->reservedSectorCount |= BootSector[14];
+  // last two bytes of Boot Sector should be signature bytes.
+  if ((BootSector[SECTOR_LEN - 2] == 0x55) && (BootSector[SECTOR_LEN - 1] == 0xAA))
+    {
+      bpb->bytesPerSector = BootSector[12];
+      bpb->bytesPerSector <<= 8;
+      bpb->bytesPerSector |= BootSector[11];
+      
+      if (bpb->bytesPerSector != SECTOR_LEN) 
+        {
+          return INVALID_BYTES_PER_SECTOR;
+        }
 
-    bpb->numberOfFats = BootSector[16];
+      // secPerClus
+      bpb->sectorsPerCluster = BootSector[13];
 
-    bpb->fatSize32 =  BootSector[39];
-    bpb->fatSize32 <<= 8;
-    bpb->fatSize32 |= BootSector[38];
-    bpb->fatSize32 <<= 8;
-    bpb->fatSize32 |= BootSector[37];
-    bpb->fatSize32 <<= 8;
-    bpb->fatSize32 |= BootSector[36];
+      if ((    bpb->sectorsPerCluster != 1 ) && (bpb->sectorsPerCluster != 2  ) && (bpb->sectorsPerCluster != 4 )
+           && (bpb->sectorsPerCluster != 8 ) && (bpb->sectorsPerCluster != 16 ) && (bpb->sectorsPerCluster != 32)
+           && (bpb->sectorsPerCluster != 64) && (bpb->sectorsPerCluster != 128))
+        {
+          return INVALID_SECTORS_PER_CLUSTER;
+        }
 
-    bpb->rootCluster =  BootSector[47];
-    bpb->rootCluster <<= 8;
-    bpb->rootCluster |= BootSector[46];
-    bpb->rootCluster <<= 8;
-    bpb->rootCluster |= BootSector[45];
-    bpb->rootCluster <<= 8;
-    bpb->rootCluster |= BootSector[44];
+      bpb->reservedSectorCount = BootSector[15];
+      bpb->reservedSectorCount <<= 8;
+      bpb->reservedSectorCount |= BootSector[14];
 
-    
-    bpb->dataRegionFirstSector = bpb->bootSectorAddress + 
-                                 bpb->reservedSectorCount + 
-                                 (bpb->numberOfFats*bpb->fatSize32);
-  }
-  else return NOT_BOOT_SECTOR;
+      bpb->numberOfFats = BootSector[16];
+
+      bpb->fatSize32 =  BootSector[39];
+      bpb->fatSize32 <<= 8;
+      bpb->fatSize32 |= BootSector[38];
+      bpb->fatSize32 <<= 8;
+      bpb->fatSize32 |= BootSector[37];
+      bpb->fatSize32 <<= 8;
+      bpb->fatSize32 |= BootSector[36];
+
+      bpb->rootCluster =  BootSector[47];
+      bpb->rootCluster <<= 8;
+      bpb->rootCluster |= BootSector[46];
+      bpb->rootCluster <<= 8;
+      bpb->rootCluster |= BootSector[45];
+      bpb->rootCluster <<= 8;
+      bpb->rootCluster |= BootSector[44];
+
+      
+      bpb->dataRegionFirstSector = bpb->bootSectorAddress + bpb->reservedSectorCount + (bpb->numberOfFats * bpb->fatSize32);
+    }
+  else 
+    {
+      return NOT_BOOT_SECTOR;
+    }
+
   return BOOT_SECTOR_VALID;
 }
 
 
 
-/******************************************************************************
- *                        "PRIVATE" FUNCTION DEFINITIONS
-******************************************************************************/
+/*
+***********************************************************************************************************************
+ *                                          "PRIVATE" FUNCTION DEFINITIONS
+***********************************************************************************************************************
+*/
 
 
-
-/******************************************************************************
- * DESCRIPTION
- * Used by the fat functions to get the next cluster in a directory or file.
+/*
+***********************************************************************************************************************
+ *                                           (PRIVATE) GET NEXT CLUSTER
+ *
+ * DESCRIPTION : Used by the fat functions to get the location of next cluster in a directory or file from the FAT.
  * 
  * ARGUMENTS 
  * (1) *byte : pointer to the current directory sector loaded in memory.
@@ -1434,7 +1446,8 @@ FAT_GetBiosParameterBlock (BiosParameterBlock * bpb)
  * RETURNS
  * FAT cluster index pointed to by the current cluster. 
  * If 0xFFFFFFFF then End Of File / Directory
-******************************************************************************/
+***********************************************************************************************************************
+*/
 uint32_t 
 pvt_GetNextCluster (uint32_t currentCluster, BiosParameterBlock * bpb)
 {
@@ -1445,11 +1458,12 @@ pvt_GetNextCluster (uint32_t currentCluster, BiosParameterBlock * bpb)
   uint32_t clusterIndexStartByte = 4 * (currentCluster % numberOfIndexedClustersPerSectorOfFat);
   uint32_t cluster = 0;
 
-  uint32_t FatSectorToRead = clusterIndex + bpb->reservedSectorCount;
+  uint32_t fatSectorToRead = clusterIndex + bpb->reservedSectorCount;
 
   uint8_t SectorContents[bpb->bytesPerSector];
 
-  fat_ReadSingleSector( FatSectorToRead, SectorContents );
+  fat_ReadSingleSector (fatSectorToRead, SectorContents);
+
   cluster = SectorContents[clusterIndexStartByte+3];
   cluster <<= 8;
   cluster |= SectorContents[clusterIndexStartByte+2];
@@ -1482,34 +1496,34 @@ pvt_PrintEntryFields (uint8_t *sector, uint16_t entry, uint8_t entryFilter)
   uint16_t writeDate;
   uint32_t fileSize;
 
-  if(CREATION & entryFilter)
-  {
-    creationTime = sector[entry + 15];
-    creationTime <<= 8;
-    creationTime |= sector[entry + 14];
-    
-    creationDate = sector[entry + 17];
-    creationDate <<= 8;
-    creationDate |= sector[entry + 16];
-  }
+  if (CREATION & entryFilter)
+    {
+      creationTime = sector[entry + 15];
+      creationTime <<= 8;
+      creationTime |= sector[entry + 14];
+      
+      creationDate = sector[entry + 17];
+      creationDate <<= 8;
+      creationDate |= sector[entry + 16];
+    }
 
-  if(LAST_ACCESS & entryFilter)
-  {
-    lastAccessDate = sector[entry + 19];
-    lastAccessDate <<= 8;
-    lastAccessDate |= sector[entry + 18];
-  }
+  if (LAST_ACCESS & entryFilter)
+    {
+      lastAccessDate = sector[entry + 19];
+      lastAccessDate <<= 8;
+      lastAccessDate |= sector[entry + 18];
+    }
 
-  if(LAST_MODIFIED & entryFilter)
-  {
-    writeTime = sector[entry + 23];
-    writeTime <<= 8;
-    writeTime |= sector[entry + 22];
+  if (LAST_MODIFIED & entryFilter)
+    {
+      writeTime = sector[entry + 23];
+      writeTime <<= 8;
+      writeTime |= sector[entry + 22];
 
-    writeDate = sector[entry + 25];
-    writeDate <<= 8;
-    writeDate |= sector[entry + 24];
-  }
+      writeDate = sector[entry + 25];
+      writeDate <<= 8;
+      writeDate |= sector[entry + 24];
+    }
 
   fileSize = sector[entry + 31];
   fileSize <<= 8;
@@ -1519,78 +1533,113 @@ pvt_PrintEntryFields (uint8_t *sector, uint16_t entry, uint8_t entryFilter)
   fileSize <<= 8;
   fileSize |= sector[entry + 28];
 
-  print_str("\n\r");
+  print_str ("\n\r");
 
-  if(CREATION & entryFilter)
-  {
-    print_str("    ");
-    if( ((creationDate & 0x01E0) >> 5) < 10) print_str("0");
-    print_dec( (creationDate & 0x01E0) >> 5 );
-    print_str("/");
-    if( (creationDate & 0x001F) < 10) print_str("0");
-    print_dec(creationDate & 0x001F);
-    print_str("/");
-    print_dec(1980 + ( (creationDate & 0xFE00) >> 9) );
+  if (CREATION & entryFilter)
+    {
+      print_str ("    ");
+      if (((creationDate & 0x01E0) >> 5) < 10) 
+        {
+          print_str ("0");
+        }
+      print_dec ((creationDate & 0x01E0) >> 5);
+      print_str ("/");
+      if ((creationDate & 0x001F) < 10)
+        {
+          print_str ("0");
+        }
+      print_dec (creationDate & 0x001F);
+      print_str ("/");
+      print_dec (1980 + ((creationDate & 0xFE00) >> 9));
 
-    print_str("  ");
-    if( ( (creationTime & 0xF800) >> 11) < 10) print_str("0");
-    print_dec( ((creationTime & 0xF800) >> 11) );
-    print_str(":");
-    if( ( (creationTime & 0x07E0) >> 5) < 10) print_str("0");
-    print_dec( (creationTime & 0x07E0) >> 5);
-    print_str(":");
-    if( (2 * (creationTime & 0x001F)) < 10) print_str("0");
-    print_dec( 2 * (creationTime & 0x001F) );
-  }
+      print_str ("  ");
+      if (((creationTime & 0xF800) >> 11) < 10) 
+        {
+          print_str ("0");
+        }
+      print_dec (((creationTime & 0xF800) >> 11));
+      print_str (":");
+      if (((creationTime & 0x07E0) >> 5) < 10)
+        {
+          print_str ("0");
+        }
+      print_dec ((creationTime & 0x07E0) >> 5);
+      print_str (":");
+      if ((2 * (creationTime & 0x001F)) < 10) 
+        {
+          print_str ("0");
+        }
+      print_dec (2 * (creationTime & 0x001F));
+    }
 
-  if(LAST_ACCESS & entryFilter)
-  {
-    print_str("     ");
-    if( ((lastAccessDate & 0x01E0) >> 5) < 10) print_str("0");
-    print_dec( (lastAccessDate & 0x01E0) >> 5);
-    print_str("/");
-    if( (lastAccessDate & 0x001F) < 10) print_str("0");
-    print_dec(lastAccessDate & 0x001F);
-    print_str("/");
-    print_dec(1980 + ((lastAccessDate & 0xFE00) >> 9) );
-  }
+  if (LAST_ACCESS & entryFilter)
+    {
+      print_str ("     ");
+      if (((lastAccessDate & 0x01E0) >> 5) < 10)
+        {
+          print_str ("0");
+        }
+      print_dec ((lastAccessDate & 0x01E0) >> 5);
+      print_str ("/");
+      if ((lastAccessDate & 0x001F) < 10) 
+        {
+          print_str("0");
+        }
+      print_dec (lastAccessDate & 0x001F);
+      print_str ("/");
+      print_dec (1980 + ((lastAccessDate & 0xFE00) >> 9));
+    }
 
 
-  if(LAST_MODIFIED & entryFilter)
-  {
-    print_str("     ");
-    if( ((writeDate & 0x01E0) >> 5) < 10) print_str("0");
-    print_dec( (writeDate & 0x01E0) >> 5);
-    print_str("/");
-    if( (writeDate & 0x001F) < 10) print_str("0");
-    print_dec(writeDate & 0x001F);
-    print_str("/");
-    print_dec(1980 + ( (writeDate & 0xFE00) >> 9) );
+  if (LAST_MODIFIED & entryFilter)
+    {
+      print_str ("     ");
+      if (((writeDate & 0x01E0) >> 5) < 10) 
+        {
+          print_str ("0");
+        }
+      print_dec ((writeDate & 0x01E0) >> 5);
+      print_str ("/");
+      if ((writeDate & 0x001F) < 10) 
+        {
+          print_str ("0");
+        }
+      print_dec (writeDate & 0x001F);
+      print_str ("/");
+      print_dec (1980 + ((writeDate & 0xFE00) >> 9));
 
-    print_str("  ");
+      print_str ("  ");
 
-    if( ((writeTime & 0xF800) >> 11) < 10) print_str("0");
-    print_dec(((writeTime&0xF800)>>11));
-    print_str(":");
-    
-    if( ((writeTime & 0x07E0) >> 5) < 10) print_str("0");
-    print_dec( (writeTime & 0x07E0) >> 5);
-
-    print_str(":");
-    if( (2 * (writeTime & 0x001F)) < 10) print_str("0");
-    print_dec(2 * (writeTime & 0x001F));
-  }
+      if (((writeTime & 0xF800) >> 11) < 10)
+       {
+         print_str ("0");
+       }
+      print_dec (((writeTime & 0xF800) >> 11));
+      print_str (":");
+      
+      if (((writeTime & 0x07E0) >> 5) < 10) 
+        {
+          print_str ("0");
+        }
+      print_dec ((writeTime & 0x07E0) >> 5);
+      print_str (":");
+      if ((2 * (writeTime & 0x001F)) < 10) 
+        {
+          print_str ("0");
+        }
+      print_dec (2 * (writeTime & 0x001F));
+    }
 
   uint16_t div = 1000;
-  print_str("     ");
-       if( (fileSize / div) >= 10000000) { print_str(" "); print_dec(fileSize / div); }
-  else if( (fileSize / div) >= 1000000) { print_str("  "); print_dec(fileSize / div); }
-  else if( (fileSize / div) >= 100000) { print_str("   "); print_dec(fileSize / div); }
-  else if( (fileSize / div) >= 10000) { print_str("    "); print_dec(fileSize / div); }
-  else if( (fileSize / div) >= 1000) { print_str("     "); print_dec(fileSize / div); }
-  else if( (fileSize / div) >= 100) { print_str("      "); print_dec(fileSize / div); }
-  else if( (fileSize / div) >= 10) { print_str("       "); print_dec(fileSize / div); }
-  else                             { print_str("        "); print_dec(fileSize / div);}        
+  print_str ("     ");
+       if ((fileSize / div) >= 10000000) { print_str(" "); print_dec(fileSize / div); }
+  else if ((fileSize / div) >= 1000000) { print_str("  "); print_dec(fileSize / div); }
+  else if ((fileSize / div) >= 100000) { print_str("   "); print_dec(fileSize / div); }
+  else if ((fileSize / div) >= 10000) { print_str("    "); print_dec(fileSize / div); }
+  else if ((fileSize / div) >= 1000) { print_str("     "); print_dec(fileSize / div); }
+  else if ((fileSize / div) >= 100) { print_str("      "); print_dec(fileSize / div); }
+  else if ((fileSize / div) >= 10) { print_str("       "); print_dec(fileSize / div); }
+  else                             { print_str("        ");print_dec(fileSize / div);}        
   
   print_str("kB");
 
@@ -1614,37 +1663,56 @@ pvt_PrintShortNameAndType (uint8_t *sector, uint16_t entry, uint8_t attr)
   char sn[9];
   char ext[5];
 
-  for(uint8_t k = 0; k < 8; k++) sn[k] = ' ';
+  for (uint8_t k = 0; k < 8; k++)
+    {
+      sn[k] = ' ';
+    }
   sn[8] = '\0';
 
   //print_str(" ENTRY = 0x"); print_hex(entry);
-  if(attr & 0x10)
-  {
-    print_str("    <DIR>    ");
-    for(uint8_t k = 0; k < 8; k++)  sn[k] = sector[entry + k];
-    print_str(sn);
-    print_str("    ");
-  }
-
-  else 
-  {
-    print_str("   <FILE>    ");
-
-    // re-initialize extension character array;
-    strcpy(ext,".   ");
-
-    for(uint8_t k = 1; k < 4; k++) {  ext[k] = sector[entry + 7 + k];  }
-
-    for(uint8_t k = 0; k < 8; k++) 
+  if (attr & 0x10)
     {
-      sn[k] = sector[k + entry];
-      if(sn[k] == ' ') { sn[k] = '\0'; break; };
+      print_str ("    <DIR>    ");
+      for (uint8_t k = 0; k < 8; k++) 
+        {
+          sn[k] = sector[entry + k];
+        }
+      print_str (sn);
+      print_str ("    ");
     }
 
-    print_str(sn);
-    if(strcmp(ext,".   "))  print_str(ext);
-    for( uint8_t p = 0; p < 10 - (strlen(sn) + 2); p++ ) print_str(" ");
-  }
+  else 
+    {
+      print_str ("   <FILE>    ");
+
+      // re-initialize extension character array;
+      strcpy (ext, ".   ");
+
+      for (uint8_t k = 1; k < 4; k++) 
+        {  
+          ext[k] = sector[entry + 7 + k];  
+        }
+
+      for (uint8_t k = 0; k < 8; k++) 
+        {
+          sn[k] = sector[k + entry];
+          if (sn[k] == ' ') 
+            { 
+              sn[k] = '\0'; 
+              break; 
+            };
+        }
+
+      print_str (sn);
+      if (strcmp (ext, ".   ")) 
+        {
+          print_str (ext);
+        }
+      for (uint8_t p = 0; p < 10 - (strlen (sn) + 2); p++ ) 
+        {
+          print_str (" ");
+        }
+    }
 }
 
 
@@ -1659,36 +1727,42 @@ pvt_PrintShortNameAndType (uint8_t *sector, uint16_t entry, uint8_t attr)
  *                   contains the file name entry for the file to be printed.
 *******************************************************************************/
 void 
-pvt_PrintFatFile (uint16_t entry, uint8_t *fileSector, 
-                  BiosParameterBlock * bpb)
-{
-  uint32_t absoluteSectorNumber;
-  uint32_t cluster;
-
-  //get FAT index for file's first cluster
-  cluster =  fileSector[entry + 21];
-  cluster <<= 8;
-  cluster |= fileSector[entry + 20];
-  cluster <<= 8;
-  cluster |= fileSector[entry + 27];
-  cluster <<= 8;
-  cluster |= fileSector[entry + 26];
-  
-  // read in contents of file starting at relative sector 0 in 'cluster' and print contents to the screen.
-  do
+pvt_PrintFatFile (uint16_t entry, uint8_t *fileSector, BiosParameterBlock * bpb)
   {
-    print_str("\n\n\r");   
-    for(uint32_t clusterSectorNumber = 0; clusterSectorNumber < bpb->sectorsPerCluster; clusterSectorNumber++) 
-    {
-      absoluteSectorNumber = clusterSectorNumber + bpb->dataRegionFirstSector + ( (cluster - 2) * bpb->sectorsPerCluster );
+    uint32_t absoluteSectorNumber;
+    uint32_t cluster;
 
-      fat_ReadSingleSector( absoluteSectorNumber, fileSector);
-      for(uint16_t k = 0; k < bpb->bytesPerSector; k++)  
+    //get FAT index for file's first cluster
+    cluster =  fileSector[entry + 21];
+    cluster <<= 8;
+    cluster |= fileSector[entry + 20];
+    cluster <<= 8;
+    cluster |= fileSector[entry + 27];
+    cluster <<= 8;
+    cluster |= fileSector[entry + 26];
+    
+    // read in contents of file starting at relative sector 0 in 'cluster' and print contents to the screen.
+    do
       {
-        if (fileSector[k] == '\n') print_str("\n\r");
-        else if(fileSector[k] == 0);
-        else USART_Transmit(fileSector[k]);
-      }
-    }
-  } while( ( (cluster = pvt_GetNextCluster(cluster,bpb)) != END_OF_CLUSTER ) );
-}
+        print_str("\n\n\r");   
+        for(uint32_t clusterSectorNumber = 0; clusterSectorNumber < bpb->sectorsPerCluster; clusterSectorNumber++) 
+          {
+            absoluteSectorNumber = clusterSectorNumber + bpb->dataRegionFirstSector + ( (cluster - 2) * bpb->sectorsPerCluster );
+
+            fat_ReadSingleSector (absoluteSectorNumber, fileSector);
+            for (uint16_t k = 0; k < bpb->bytesPerSector; k++)  
+              {
+                if (fileSector[k] == '\n') 
+                  {
+                    print_str ("\n\r");
+                  }
+                else if (fileSector[k] == 0);
+                else 
+                  { 
+                    USART_Transmit (fileSector[k]);
+                  }
+              }
+          }
+      } 
+    while( ( (cluster = pvt_GetNextCluster(cluster,bpb)) != END_OF_CLUSTER ) );
+  }

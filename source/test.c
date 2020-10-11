@@ -83,7 +83,7 @@ int main(void)
         FatCurrentDirectory cwd = {"/","","/","", bpb.rootCluster};
         //uint16_t err = 0;
         //FAT_PrintCurrentDirectory(&cwd, LONG_NAME|HIDDEN);
-        //PrintFatError(err);
+        //FAT_PrintError(err);
 
         //print_str("\n\rGetFatRootClus() = "); print_dec(GetFatRootClus());
         
@@ -160,7 +160,7 @@ int main(void)
                 if(!strcmp(c,"cd"))
                 {   
                     err = FAT_SetCurrentDirectory(&cwd, a, &bpb);
-                    PrintFatError(err);
+                    FAT_PrintError(err);
                 }
                 
                 else if (!strcmp(c,"ls"))
@@ -196,13 +196,13 @@ int main(void)
                     
                     if((flag&SHORT_NAME) != SHORT_NAME) { flag |= LONG_NAME; } //long name is default
                     err = FAT_PrintCurrentDirectory(&cwd, flag, &bpb);
-                    PrintFatError(err);
+                    FAT_PrintError(err);
                 }
                 
                 else if (!strcmp(c,"open")) 
                 { 
                     err = FAT_PrintFile(&cwd,a,&bpb);
-                    PrintFatError(err);
+                    FAT_PrintError(err);
                 }
                 else if (!strcmp(c,"cwd"))
                 {
