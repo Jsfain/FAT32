@@ -159,7 +159,7 @@ int main(void)
             {
                 if(!strcmp(c,"cd"))
                 {   
-                    err = SetFatCurrentDirectory(&cwd, a, &bpb);
+                    err = FAT_SetCurrentDirectory(&cwd, a, &bpb);
                     PrintFatError(err);
                 }
                 
