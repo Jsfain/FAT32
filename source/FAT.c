@@ -937,9 +937,20 @@ FAT_PrintFile (FatCurrentDirectory * currentDirectory, char * fileNameStr, BiosP
   if ((strcmp(fileNameStr,"") == 0) ) return INVALID_FILE_NAME;
   if ( fileNameStr[0] == ' ') return INVALID_FILE_NAME;
   
+  char illegalCharacters[] = {'\\','/',':','*','?','"','<','>','|'};
+  for (uint8_t k = 0; k < fileNameStrLen; k++)
+  {       
+    for (uint8_t j = 0; j < 9; j++)
+      {
+        if (fileNameStr[k] == illegalCharacters[j])
+          return INVALID_DIR_NAME;
+      }
+  }
+
+  /*
   for (uint8_t k = 0; k < fileNameStrLen; k++)
   {
-    if( ( fileNameStr[k] == 92 /* '\' */ ) ||
+    if( ( fileNameStr[k] == '\\') ||
         ( fileNameStr[k] == '/' ) ||
         ( fileNameStr[k] == ':' ) ||
         ( fileNameStr[k] == '*' ) ||
@@ -952,6 +963,7 @@ FAT_PrintFile (FatCurrentDirectory * currentDirectory, char * fileNameStr, BiosP
       return INVALID_FILE_NAME;
     }
   }
+  */
 
   uint8_t allSpacesFlag = 1;
   for (uint8_t k = 0; k < fileNameStrLen; k++) 
