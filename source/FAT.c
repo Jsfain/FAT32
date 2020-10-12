@@ -58,7 +58,7 @@ FAT_SetCurrentDirectory (FatCurrentDirectory * currentDirectory, char * newDirec
 {
   uint8_t newDirStrLen = strlen (newDirectoryStr);
     
-  if ( pvt_CheckIllegalName(newDirectoryStr) ) return INVALID_DIR_NAME;
+  if (pvt_CheckIllegalName (newDirectoryStr)) return INVALID_DIR_NAME;
   // *** BEGIN: Legal name verification
   /*
   char illegalCharacters[] = {'\\','/',':','*','?','"','<','>','|'};
@@ -1466,36 +1466,36 @@ FAT_GetBiosParameterBlock (BiosParameterBlock * bpb)
 */
 
 
-
+// returns 1 if the name is an illegal FAT name.
 uint8_t
 pvt_CheckIllegalName (char * nameStr)
 {
-    if ((strcmp (nameStr, "") == 0)) return 1;
-    if (nameStr[0] == ' ') return 1;
-
-    
+    // illegal if name string is empty or begins with a space character 
+    if ((strcmp (nameStr, "") == 0) || (nameStr[0] == ' '))  return 1;
+   
+    // illegal if name string contains an illegal character
     char illegalCharacters[] = {'\\','/',':','*','?','"','<','>','|'};
     for (uint8_t k = 0; k < strlen (nameStr); k++)
       {       
         for (uint8_t j = 0; j < 9; j++)
           {
             if (nameStr[k] == illegalCharacters[j])
+            {
               return 1;
+            }
           }
       }
 
-    //uint8_t allSpacesFlag = 1;
+    // illegal if name string is all space characters.
     for (uint8_t k = 0; k < strlen (nameStr); k++)  
       {
         if (nameStr[k] != ' ') 
           { 
             return 1;
-            //allSpacesFlag = 0;  
-            //break; 
           }
       }  
-  //if ( allSpacesFlag == 1 ) return INVALID_DIR_NAME;
-    return 0;
+
+    return 0; // legal name
 }
 
 
