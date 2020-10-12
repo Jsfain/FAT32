@@ -30,8 +30,11 @@
 uint32_t 
 pvt_GetNextCluster (uint32_t currentCluster, BiosParameterBlock * bpb);
 
-uint8_t
-pvt_CheckIllegalName (char * fileName);
+uint8_t // returns 0 if name is legal. 1 if name is illegal
+pvt_CheckIllegalName (char * nameStr);
+
+void // updates current directory to the parent directory
+pvt_SetCurrentDirectoryToParent (FatCurrentDirectory * currentDirectory, BiosParameterBlock * bpb);
 
 void 
 pvt_PrintEntryFields (uint8_t *byte, uint16_t entry, uint8_t entryFilter);
@@ -81,53 +84,7 @@ FAT_SetCurrentDirectory (FatCurrentDirectory * currentDirectory, char * newDirec
   if (!strcmp (newDirectoryStr,  ".")) return SUCCESS; // Current Directory
   if (!strcmp (newDirectoryStr, "..")) // Parent Dirctory
     {
-      uint32_t parentDirectoryFirstCluster;
-
-      absoluteSectorNumber = bpb->dataRegionFirstSector + ((cluster - 2) * bpb->sectorsPerCluster);
-
-      fat_ReadSingleSector (absoluteSectorNumber, currentSectorContents);
-
-      parentDirectoryFirstCluster = currentSectorContents[53];
-      parentDirectoryFirstCluster <<= 8;
-      parentDirectoryFirstCluster |= currentSectorContents[52];
-      parentDirectoryFirstCluster <<= 8;
-      parentDirectoryFirstCluster |= currentSectorContents[59];
-      parentDirectoryFirstCluster <<= 8;
-      parentDirectoryFirstCluster |= currentSectorContents[58];
-
-      // if current directory is root directory, do nothing.
-      if (currentDirectory->FATFirstCluster == bpb->rootCluster); 
-
-      // parent directory is root directory
-      else if (parentDirectoryFirstCluster == 0)
-        {
-          strcpy (currentDirectory->shortName, "/");
-          strcpy (currentDirectory->shortParentPath, "");
-          strcpy (currentDirectory->longName, "/");
-          strcpy (currentDirectory->longParentPath, "");
-          currentDirectory->FATFirstCluster = bpb->rootCluster;
-        }
-      else // parent directory is not root directory
-        {          
-          char tmpShortNamePath[64];
-          char tmpLongNamePath[64];
-
-          strlcpy (tmpShortNamePath, currentDirectory->shortParentPath, strlen (currentDirectory->shortParentPath));
-          strlcpy (tmpLongNamePath, currentDirectory->longParentPath,   strlen (currentDirectory->longParentPath ));
-          
-          char *shortNameLastDirectoryInPath = strrchr (tmpShortNamePath, '/');
-          char *longNameLastDirectoryInPath  = strrchr (tmpLongNamePath , '/');
-          
-          strcpy (currentDirectory->shortName, shortNameLastDirectoryInPath + 1);
-          strcpy (currentDirectory->longName , longNameLastDirectoryInPath  + 1);
-
-          strlcpy (currentDirectory->shortParentPath, tmpShortNamePath, 
-                   (shortNameLastDirectoryInPath + 2) - tmpShortNamePath);
-          strlcpy (currentDirectory->longParentPath,  tmpLongNamePath, 
-                   (longNameLastDirectoryInPath  + 2) -  tmpLongNamePath);
-
-          currentDirectory->FATFirstCluster = parentDirectoryFirstCluster;
-        }
+      pvt_SetCurrentDirectoryToParent (currentDirectory, bpb);
       return SUCCESS;
     }
   // END: check if new directory is the current or parent directory
@@ -1462,6 +1419,61 @@ pvt_CheckIllegalName (char * nameStr)
   return 1; // legal name
 }
 
+
+void // returns 0 if success updating the cwd to the parent directory
+pvt_SetCurrentDirectoryToParent (FatCurrentDirectory * currentDirectory, BiosParameterBlock * bpb)
+{
+  uint32_t parentDirectoryFirstCluster;
+  uint32_t absoluteSectorNumber;
+  uint8_t  currentSectorContents[bpb->bytesPerSector];
+
+  //absoluteSectorNumber = bpb->dataRegionFirstSector + ((cluster - 2) * bpb->sectorsPerCluster);
+  absoluteSectorNumber = bpb->dataRegionFirstSector + ((currentDirectory->FATFirstCluster - 2) * bpb->sectorsPerCluster);
+
+  fat_ReadSingleSector (absoluteSectorNumber, currentSectorContents);
+
+  parentDirectoryFirstCluster = currentSectorContents[53];
+  parentDirectoryFirstCluster <<= 8;
+  parentDirectoryFirstCluster |= currentSectorContents[52];
+  parentDirectoryFirstCluster <<= 8;
+  parentDirectoryFirstCluster |= currentSectorContents[59];
+  parentDirectoryFirstCluster <<= 8;
+  parentDirectoryFirstCluster |= currentSectorContents[58];
+
+  // if current directory is root directory, do nothing.
+  if (currentDirectory->FATFirstCluster == bpb->rootCluster); 
+
+  // parent directory is root directory
+  else if (parentDirectoryFirstCluster == 0)
+    {
+      strcpy (currentDirectory->shortName, "/");
+      strcpy (currentDirectory->shortParentPath, "");
+      strcpy (currentDirectory->longName, "/");
+      strcpy (currentDirectory->longParentPath, "");
+      currentDirectory->FATFirstCluster = bpb->rootCluster;
+    }
+  else // parent directory is not root directory
+    {          
+      char tmpShortNamePath[64];
+      char tmpLongNamePath[64];
+
+      strlcpy (tmpShortNamePath, currentDirectory->shortParentPath, strlen (currentDirectory->shortParentPath));
+      strlcpy (tmpLongNamePath, currentDirectory->longParentPath,   strlen (currentDirectory->longParentPath ));
+      
+      char *shortNameLastDirectoryInPath = strrchr (tmpShortNamePath, '/');
+      char *longNameLastDirectoryInPath  = strrchr (tmpLongNamePath , '/');
+      
+      strcpy (currentDirectory->shortName, shortNameLastDirectoryInPath + 1);
+      strcpy (currentDirectory->longName , longNameLastDirectoryInPath  + 1);
+
+      strlcpy (currentDirectory->shortParentPath, tmpShortNamePath, 
+                (shortNameLastDirectoryInPath + 2) - tmpShortNamePath);
+      strlcpy (currentDirectory->longParentPath,  tmpLongNamePath, 
+                (longNameLastDirectoryInPath  + 2) -  tmpLongNamePath);
+
+      currentDirectory->FATFirstCluster = parentDirectoryFirstCluster;
+    }
+}
 
 /*
 ***********************************************************************************************************************
