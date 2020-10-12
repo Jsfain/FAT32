@@ -36,6 +36,9 @@ pvt_CheckIllegalName (char * nameStr);
 void // updates current directory to the parent directory
 pvt_SetCurrentDirectoryToParent (FatCurrentDirectory * currentDirectory, BiosParameterBlock * bpb);
 
+void // updates current directory to a child directory
+pvt_SetCurrentDirectoryToChild (FatCurrentDirectory * currentDirectory, uint8_t *sector, uint16_t shortNamePosition, char * nameStr, BiosParameterBlock * bpb);
+
 void 
 pvt_PrintEntryFields (uint8_t *byte, uint16_t entry, uint8_t entryFilter);
 
@@ -260,6 +263,8 @@ FAT_SetCurrentDirectory (FatCurrentDirectory * currentDirectory, char * newDirec
                               // if match, then update currentDirectory members
                               if (!strcmp (newDirectoryStr, longNameStr) ) 
                                 {                                                        
+                                  pvt_SetCurrentDirectoryToChild (currentDirectory, nextSectorContents, shortNamePositionInNextSector, newDirectoryStr, bpb);
+                                  /*
                                   uint32_t dirFstClus;
                                   dirFstClus = nextSectorContents[shortNamePositionInNextSector + 21];
                                   dirFstClus <<= 8;
@@ -289,7 +294,7 @@ FAT_SetCurrentDirectory (FatCurrentDirectory * currentDirectory, char * newDirec
                                     strcat(currentDirectory->shortParentPath,"/");
                                   
                                   strcpy (currentDirectory->shortName, sn);
-
+                                  */
                                   return SUCCESS;
                                 }
                             }
@@ -340,34 +345,7 @@ FAT_SetCurrentDirectory (FatCurrentDirectory * currentDirectory, char * newDirec
                               // if match, then update currentDirectory members
                               if (!strcmp (newDirectoryStr, longNameStr)) 
                                 { 
-                                  uint32_t dirFstClus;
-                                  dirFstClus = nextSectorContents[shortNamePositionInNextSector + 21];
-                                  dirFstClus <<= 8;
-                                  dirFstClus |= nextSectorContents[shortNamePositionInNextSector + 20];
-                                  dirFstClus <<= 8;
-                                  dirFstClus |= nextSectorContents[shortNamePositionInNextSector + 27];
-                                  dirFstClus <<= 8;
-                                  dirFstClus |= nextSectorContents[shortNamePositionInNextSector + 26];
-
-                                  currentDirectory->FATFirstCluster = dirFstClus;
-
-                                  char sn[9];                                                     
-                                  for (int k = 0; k < 8; k++) 
-                                    sn[k] = nextSectorContents[shortNamePositionInNextSector + k];
-                                  sn[8] = '\0';
-
-                                  strcat(currentDirectory->longParentPath, currentDirectory->longName );
-                                  strcat(currentDirectory->shortParentPath, currentDirectory->shortName);
-
-                                  // if current directory is not root, append '/' 
-                                  if (currentDirectory->longName[0] != '/') 
-                                    strcat (currentDirectory->longParentPath, "/"); 
-                                  strcpy (currentDirectory->longName, newDirectoryStr);
-                                  
-                                  if (currentDirectory->shortName[0] != '/') 
-                                    strcat(currentDirectory->shortParentPath, "/");
-                                  strcpy(currentDirectory->shortName, sn);
-
+                                  pvt_SetCurrentDirectoryToChild (currentDirectory, nextSectorContents, shortNamePositionInNextSector, newDirectoryStr, bpb);
                                   return SUCCESS;
                                 }
                             }
@@ -424,34 +402,7 @@ FAT_SetCurrentDirectory (FatCurrentDirectory * currentDirectory, char * newDirec
                           // if match, then update currentDirectory members
                           if  (!strcmp (newDirectoryStr, longNameStr)) 
                             { 
-                              uint32_t dirFstClus;
-                              dirFstClus = currentSectorContents[shortNamePositionInCurrentSector+21];
-                              dirFstClus <<= 8;
-                              dirFstClus |= currentSectorContents[shortNamePositionInCurrentSector+20];
-                              dirFstClus <<= 8;
-                              dirFstClus |= currentSectorContents[shortNamePositionInCurrentSector+27];
-                              dirFstClus <<= 8;
-                              dirFstClus |= currentSectorContents[shortNamePositionInCurrentSector+26];
-
-                              currentDirectory->FATFirstCluster = dirFstClus;
-                              
-                              char sn[9];                                    
-                              for (uint8_t k = 0; k < 8; k++)  
-                                sn[k] = currentSectorContents[shortNamePositionInCurrentSector + k];
-                              sn[8] = '\0';
-
-                              strcat (currentDirectory->longParentPath,  currentDirectory->longName );
-                              strcat (currentDirectory->shortParentPath, currentDirectory->shortName);
-
-                              // if current directory is not root then append '/'
-                              if (currentDirectory->longName[0] != '/') 
-                                strcat(currentDirectory->longParentPath, "/"); 
-                              strcpy(currentDirectory->longName, newDirectoryStr);
-                              
-                              if (currentDirectory->shortName[0] != '/') 
-                                strcat(currentDirectory->shortParentPath, "/");
-                              strcpy(currentDirectory->shortName, sn);
-
+                              pvt_SetCurrentDirectoryToChild (currentDirectory, currentSectorContents, shortNamePositionInCurrentSector, newDirectoryStr, bpb);
                               return SUCCESS;
                             }                                       
                         }
@@ -477,29 +428,7 @@ FAT_SetCurrentDirectory (FatCurrentDirectory * currentDirectory, char * newDirec
                       // if match, then update currentDirectory members
                       if (!strcmp (tempDir, sn))
                         { 
-                          uint32_t dirFstClus;
-                          dirFstClus = currentSectorContents[entry + 21];
-                          dirFstClus <<= 8;
-                          dirFstClus |= currentSectorContents[entry + 20];
-                          dirFstClus <<= 8;
-                          dirFstClus |= currentSectorContents[entry + 27];
-                          dirFstClus <<= 8;
-                          dirFstClus |= currentSectorContents[entry + 26];
-
-                          currentDirectory->FATFirstCluster = dirFstClus;
-                          
-                          strcat (currentDirectory->longParentPath,  currentDirectory->longName );
-                          strcat (currentDirectory->shortParentPath, currentDirectory->shortName);
-                          
-                          // if current directory is not root then append '/'
-                          if (currentDirectory->longName[0] != '/') 
-                            strcat(currentDirectory->longParentPath,"/");
-                          strcpy(currentDirectory->longName,newDirectoryStr);
-
-                          if(currentDirectory->shortName[0] != '/') 
-                            strcat(currentDirectory->shortParentPath,"/");
-                          strcpy(currentDirectory->shortName,sn);
-
+                          pvt_SetCurrentDirectoryToChild (currentDirectory, currentSectorContents, entry, newDirectoryStr, bpb);
                           return SUCCESS;
                         }
                     }
@@ -1382,7 +1311,7 @@ pvt_CheckIllegalName (char * nameStr)
 }
 
 
-void // returns 0 if success updating the cwd to the parent directory
+void // sets the current directory to the parent directory
 pvt_SetCurrentDirectoryToParent (FatCurrentDirectory * currentDirectory, BiosParameterBlock * bpb)
 {
   uint32_t parentDirectoryFirstCluster;
@@ -1436,6 +1365,44 @@ pvt_SetCurrentDirectoryToParent (FatCurrentDirectory * currentDirectory, BiosPar
       currentDirectory->FATFirstCluster = parentDirectoryFirstCluster;
     }
 }
+
+
+void // sets the current directory to a child of the current directory
+pvt_SetCurrentDirectoryToChild (FatCurrentDirectory * currentDirectory, uint8_t *sector, uint16_t shortNamePosition, char * nameStr, BiosParameterBlock * bpb)
+{
+  uint32_t dirFirstCluster;
+  dirFirstCluster = sector[shortNamePosition + 21];
+  dirFirstCluster <<= 8;
+  dirFirstCluster |= sector[shortNamePosition + 20];
+  dirFirstCluster <<= 8;
+  dirFirstCluster |= sector[shortNamePosition + 27];
+  dirFirstCluster <<= 8;
+  dirFirstCluster |= sector[shortNamePosition + 26];
+
+  currentDirectory->FATFirstCluster = dirFirstCluster;
+  
+  uint8_t snLen;
+  if (strlen(nameStr) < 8) snLen = strlen(nameStr);
+  else snLen = 8; 
+
+  char sn[9];                                    
+  for (uint8_t k = 0; k < snLen; k++)  
+    sn[k] = sector[shortNamePosition + k];
+  sn[snLen] = '\0';
+
+  strcat (currentDirectory->longParentPath,  currentDirectory->longName );
+  strcat (currentDirectory->shortParentPath, currentDirectory->shortName);
+
+  // if current directory is not root then append '/'
+  if (currentDirectory->longName[0] != '/') 
+    strcat(currentDirectory->longParentPath, "/"); 
+  strcpy(currentDirectory->longName, nameStr);
+  
+  if (currentDirectory->shortName[0] != '/') 
+    strcat(currentDirectory->shortParentPath, "/");
+  strcpy(currentDirectory->shortName, sn);
+}
+
 
 /*
 ***********************************************************************************************************************
