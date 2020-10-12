@@ -56,50 +56,10 @@ pvt_PrintFatFile (uint16_t entry, uint8_t *fileSector, BiosParameterBlock * bpb)
 uint16_t 
 FAT_SetCurrentDirectory (FatCurrentDirectory * currentDirectory, char * newDirectoryStr, BiosParameterBlock * bpb)
 {
+  if (pvt_CheckIllegalName (newDirectoryStr)) 
+    return INVALID_DIR_NAME;
+
   uint8_t newDirStrLen = strlen (newDirectoryStr);
-    
-  if (pvt_CheckIllegalName (newDirectoryStr)) return INVALID_DIR_NAME;
-  // *** BEGIN: Legal name verification
-  /*
-  char illegalCharacters[] = {'\\','/',':','*','?','"','<','>','|'};
-
-  if ((strcmp (newDirectoryStr, "") == 0)) return INVALID_DIR_NAME;
-  if (newDirectoryStr[0] == ' ') return INVALID_DIR_NAME;
-
-
-  for (uint8_t k = 0; k < newDirStrLen; k++)
-    {       
-      for (uint8_t j = 0; j < 9; j++)
-        {
-          if (newDirectoryStr[k] == illegalCharacters[j])
-            return INVALID_DIR_NAME;
-        }
-    }
-  */
-  /*
-   for (uint8_t k = 0; k < newDirStrLen; k++)
-    {      
-      if ((    newDirectoryStr[k] == '\\') || (newDirectoryStr[k] == '/') || (newDirectoryStr[k] == ':') 
-           || (newDirectoryStr[k] == '*')  || (newDirectoryStr[k] == '?') || (newDirectoryStr[k] == '"')
-           || (newDirectoryStr[k] == '<')  || (newDirectoryStr[k] == '>') || (newDirectoryStr[k] == '|'))
-        {
-          return INVALID_DIR_NAME;
-        }
-    }
-    */
-  /*
-  uint8_t allSpacesFlag = 1;
-  for (uint8_t k = 0; k < newDirStrLen; k++)  
-    {
-      if (newDirectoryStr[k] != ' ') 
-        { 
-          allSpacesFlag = 0;  
-          break; 
-        }
-    }  
-  if ( allSpacesFlag == 1 ) return INVALID_DIR_NAME;
-  */
-  // *** END: Legal name verification
 
   // *** BEGIN: define variables
   uint32_t absoluteSectorNumber;
@@ -291,7 +251,7 @@ FAT_SetCurrentDirectory (FatCurrentDirectory * currentDirectory, char * newDirec
 
                                           // load long name entry into longNameStr[]
                                           for (int i = (shortNamePositionInNextSector - ENTRY_LEN); i >= 0; i = i - ENTRY_LEN)
-                                            {
+                                            {                                              
                                               for (uint16_t n = i + 1; n < i + 11; n++)
                                                 {                                  
                                                   if (nextSectorContents[n] == 0 || nextSectorContents[n] > 126);
@@ -488,8 +448,9 @@ FAT_SetCurrentDirectory (FatCurrentDirectory * currentDirectory, char * newDirec
                                   longNameStrIndex = 0;
 
                                   // load long name entry into longNameStr[]
-                                  for (int i = shortNamePositionInCurrentSector - ENTRY_LEN; i >= entry; i = i - ENTRY_LEN)
+                                  for (int i = shortNamePositionInCurrentSector - ENTRY_LEN; i >= (int)entry; i = i - ENTRY_LEN)
                                     {                                
+                                      print_str("\n\r i = "); print_dec(i);
                                       for (uint16_t n = i + 1; n < i + 11; n++)
                                         {                                  
                                           if (currentSectorContents[n] == 0 || currentSectorContents[n] > 126);
@@ -1470,32 +1431,35 @@ FAT_GetBiosParameterBlock (BiosParameterBlock * bpb)
 uint8_t
 pvt_CheckIllegalName (char * nameStr)
 {
-    // illegal if name string is empty or begins with a space character 
-    if ((strcmp (nameStr, "") == 0) || (nameStr[0] == ' '))  return 1;
-   
-    // illegal if name string contains an illegal character
-    char illegalCharacters[] = {'\\','/',':','*','?','"','<','>','|'};
-    for (uint8_t k = 0; k < strlen (nameStr); k++)
-      {       
-        for (uint8_t j = 0; j < 9; j++)
-          {
-            if (nameStr[k] == illegalCharacters[j])
-            {
-              return 1;
-            }
-          }
-      }
+  // illegal if name string is empty or begins with a space character 
+  if ((strcmp (nameStr, "") == 0) || (nameStr[0] == ' ')) 
+    {
+      return 1;
+    }
 
-    // illegal if name string is all space characters.
-    for (uint8_t k = 0; k < strlen (nameStr); k++)  
-      {
-        if (nameStr[k] != ' ') 
-          { 
+  // illegal if name string contains an illegal character
+  char illegalCharacters[] = {'\\','/',':','*','?','"','<','>','|'};
+  for (uint8_t k = 0; k < strlen (nameStr); k++)
+    {       
+      for (uint8_t j = 0; j < 9; j++)
+        {
+          if (nameStr[k] == illegalCharacters[j])
+          {
             return 1;
           }
-      }  
+        }
+    }
 
-    return 0; // legal name
+  // illegal if name string is all space characters.
+  for (uint8_t k = 0; k < strlen (nameStr); k++)  
+    {
+      if (nameStr[k] != ' ') 
+        { 
+          return 0;
+        }
+    }  
+
+  return 1; // legal name
 }
 
 
