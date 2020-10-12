@@ -62,6 +62,15 @@ FAT_SetCurrentDirectory (FatCurrentDirectory * currentDirectory, char * newDirec
   if (pvt_CheckIllegalName (newDirectoryStr)) 
     return INVALID_DIR_NAME;
 
+  // *** BEGIN: check if new directory is the current or parent directory
+  if (!strcmp (newDirectoryStr,  ".")) return SUCCESS; // Current Directory
+  if (!strcmp (newDirectoryStr, "..")) // Parent Dirctory
+    {
+      pvt_SetCurrentDirectoryToParent (currentDirectory, bpb);
+      return SUCCESS;
+    }
+  // END: check if new directory is the current or parent directory
+
   uint8_t newDirStrLen = strlen (newDirectoryStr);
 
   // *** BEGIN: define variables
@@ -80,15 +89,6 @@ FAT_SetCurrentDirectory (FatCurrentDirectory * currentDirectory, char * newDirec
   uint8_t  longNameLastSectorEntryFlag = 0;
   // *** END: define variables
   
-  // *** BEGIN: check if new directory is the current or parent directory
-  if (!strcmp (newDirectoryStr,  ".")) return SUCCESS; // Current Directory
-  if (!strcmp (newDirectoryStr, "..")) // Parent Dirctory
-    {
-      pvt_SetCurrentDirectoryToParent (currentDirectory, bpb);
-      return SUCCESS;
-    }
-  // END: check if new directory is the current or parent directory
-
     
   // BEGIN: search for new directory as a child of the current directory
   do
@@ -126,401 +126,381 @@ FAT_SetCurrentDirectory (FatCurrentDirectory * currentDirectory, char * newDirec
                   longNameExistsFlag = 0;
                 }
 
-              // 0xE5 = marked for deletion
-              if (currentSectorContents[entry] == 0xE5);
-
               // all subsequent entries are empty.
-              else if (currentSectorContents[entry] == 0) return END_OF_DIRECTORY;
-              else
-                {                
-                  attributeByte = currentSectorContents[entry + 11];
+              if (currentSectorContents[entry] == 0) return END_OF_DIRECTORY;
 
-                  // Long Name?
-                  if ((attributeByte & LONG_NAME_ATTR_MASK) == LONG_NAME_ATTR_MASK)
+              attributeByte = currentSectorContents[entry + 11];
+
+              if (((attributeByte & LONG_NAME_ATTR_MASK) == LONG_NAME_ATTR_MASK) && (currentSectorContents[entry] != 0xE5)) // 0xE5 = marked for deletion
+                {
+                  // confirm long name last entry flag is set for this entry
+                  if (!(currentSectorContents[entry] & LONG_NAME_LAST_ENTRY_FLAG)) return CORRUPT_FAT_ENTRY;
+
+                  longNameExistsFlag = 1;
+                  for ( uint8_t k = 0; k < LONG_NAME_LEN_MAX; k++) longNameStr[k] = '\0';
+
+                  // number of entries required for the long name
+                  uint8_t longNameOrder = LONG_NAME_ORDINAL_MASK & currentSectorContents[entry];
+
+                  shortNamePositionInCurrentSector = entry + (ENTRY_LEN * longNameOrder);
+                  
+                  // short name is in next sector?
+                  if (shortNamePositionInCurrentSector >= bpb->bytesPerSector)
                     {
-                      // confirm long name last entry flag is set for this entry
-                      if (!(currentSectorContents[entry] & LONG_NAME_LAST_ENTRY_FLAG)) return CORRUPT_FAT_ENTRY;
-                      else
+                      // long name crosses sector boundary?
+                      if (shortNamePositionInCurrentSector > bpb->bytesPerSector)
                         {
-                          longNameExistsFlag = 1;
-                          for ( uint8_t k = 0; k < LONG_NAME_LEN_MAX; k++) longNameStr[k] = '\0';
-
-                          // number of entries required for the long name
-                          uint8_t longNameOrder = LONG_NAME_ORDINAL_MASK & currentSectorContents[entry];
-
-                          shortNamePositionInCurrentSector = entry + (ENTRY_LEN * longNameOrder);
-                          
-                          // short name is in next sector?
-                          if (shortNamePositionInCurrentSector >= bpb->bytesPerSector)
-                            {
-                              // long name crosses sector boundary?
-                              if (shortNamePositionInCurrentSector > bpb->bytesPerSector)
-                                {
-                                  longNameCrossSectorBoundaryFlag = 1;
-                                  longNameLastSectorEntryFlag = 0;
-                                }
-
-                              // entire long name is in current sector?
-                              else if (shortNamePositionInCurrentSector == bpb->bytesPerSector)
-                                {
-                                  longNameCrossSectorBoundaryFlag = 0;
-                                  longNameLastSectorEntryFlag = 1;
-                                }
-                              else return CORRUPT_FAT_ENTRY;
-
-                              //get next sector's contents
-                              uint32_t nextSector;
-                              if (clusterSectorNumber >= bpb->bytesPerSector - 1)
-                                {
-                                  nextSector = bpb->dataRegionFirstSector + ((pvt_GetNextCluster (cluster, bpb) - 2) * bpb->bytesPerSector);
-                                }
-                              else nextSector = 1 + absoluteSectorNumber;
-
-                              fat_ReadSingleSector (nextSector, nextSectorContents);
-
-                              // short name start position in the next sector
-                              shortNamePositionInNextSector = shortNamePositionInCurrentSector - bpb->bytesPerSector;
-
-                              attributeByte = nextSectorContents[shortNamePositionInNextSector + 11];
-                              
-                              // If not a directory entry, do nothing
-                              if (!(attributeByte & DIRECTORY_ENTRY_ATTR_FLAG));
-
-                              // shortNamePositionInNextSector points to long name entry?
-                              if ((attributeByte & LONG_NAME_ATTR_MASK) == LONG_NAME_ATTR_MASK) 
-                                {
-                                  return CORRUPT_FAT_ENTRY;
-                                }
-                              else
-                                {                                                           
-                                  // Long name crosses sector boundary?
-                                  if ((longNameCrossSectorBoundaryFlag == 1) && (longNameLastSectorEntryFlag == 0))
-                                    {
-                                      // Confirm entry preceding short name is first entry of a long name. 
-                                      // Value in ordinal position must be 1, but mask out possible LONG_NAME_LAST_ENTRY_FLAG
-                                      if ((nextSectorContents[shortNamePositionInNextSector - ENTRY_LEN] & LONG_NAME_ORDINAL_MASK) != 1)
-                                        {
-                                          return CORRUPT_FAT_ENTRY;
-                                        }                                      
-                                      else
-                                        {
-                                          longNameStrIndex = 0;   
-
-                                          // load long name entry into longNameStr[]
-                                          for (int i = (shortNamePositionInNextSector - ENTRY_LEN); i >= 0; i = i - ENTRY_LEN)
-                                            {                                              
-                                              for (uint16_t n = i + 1; n < i + 11; n++)
-                                                {                                  
-                                                  if (nextSectorContents[n] == 0 || nextSectorContents[n] > 126);
-                                                  else 
-                                                    { 
-                                                      longNameStr[longNameStrIndex] = nextSectorContents[n];  
-                                                      longNameStrIndex++;  
-                                                    }
-                                                }
-
-                                              for (uint16_t n = i + 14; n < i + 26; n++)
-                                                {                                  
-                                                  if (nextSectorContents[n] == 0 || nextSectorContents[n] > 126);
-                                                  else 
-                                                    { 
-                                                      longNameStr[longNameStrIndex] = nextSectorContents[n];
-                                                      longNameStrIndex++;  
-                                                    }
-                                                }
-                                              
-                                              for (uint16_t n = i + 28; n < i + 32; n++)
-                                                {                                  
-                                                  if (nextSectorContents[n] == 0 || nextSectorContents[n] > 126);
-                                                  else 
-                                                    { 
-                                                      longNameStr[longNameStrIndex] = nextSectorContents[n];  
-                                                      longNameStrIndex++;  
-                                                    }
-                                                }            
-                                            }
-                                          for (int i = SECTOR_LEN - ENTRY_LEN; i >= entry; i = i - ENTRY_LEN)
-                                            {                                
-                                              for (uint16_t n = i + 1; n < i + 11; n++)
-                                                {                                  
-                                                  if (currentSectorContents[n] == 0 || currentSectorContents[n] > 126);
-                                                  else 
-                                                    { 
-                                                      longNameStr[longNameStrIndex] = currentSectorContents[n];
-                                                      longNameStrIndex++; 
-                                                    }
-                                                }
-                                              for (uint16_t n = i + 14; n < i + 26; n++)
-                                                {   
-                                                  if (currentSectorContents[n] == 0 || currentSectorContents[n] > 126);
-                                                  else 
-                                                  { 
-                                                    longNameStr[longNameStrIndex] = currentSectorContents[n];  
-                                                    longNameStrIndex++; 
-                                                  }
-                                                }
-                                              for (uint16_t n = i + 28; n < i + 32; n++)
-                                                {                                  
-                                                  if (currentSectorContents[n] == 0 || currentSectorContents[n] > 126);
-                                                  else 
-                                                    { 
-                                                      longNameStr[longNameStrIndex] = currentSectorContents[n];  
-                                                      longNameStrIndex++; 
-                                                    }
-                                                }
-                                            }
-                                          // if match, then update currentDirectory members
-                                          if (!strcmp (newDirectoryStr, longNameStr) ) 
-                                            {                                                        
-                                              uint32_t dirFstClus;
-                                              dirFstClus = nextSectorContents[shortNamePositionInNextSector + 21];
-                                              dirFstClus <<= 8;
-                                              dirFstClus |= nextSectorContents[shortNamePositionInNextSector + 20];
-                                              dirFstClus <<= 8;
-                                              dirFstClus |= nextSectorContents[shortNamePositionInNextSector + 27];
-                                              dirFstClus <<= 8;
-                                              dirFstClus |= nextSectorContents[shortNamePositionInNextSector + 26];
-
-                                              currentDirectory->FATFirstCluster = dirFstClus;
-
-                                              char sn[9];                                                     
-                                              for (uint8_t k = 0; k < 8; k++)
-                                                sn[k] = nextSectorContents[shortNamePositionInNextSector + k];
-                                              sn[8] = '\0';
-
-                                              strcat (currentDirectory->longParentPath, currentDirectory->longName);
-                                              strcat (currentDirectory->shortParentPath, currentDirectory->shortName);
-
-                                              // if current directory is not root, append '/'
-                                              if (currentDirectory->longName[0] != '/') 
-                                                strcat (currentDirectory->longParentPath, "/");
-
-                                              strcpy (currentDirectory->longName,newDirectoryStr);
-                                              
-                                              if (currentDirectory->shortName[0] != '/') 
-                                                strcat(currentDirectory->shortParentPath,"/");
-                                              
-                                              strcpy (currentDirectory->shortName, sn);
-
-                                              return SUCCESS;
-                                            }
-                                        }
-                                    }
-
-                                  // all entries for long name are in current sector but short name is in next sector
-                                  else if (longNameCrossSectorBoundaryFlag == 0 && longNameLastSectorEntryFlag == 1)
-                                    {
-                                      longNameStrIndex = 0;
-
-                                      // confirm last entry of current sector is the first entry of the long name
-                                      if ((currentSectorContents[SECTOR_LEN - ENTRY_LEN] & LONG_NAME_ORDINAL_MASK) != 1)
-                                        return CORRUPT_FAT_ENTRY;
-                                      else
-                                        {                               
-                                          // load long name entry into longNameStr[]
-                                          for (int i = (SECTOR_LEN - ENTRY_LEN) ; i >= entry ; i = i - ENTRY_LEN)
-                                            {                                
-                                              for (uint16_t n = i + 1; n < i + 11; n++)
-                                                {                                  
-                                                  if (currentSectorContents[n] == 0 || currentSectorContents[n] > 126);
-                                                  else 
-                                                    { 
-                                                      longNameStr[longNameStrIndex] = currentSectorContents[n]; 
-                                                      longNameStrIndex++; 
-                                                    }
-                                                }
-                                              for (uint16_t n = i + 14; n < i + 26; n++)
-                                                {   
-                                                  if (currentSectorContents[n] == 0 || currentSectorContents[n] > 126);
-                                                  else 
-                                                    { 
-                                                      longNameStr[longNameStrIndex] = currentSectorContents[n]; 
-                                                      longNameStrIndex++; 
-                                                    }
-                                                }
-                                              
-                                              for (uint16_t n = i + 28; n < i + 32; n++)
-                                                {                                  
-                                                  if (currentSectorContents[n] == 0 || currentSectorContents[n] > 126);
-                                                  else 
-                                                    { 
-                                                      longNameStr[longNameStrIndex] = currentSectorContents[n];
-                                                      longNameStrIndex++; 
-                                                    }
-                                                }
-                                            }
-
-                                          // if match, then update currentDirectory members
-                                          if (!strcmp (newDirectoryStr, longNameStr)) 
-                                            { 
-                                              uint32_t dirFstClus;
-                                              dirFstClus = nextSectorContents[shortNamePositionInNextSector + 21];
-                                              dirFstClus <<= 8;
-                                              dirFstClus |= nextSectorContents[shortNamePositionInNextSector + 20];
-                                              dirFstClus <<= 8;
-                                              dirFstClus |= nextSectorContents[shortNamePositionInNextSector + 27];
-                                              dirFstClus <<= 8;
-                                              dirFstClus |= nextSectorContents[shortNamePositionInNextSector + 26];
-
-                                              currentDirectory->FATFirstCluster = dirFstClus;
-
-                                              char sn[9];                                                     
-                                              for (int k = 0; k < 8; k++) 
-                                                sn[k] = nextSectorContents[shortNamePositionInNextSector + k];
-                                              sn[8] = '\0';
-
-                                              strcat(currentDirectory->longParentPath, currentDirectory->longName );
-                                              strcat(currentDirectory->shortParentPath, currentDirectory->shortName);
-
-                                              // if current directory is not root, append '/' 
-                                              if (currentDirectory->longName[0] != '/') 
-                                                strcat (currentDirectory->longParentPath, "/"); 
-                                              strcpy (currentDirectory->longName, newDirectoryStr);
-                                              
-                                              if (currentDirectory->shortName[0] != '/') 
-                                                strcat(currentDirectory->shortParentPath, "/");
-                                              strcpy(currentDirectory->shortName, sn);
-
-                                              return SUCCESS;
-                                            }
-                                        }
-                                    }
-                                  else return CORRUPT_FAT_ENTRY;
-                                }
-                            }
-                          else // Long name exists and is entirely in current sector along with the short name
-                            {   
-                              attributeByte = currentSectorContents[shortNamePositionInCurrentSector + 11];
-                              
-                              // If not a directory entry, move on to next entry.
-                              if (!(attributeByte & DIRECTORY_ENTRY_ATTR_FLAG));
-
-                              // Confirm entry preceding short name is first entry of a long name.
-                              if ((currentSectorContents[shortNamePositionInCurrentSector - ENTRY_LEN] & LONG_NAME_ORDINAL_MASK) != 1)
-                                {
-                                  return CORRUPT_FAT_ENTRY;
-                                }
-                              else
-                                {
-                                  longNameStrIndex = 0;
-
-                                  // load long name entry into longNameStr[]
-                                  for (int i = shortNamePositionInCurrentSector - ENTRY_LEN; i >= (int)entry; i = i - ENTRY_LEN)
-                                    {                                
-                                      print_str("\n\r i = "); print_dec(i);
-                                      for (uint16_t n = i + 1; n < i + 11; n++)
-                                        {                                  
-                                          if (currentSectorContents[n] == 0 || currentSectorContents[n] > 126);
-                                          else 
-                                            { 
-                                              longNameStr[longNameStrIndex] = currentSectorContents[n];  
-                                              longNameStrIndex++; 
-                                            }
-                                        }
-                                      for (uint16_t n = i + 14; n < i + 26; n++)
-                                        {   
-                                          if (currentSectorContents[n] == 0 || currentSectorContents[n] > 126);
-                                          else 
-                                            { 
-                                              longNameStr[longNameStrIndex] = currentSectorContents[n];
-                                              longNameStrIndex++; 
-                                            }
-                                        }
-                                      for (uint16_t n = i + 28; n < i + 32; n++)
-                                        {                                  
-                                          if (currentSectorContents[n] == 0 || currentSectorContents[n] > 126);
-                                          else 
-                                            { 
-                                              longNameStr[longNameStrIndex] = currentSectorContents[n];  
-                                              longNameStrIndex++; 
-                                            }
-                                        }
-                                    }
-                                  // if match, then update currentDirectory members
-                                  if  (!strcmp  (newDirectoryStr, longNameStr)) 
-                                    { 
-                                      uint32_t dirFstClus;
-                                      dirFstClus = currentSectorContents[shortNamePositionInCurrentSector+21];
-                                      dirFstClus <<= 8;
-                                      dirFstClus |= currentSectorContents[shortNamePositionInCurrentSector+20];
-                                      dirFstClus <<= 8;
-                                      dirFstClus |= currentSectorContents[shortNamePositionInCurrentSector+27];
-                                      dirFstClus <<= 8;
-                                      dirFstClus |= currentSectorContents[shortNamePositionInCurrentSector+26];
-
-                                      currentDirectory->FATFirstCluster = dirFstClus;
-                                      
-                                      char sn[9];                                    
-                                      for (uint8_t k = 0; k < 8; k++)  
-                                        sn[k] = currentSectorContents[shortNamePositionInCurrentSector + k];
-                                      sn[8] = '\0';
-
-                                      strcat (currentDirectory->longParentPath,  currentDirectory->longName );
-                                      strcat (currentDirectory->shortParentPath, currentDirectory->shortName);
-
-                                      // if current directory is not root then append '/'
-                                      if (currentDirectory->longName[0] != '/') 
-                                        strcat(currentDirectory->longParentPath, "/"); 
-                                      strcpy(currentDirectory->longName, newDirectoryStr);
-                                      
-                                      if (currentDirectory->shortName[0] != '/') 
-                                        strcat(currentDirectory->shortParentPath, "/");
-                                      strcpy(currentDirectory->shortName, sn);
-
-                                      return SUCCESS;
-                                    }                                       
-                                }
-                            }
+                          longNameCrossSectorBoundaryFlag = 1;
+                          longNameLastSectorEntryFlag = 0;
                         }
-                    }                   
 
-                  else  // Long Name Entry does not exist
-                    {
-                      attributeByte = currentSectorContents[entry + 11];
+                      // entire long name is in current sector?
+                      else if (shortNamePositionInCurrentSector == bpb->bytesPerSector)
+                        {
+                          longNameCrossSectorBoundaryFlag = 0;
+                          longNameLastSectorEntryFlag = 1;
+                        }
+                      else return CORRUPT_FAT_ENTRY;
 
-                      // If not a directory entry, move on to next entry.
-                      if (!(attributeByte & DIRECTORY_ENTRY_ATTR_FLAG));
+                      //get next sector's contents
+                      uint32_t nextSector;
+                      if (clusterSectorNumber >= bpb->bytesPerSector - 1)
+                        {
+                          nextSector = bpb->dataRegionFirstSector + ((pvt_GetNextCluster (cluster, bpb) - 2) * bpb->bytesPerSector);
+                        }
+                      else nextSector = 1 + absoluteSectorNumber;
 
-                      // newDirectoryStr is too long for a short name
-                      else if (newDirStrLen > 8);
-                      else 
-                        {                   
-                          char sn[9];
-                          char tempDir[9];
-                          strcpy(tempDir,newDirectoryStr);
+                      fat_ReadSingleSector (nextSector, nextSectorContents);
 
-                          for (uint8_t k = 0; k < newDirStrLen; k++) 
-                            sn[k] = currentSectorContents[k + entry];
-                          sn[newDirStrLen] = '\0';
+                      // short name start position in the next sector
+                      shortNamePositionInNextSector = shortNamePositionInCurrentSector - bpb->bytesPerSector;
 
+                      attributeByte = nextSectorContents[shortNamePositionInNextSector + 11];
+                      
+
+                      // shortNamePositionInNextSector points to long name entry?
+                      // AND Confirm entry preceding short name is first entry of a long name. 
+                      // Value in ordinal position must be 1, but mask out possible LONG_NAME_LAST_ENTRY_FLAG
+                      if (((attributeByte & LONG_NAME_ATTR_MASK) == LONG_NAME_ATTR_MASK) 
+                           && ((nextSectorContents[shortNamePositionInNextSector - ENTRY_LEN] & LONG_NAME_ORDINAL_MASK) != 1))
+                        {
+                          return CORRUPT_FAT_ENTRY;
+                        }
+
+                      if ((attributeByte & DIRECTORY_ENTRY_ATTR_FLAG))
+                        {                                                           
+                          // Long name crosses sector boundary?
+                          if ((longNameCrossSectorBoundaryFlag == 1) && (longNameLastSectorEntryFlag == 0))
+                            {
+                              longNameStrIndex = 0;   
+
+                              // load long name entry into longNameStr[]
+                              for (int i = (shortNamePositionInNextSector - ENTRY_LEN); i >= 0; i = i - ENTRY_LEN)
+                                {                                              
+                                  for (uint16_t n = i + 1; n < i + 11; n++)
+                                    {                                  
+                                      if (nextSectorContents[n] == 0 || nextSectorContents[n] > 126);
+                                      else 
+                                        { 
+                                          longNameStr[longNameStrIndex] = nextSectorContents[n];  
+                                          longNameStrIndex++;  
+                                        }
+                                    }
+
+                                  for (uint16_t n = i + 14; n < i + 26; n++)
+                                    {                                  
+                                      if (nextSectorContents[n] == 0 || nextSectorContents[n] > 126);
+                                      else 
+                                        { 
+                                          longNameStr[longNameStrIndex] = nextSectorContents[n];
+                                          longNameStrIndex++;  
+                                        }
+                                    }
+                                  
+                                  for (uint16_t n = i + 28; n < i + 32; n++)
+                                    {                                  
+                                      if (nextSectorContents[n] == 0 || nextSectorContents[n] > 126);
+                                      else 
+                                        { 
+                                          longNameStr[longNameStrIndex] = nextSectorContents[n];  
+                                          longNameStrIndex++;  
+                                        }
+                                    }            
+                                }
+                              for (int i = SECTOR_LEN - ENTRY_LEN; i >= (int)entry; i = i - ENTRY_LEN)
+                                {                                
+                                  for (uint16_t n = i + 1; n < i + 11; n++)
+                                    {                                  
+                                      if (currentSectorContents[n] == 0 || currentSectorContents[n] > 126);
+                                      else 
+                                        { 
+                                          longNameStr[longNameStrIndex] = currentSectorContents[n];
+                                          longNameStrIndex++; 
+                                        }
+                                    }
+                                  for (uint16_t n = i + 14; n < i + 26; n++)
+                                    {   
+                                      if (currentSectorContents[n] == 0 || currentSectorContents[n] > 126);
+                                      else 
+                                      { 
+                                        longNameStr[longNameStrIndex] = currentSectorContents[n];  
+                                        longNameStrIndex++; 
+                                      }
+                                    }
+                                  for (uint16_t n = i + 28; n < i + 32; n++)
+                                    {                                  
+                                      if (currentSectorContents[n] == 0 || currentSectorContents[n] > 126);
+                                      else 
+                                        { 
+                                          longNameStr[longNameStrIndex] = currentSectorContents[n];  
+                                          longNameStrIndex++; 
+                                        }
+                                    }
+                                }
+                              // if match, then update currentDirectory members
+                              if (!strcmp (newDirectoryStr, longNameStr) ) 
+                                {                                                        
+                                  uint32_t dirFstClus;
+                                  dirFstClus = nextSectorContents[shortNamePositionInNextSector + 21];
+                                  dirFstClus <<= 8;
+                                  dirFstClus |= nextSectorContents[shortNamePositionInNextSector + 20];
+                                  dirFstClus <<= 8;
+                                  dirFstClus |= nextSectorContents[shortNamePositionInNextSector + 27];
+                                  dirFstClus <<= 8;
+                                  dirFstClus |= nextSectorContents[shortNamePositionInNextSector + 26];
+
+                                  currentDirectory->FATFirstCluster = dirFstClus;
+
+                                  char sn[9];                                                     
+                                  for (uint8_t k = 0; k < 8; k++)
+                                    sn[k] = nextSectorContents[shortNamePositionInNextSector + k];
+                                  sn[8] = '\0';
+
+                                  strcat (currentDirectory->longParentPath, currentDirectory->longName);
+                                  strcat (currentDirectory->shortParentPath, currentDirectory->shortName);
+
+                                  // if current directory is not root, append '/'
+                                  if (currentDirectory->longName[0] != '/') 
+                                    strcat (currentDirectory->longParentPath, "/");
+
+                                  strcpy (currentDirectory->longName,newDirectoryStr);
+                                  
+                                  if (currentDirectory->shortName[0] != '/') 
+                                    strcat(currentDirectory->shortParentPath,"/");
+                                  
+                                  strcpy (currentDirectory->shortName, sn);
+
+                                  return SUCCESS;
+                                }
+                            }
+                          // all entries for long name are in current sector but short name is in next sector
+                          else if (longNameCrossSectorBoundaryFlag == 0 && longNameLastSectorEntryFlag == 1)
+                            {
+                              longNameStrIndex = 0;
+
+                              // confirm last entry of current sector is the first entry of the long name
+                              if ((currentSectorContents[SECTOR_LEN - ENTRY_LEN] & LONG_NAME_ORDINAL_MASK) != 1)
+                                {
+                                  return CORRUPT_FAT_ENTRY;
+                                }
+
+                              // load long name entry into longNameStr[]
+                              for (int i = (SECTOR_LEN - ENTRY_LEN) ; i >= (int)entry ; i = i - ENTRY_LEN)
+                                {                                
+                                  for (uint16_t n = i + 1; n < i + 11; n++)
+                                    {                                  
+                                      if (currentSectorContents[n] == 0 || currentSectorContents[n] > 126);
+                                      else 
+                                        { 
+                                          longNameStr[longNameStrIndex] = currentSectorContents[n]; 
+                                          longNameStrIndex++; 
+                                        }
+                                    }
+                                  for (uint16_t n = i + 14; n < i + 26; n++)
+                                    {   
+                                      if (currentSectorContents[n] == 0 || currentSectorContents[n] > 126);
+                                      else 
+                                        { 
+                                          longNameStr[longNameStrIndex] = currentSectorContents[n]; 
+                                          longNameStrIndex++; 
+                                        }
+                                    }
+                                  
+                                  for (uint16_t n = i + 28; n < i + 32; n++)
+                                    {                                  
+                                      if (currentSectorContents[n] == 0 || currentSectorContents[n] > 126);
+                                      else 
+                                        { 
+                                          longNameStr[longNameStrIndex] = currentSectorContents[n];
+                                          longNameStrIndex++; 
+                                        }
+                                    }
+                                }
+
+                              // if match, then update currentDirectory members
+                              if (!strcmp (newDirectoryStr, longNameStr)) 
+                                { 
+                                  uint32_t dirFstClus;
+                                  dirFstClus = nextSectorContents[shortNamePositionInNextSector + 21];
+                                  dirFstClus <<= 8;
+                                  dirFstClus |= nextSectorContents[shortNamePositionInNextSector + 20];
+                                  dirFstClus <<= 8;
+                                  dirFstClus |= nextSectorContents[shortNamePositionInNextSector + 27];
+                                  dirFstClus <<= 8;
+                                  dirFstClus |= nextSectorContents[shortNamePositionInNextSector + 26];
+
+                                  currentDirectory->FATFirstCluster = dirFstClus;
+
+                                  char sn[9];                                                     
+                                  for (int k = 0; k < 8; k++) 
+                                    sn[k] = nextSectorContents[shortNamePositionInNextSector + k];
+                                  sn[8] = '\0';
+
+                                  strcat(currentDirectory->longParentPath, currentDirectory->longName );
+                                  strcat(currentDirectory->shortParentPath, currentDirectory->shortName);
+
+                                  // if current directory is not root, append '/' 
+                                  if (currentDirectory->longName[0] != '/') 
+                                    strcat (currentDirectory->longParentPath, "/"); 
+                                  strcpy (currentDirectory->longName, newDirectoryStr);
+                                  
+                                  if (currentDirectory->shortName[0] != '/') 
+                                    strcat(currentDirectory->shortParentPath, "/");
+                                  strcpy(currentDirectory->shortName, sn);
+
+                                  return SUCCESS;
+                                }
+                            }
+                          else return CORRUPT_FAT_ENTRY;
+                        }
+                    }
+                  else // Long name exists and is entirely in current sector along with the short name
+                    {   
+                      // Confirm entry preceding short name is first entry of a long name.
+                      if ((currentSectorContents[shortNamePositionInCurrentSector - ENTRY_LEN] & LONG_NAME_ORDINAL_MASK) != 1)                            
+                        {
+                          return CORRUPT_FAT_ENTRY;
+                        }
+     
+                      attributeByte = currentSectorContents[shortNamePositionInCurrentSector + 11];
+                      
+                      // If a directory entry, move on to next entry.
+                      if ((attributeByte & DIRECTORY_ENTRY_ATTR_FLAG))
+                        {
+                          longNameStrIndex = 0;
+
+                          // load long name entry into longNameStr[]
+                          for (int i = shortNamePositionInCurrentSector - ENTRY_LEN; i >= (int)entry; i = i - ENTRY_LEN)
+                            {                                
+                              print_str("\n\r i = "); print_dec(i);
+                              for (uint16_t n = i + 1; n < i + 11; n++)
+                                {                                  
+                                  if (currentSectorContents[n] == 0 || currentSectorContents[n] > 126);
+                                  else 
+                                    { 
+                                      longNameStr[longNameStrIndex] = currentSectorContents[n];  
+                                      longNameStrIndex++; 
+                                    }
+                                }
+                              for (uint16_t n = i + 14; n < i + 26; n++)
+                                {   
+                                  if (currentSectorContents[n] == 0 || currentSectorContents[n] > 126);
+                                  else 
+                                    { 
+                                      longNameStr[longNameStrIndex] = currentSectorContents[n];
+                                      longNameStrIndex++; 
+                                    }
+                                }
+                              for (uint16_t n = i + 28; n < i + 32; n++)
+                                {                                  
+                                  if (currentSectorContents[n] == 0 || currentSectorContents[n] > 126);
+                                  else 
+                                    { 
+                                      longNameStr[longNameStrIndex] = currentSectorContents[n];  
+                                      longNameStrIndex++; 
+                                    }
+                                }
+                            }
                           // if match, then update currentDirectory members
-                          if (!strcmp (tempDir, sn))
+                          if  (!strcmp (newDirectoryStr, longNameStr)) 
                             { 
                               uint32_t dirFstClus;
-                              dirFstClus = currentSectorContents[entry + 21];
+                              dirFstClus = currentSectorContents[shortNamePositionInCurrentSector+21];
                               dirFstClus <<= 8;
-                              dirFstClus |= currentSectorContents[entry + 20];
+                              dirFstClus |= currentSectorContents[shortNamePositionInCurrentSector+20];
                               dirFstClus <<= 8;
-                              dirFstClus |= currentSectorContents[entry + 27];
+                              dirFstClus |= currentSectorContents[shortNamePositionInCurrentSector+27];
                               dirFstClus <<= 8;
-                              dirFstClus |= currentSectorContents[entry + 26];
+                              dirFstClus |= currentSectorContents[shortNamePositionInCurrentSector+26];
 
                               currentDirectory->FATFirstCluster = dirFstClus;
                               
+                              char sn[9];                                    
+                              for (uint8_t k = 0; k < 8; k++)  
+                                sn[k] = currentSectorContents[shortNamePositionInCurrentSector + k];
+                              sn[8] = '\0';
+
                               strcat (currentDirectory->longParentPath,  currentDirectory->longName );
                               strcat (currentDirectory->shortParentPath, currentDirectory->shortName);
-                              
+
                               // if current directory is not root then append '/'
                               if (currentDirectory->longName[0] != '/') 
-                                strcat(currentDirectory->longParentPath,"/");
-                              strcpy(currentDirectory->longName,newDirectoryStr);
-
-                              if(currentDirectory->shortName[0] != '/') 
-                                strcat(currentDirectory->shortParentPath,"/");
-                              strcpy(currentDirectory->shortName,sn);
+                                strcat(currentDirectory->longParentPath, "/"); 
+                              strcpy(currentDirectory->longName, newDirectoryStr);
+                              
+                              if (currentDirectory->shortName[0] != '/') 
+                                strcat(currentDirectory->shortParentPath, "/");
+                              strcpy(currentDirectory->shortName, sn);
 
                               return SUCCESS;
-                            }
+                            }                                       
+                        }
+                    }
+                }                   
+
+              else  // Long Name Entry does not exist
+                {
+                  attributeByte = currentSectorContents[entry + 11];
+
+                  // If not a directory entry, move on to next entry.
+                  // newDirectoryStr is too long for a short name
+                  if ( (newDirStrLen < 9) && (attributeByte & DIRECTORY_ENTRY_ATTR_FLAG) )
+                    {                   
+                      char sn[9];
+                      char tempDir[9];
+                      strcpy(tempDir,newDirectoryStr);
+
+                      for (uint8_t k = 0; k < newDirStrLen; k++) 
+                        sn[k] = currentSectorContents[k + entry];
+                      sn[newDirStrLen] = '\0';
+
+                      // if match, then update currentDirectory members
+                      if (!strcmp (tempDir, sn))
+                        { 
+                          uint32_t dirFstClus;
+                          dirFstClus = currentSectorContents[entry + 21];
+                          dirFstClus <<= 8;
+                          dirFstClus |= currentSectorContents[entry + 20];
+                          dirFstClus <<= 8;
+                          dirFstClus |= currentSectorContents[entry + 27];
+                          dirFstClus <<= 8;
+                          dirFstClus |= currentSectorContents[entry + 26];
+
+                          currentDirectory->FATFirstCluster = dirFstClus;
+                          
+                          strcat (currentDirectory->longParentPath,  currentDirectory->longName );
+                          strcat (currentDirectory->shortParentPath, currentDirectory->shortName);
+                          
+                          // if current directory is not root then append '/'
+                          if (currentDirectory->longName[0] != '/') 
+                            strcat(currentDirectory->longParentPath,"/");
+                          strcpy(currentDirectory->longName,newDirectoryStr);
+
+                          if(currentDirectory->shortName[0] != '/') 
+                            strcat(currentDirectory->shortParentPath,"/");
+                          strcpy(currentDirectory->shortName,sn);
+
+                          return SUCCESS;
                         }
                     }
                 }
@@ -870,24 +850,6 @@ FAT_PrintFile (FatCurrentDirectory * currentDirectory, char * fileNameStr, BiosP
           return INVALID_DIR_NAME;
       }
   }
-
-  /*
-  for (uint8_t k = 0; k < fileNameStrLen; k++)
-  {
-    if( ( fileNameStr[k] == '\\') ||
-        ( fileNameStr[k] == '/' ) ||
-        ( fileNameStr[k] == ':' ) ||
-        ( fileNameStr[k] == '*' ) ||
-        ( fileNameStr[k] == '?' ) ||
-        ( fileNameStr[k] == '"' ) ||
-        ( fileNameStr[k] == '<' ) ||
-        ( fileNameStr[k] == '>' ) ||
-        ( fileNameStr[k] == '|' )   )
-    {
-      return INVALID_FILE_NAME;
-    }
-  }
-  */
 
   uint8_t allSpacesFlag = 1;
   for (uint8_t k = 0; k < fileNameStrLen; k++) 
