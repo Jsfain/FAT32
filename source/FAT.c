@@ -150,6 +150,7 @@ FAT_SetCurrentDirectory (FatCurrentDirectory * currentDirectory, char * newDirec
                                                &getNextSectorFlag,
                                                bpb
                                             );
+
               if (err != SUCCESS)
                 return err;
               
@@ -159,8 +160,9 @@ FAT_SetCurrentDirectory (FatCurrentDirectory * currentDirectory, char * newDirec
                   break;    
                 }
 
+              if (currentSectorContents[entry] == 0xE5);
 
-              if (longNameExistsFlag == 1)
+              else if (longNameExistsFlag == 1)
                 {
                   longNameStrIndex = 0;
 
@@ -277,20 +279,20 @@ FAT_PrintCurrentDirectory (FatCurrentDirectory * currentDirectory, uint8_t entry
   uint16_t shortNamePositionInCurrentSector = 0;
 
   uint8_t  nextSectorContents[ bpb->bytesPerSector ];
-  uint32_t absoluteNextSectorNumber;
   uint16_t shortNamePositionInNextSector = 0;
 
   uint8_t  attributeByte;
 
   char     longNameStr[ LONG_NAME_LEN_MAX ];
   uint8_t  longNameStrIndex = 0;
-  uint8_t  longNameOrder;
 
   // Long Name flags
   uint8_t longNameExistsFlag = 0; 
   uint8_t longNameCrossSectorBoundaryFlag = 0;
   uint8_t longNameLastSectorEntryFlag = 0;
 
+  uint8_t   getNextSectorFlag = 0;
+  uint16_t  err;
 
   // Prints column headers according to entryFilter
   print_str("\n\n\r");
@@ -319,99 +321,59 @@ FAT_PrintCurrentDirectory (FatCurrentDirectory * currentDirectory, uint8_t entry
           // loop through entries in the current sector.
           for (uint16_t entry = 0; entry < bpb->bytesPerSector; entry = entry + ENTRY_LEN)
             {
-              // ensure 'entry' is pointing at correct location in current sector.
-              if (longNameExistsFlag)
+              err = pvt_LocateEntriesToCheck (&longNameExistsFlag, 
+                                              &longNameCrossSectorBoundaryFlag, 
+                                              &longNameLastSectorEntryFlag,
+                                              &entry,
+                                              clusterNumber,
+                                              &attributeByte,
+                                              &shortNamePositionInCurrentSector,
+                                              &shortNamePositionInNextSector,
+                                              currentSectorContents,
+                                              absoluteCurrentSectorNumber,
+                                              nextSectorContents,
+                                              &currentSectorNumberInCluster,
+                                              &getNextSectorFlag,
+                                              bpb
+                                          );
+                                        
+              if (err != SUCCESS)
                 {
-                  if (shortNamePositionInCurrentSector >= (SECTOR_LEN - ENTRY_LEN))
-                    {
-                      if (entry != 0)
-                        break;
-                      else 
-                        shortNamePositionInCurrentSector = -ENTRY_LEN;
-                    }
-
-                  if( (longNameCrossSectorBoundaryFlag || longNameLastSectorEntryFlag) )
-                    {
-                      entry = shortNamePositionInNextSector + ENTRY_LEN;
-                      shortNamePositionInNextSector = 0;
-                      longNameCrossSectorBoundaryFlag = 0;
-                      longNameLastSectorEntryFlag = 0;
-                    }
-                  else 
-                    {
-                      entry = shortNamePositionInCurrentSector + ENTRY_LEN;
-                      shortNamePositionInCurrentSector = 0;
-                    }
-                  longNameExistsFlag = 0;
+                  print_str("\n\rot successful");
+                  return err;
+                } 
+              if (getNextSectorFlag == 1)
+                {
+                  print_str("getNextSectorFlag set");
+                  getNextSectorFlag = 0;
+                  break;    
                 }
 
-              // If first value of entry is 0 then all subsequent entries are empty.
-              if (currentSectorContents[ entry ] == 0) 
-                return END_OF_DIRECTORY;
+              if (currentSectorContents[entry] == 0xE5);
 
-              attributeByte = currentSectorContents[ entry + 11 ];
-
-              // entry is marked for deletion. Do nothing.
-              if (currentSectorContents[ entry ] == 0xE5);
-
-              // Entry being checked for match is a long name entry and has not been marked for deleteion (0xE5)
-              else if (((attributeByte & LONG_NAME_ATTR_MASK) == LONG_NAME_ATTR_MASK))
+              else if (longNameExistsFlag == 1)
                 {
-                  longNameExistsFlag = 1;
                   longNameStrIndex = 0;
 
-                  if ( !(currentSectorContents[ entry ] & LONG_NAME_LAST_ENTRY_FLAG))
-                    return CORRUPT_FAT_ENTRY;
-                                          
                   for (uint8_t k = 0; k < LONG_NAME_LEN_MAX; k++) 
-                    longNameStr[ k ] = '\0';
+                    longNameStr[k] = '\0';
 
-                  // number of entries required by the long name
-                  longNameOrder = LONG_NAME_ORDINAL_MASK & currentSectorContents[ entry ];
-
-                  shortNamePositionInCurrentSector = entry + (ENTRY_LEN * longNameOrder);
-
-                  // if the short name position is greater than 511 (bytePerSector-1) then the short name is in the next sector.
                   if (shortNamePositionInCurrentSector >= bpb->bytesPerSector)
                     {
-                      if (shortNamePositionInCurrentSector > bpb->bytesPerSector)
-                        {
-                          longNameCrossSectorBoundaryFlag = 1;
-                          longNameLastSectorEntryFlag = 0;
-                        }
-                      else if (shortNamePositionInCurrentSector == bpb->bytesPerSector)
-                        {
-                          longNameCrossSectorBoundaryFlag = 0;
-                          longNameLastSectorEntryFlag = 1;
-                        }
-                      else 
-                        return CORRUPT_FAT_ENTRY;
-
-                      // find next sector
-                      if (currentSectorNumberInCluster >= bpb->sectorsPerCluster - 1) 
-                        absoluteNextSectorNumber = bpb->dataRegionFirstSector + (( pvt_GetNextCluster( clusterNumber, bpb ) - 2) * bpb->sectorsPerCluster);
-                      else absoluteNextSectorNumber = 1 + absoluteCurrentSectorNumber;
-
-                      // get contents of next sector and load into nextSectorContents array.
-                      fat_ReadSingleSector (absoluteNextSectorNumber, nextSectorContents);
-
-                      shortNamePositionInNextSector = shortNamePositionInCurrentSector - bpb->bytesPerSector;
-
-                      attributeByte = nextSectorContents[ shortNamePositionInNextSector + 11 ];
-                      
                       // if shortNamePositionInNextSector points to a long name entry then something is wrong.
                       if ((attributeByte & LONG_NAME_ATTR_MASK) == LONG_NAME_ATTR_MASK) 
                         return CORRUPT_FAT_ENTRY;
-                      
+                        
                       // print if hidden attribute flag is not set OR if it is set AND the hidden filter flag is set.
                       if ( (!(attributeByte & HIDDEN_ATTR_FLAG)) || ((attributeByte & HIDDEN_ATTR_FLAG) && (entryFilter & HIDDEN)))
                         {                                                           
+                          
                           if (entryFilter & SHORT_NAME)
                             {
                               pvt_PrintEntryFields(nextSectorContents, shortNamePositionInNextSector, entryFilter);
                               pvt_PrintShortNameAndType(nextSectorContents, shortNamePositionInNextSector, attributeByte);
                             }
-                  
+
                           if (entryFilter & LONG_NAME)
                             {
                               // entries for long name cross sector boundary
@@ -462,7 +424,6 @@ FAT_PrintCurrentDirectory (FatCurrentDirectory * currentDirectory, uint8_t entry
                   else // Long name exists and is entirely in current sector along with the short name
                     {   
                       attributeByte = currentSectorContents[ shortNamePositionInCurrentSector + 11 ];
-                      
                       // shortNamePositionInCurrentSector points to long name entry
                       if ((attributeByte & LONG_NAME_ATTR_MASK) == LONG_NAME_ATTR_MASK) 
                         return CORRUPT_FAT_ENTRY;
@@ -499,7 +460,6 @@ FAT_PrintCurrentDirectory (FatCurrentDirectory * currentDirectory, uint8_t entry
               else  // Long Name Entry does not exist so use short name instead, regardless of SHORT_NAME entryFilter setting
                 {
                   attributeByte = currentSectorContents[entry + 11];
-
                   if ( (!(attributeByte & HIDDEN_ATTR_FLAG)) || ((attributeByte & HIDDEN_ATTR_FLAG) && (entryFilter & HIDDEN)))
                     {
                       pvt_PrintEntryFields(currentSectorContents, entry, entryFilter);
@@ -534,20 +494,20 @@ FAT_PrintFile (FatCurrentDirectory * currentDirectory, char * fileNameStr, BiosP
   uint16_t shortNamePositionInCurrentSector = 0;
 
   uint8_t  nextSectorContents[ bpb->bytesPerSector ];
-  uint32_t absoluteNextSectorNumber;
   uint16_t shortNamePositionInNextSector = 0;
 
   uint8_t  attributeByte;
 
   char     longNameStr[LONG_NAME_LEN_MAX];
   uint8_t  longNameStrIndex = 0;
-  uint8_t  longNameOrder;
 
   // long name flags. Set to 1 if true for current name
   uint8_t longNameExistsFlag = 0; 
   uint8_t longNameCrossSectorBoundaryFlag = 0;
   uint8_t longNameLastSectorEntryFlag = 0;
 
+  uint8_t   getNextSectorFlag = 0;
+  uint16_t  err;
 
   // ***     Search files in current directory for match to fileNameStr and print if found    *** /
   
@@ -566,86 +526,44 @@ FAT_PrintFile (FatCurrentDirectory * currentDirectory, char * fileNameStr, BiosP
           // loop through entries in the current sector.
           for (uint16_t entry = 0; entry < bpb->bytesPerSector; entry = entry + ENTRY_LEN)
             { 
-              // ensure 'entry' is pointing to correct location in current sector.
-              if (longNameExistsFlag)
+              err = pvt_LocateEntriesToCheck (&longNameExistsFlag, 
+                                              &longNameCrossSectorBoundaryFlag, 
+                                              &longNameLastSectorEntryFlag,
+                                              &entry,
+                                              clusterNumber,
+                                              &attributeByte,
+                                              &shortNamePositionInCurrentSector,
+                                              &shortNamePositionInNextSector,
+                                              currentSectorContents,
+                                              absoluteCurrentSectorNumber,
+                                              nextSectorContents,
+                                              &currentSectorNumberInCluster,
+                                              &getNextSectorFlag,
+                                              bpb
+                                          );
+              if (err != SUCCESS)
                 {
-                  if (shortNamePositionInCurrentSector >= (SECTOR_LEN - ENTRY_LEN))
-                    {
-                      if (entry != 0) 
-                        break;
-                      else 
-                        shortNamePositionInCurrentSector = -ENTRY_LEN;
-                    }
-
-                  if (longNameCrossSectorBoundaryFlag || longNameLastSectorEntryFlag)
-                    {
-                      entry = shortNamePositionInNextSector + ENTRY_LEN; 
-                      shortNamePositionInNextSector = 0; 
-                      longNameCrossSectorBoundaryFlag = 0; 
-                      longNameLastSectorEntryFlag = 0;
-                    }
-                  else 
-                    {
-                      entry = shortNamePositionInCurrentSector + ENTRY_LEN; 
-                      shortNamePositionInCurrentSector = 0;
-                    }
-
-                  longNameExistsFlag = 0;
+                  print_str("\n\rot successful");
+                  return err;
+                } 
+              if (getNextSectorFlag == 1)
+                {
+                  print_str("getNextSectorFlag set");
+                  getNextSectorFlag = 0;
+                  break;    
                 }
 
-              // If first value of entry is 0 then all subsequent entries are empty.
-              if (currentSectorContents[ entry ] == 0) 
-                return END_OF_DIRECTORY;
+              if (currentSectorContents[entry] == 0xE5);
 
-              attributeByte = currentSectorContents[ entry + 11 ];
-            
-              // entry is marked for deletion. Do nothing.
-              if (currentSectorContents[ entry ] == 0xE5);
-
-              // if entry being checked is a long name entry
-              else if ((attributeByte & LONG_NAME_ATTR_MASK) == LONG_NAME_ATTR_MASK)
+              else if (longNameExistsFlag == 1)
                 {
-                  longNameExistsFlag = 1;
                   longNameStrIndex = 0;
 
-                  if ( !(currentSectorContents[entry] & LONG_NAME_LAST_ENTRY_FLAG))
-                    return CORRUPT_FAT_ENTRY;
-
-                  for(uint8_t k = 0; k < LONG_NAME_LEN_MAX; k++) 
+                  for (uint8_t k = 0; k < LONG_NAME_LEN_MAX; k++) 
                     longNameStr[k] = '\0';
-                  
-                  // number of entries required by the long name
-                  longNameOrder = LONG_NAME_ORDINAL_MASK & currentSectorContents[entry]; 
-                                                  
-                  shortNamePositionInCurrentSector = entry + (ENTRY_LEN * longNameOrder);
-                  
-                  // if the short name position is greater than 511 (bytePerSector-1) then the short name is in the next sector.
+
                   if (shortNamePositionInCurrentSector >= bpb->bytesPerSector)
-                    {
-                      if (shortNamePositionInCurrentSector > bpb->bytesPerSector)
-                        {
-                          longNameCrossSectorBoundaryFlag = 1;
-                          longNameLastSectorEntryFlag = 0;
-                        }
-                      else if (shortNamePositionInCurrentSector == SECTOR_LEN)
-                        {
-                          longNameCrossSectorBoundaryFlag = 0;
-                          longNameLastSectorEntryFlag = 1;
-                        }
-                      else return CORRUPT_FAT_ENTRY;
-
-                      // find next sector
-                      if (currentSectorNumberInCluster >= bpb->sectorsPerCluster - 1) 
-                        absoluteNextSectorNumber = bpb->dataRegionFirstSector + ((pvt_GetNextCluster(clusterNumber, bpb) - 2) * bpb->sectorsPerCluster);
-                      else absoluteNextSectorNumber = 1 + absoluteCurrentSectorNumber;
-
-                      // get contents of next sector and load into nextSectorContents array.
-                      fat_ReadSingleSector (absoluteNextSectorNumber, nextSectorContents);
-
-                      shortNamePositionInNextSector = shortNamePositionInCurrentSector - bpb->bytesPerSector;
-
-                      attributeByte = nextSectorContents[ shortNamePositionInNextSector + 11 ];
-                      
+                    {       
                       // If shortNamePositionInNextSector points to long name entry then something is wrong.
                       if ((attributeByte & LONG_NAME_ATTR_MASK) == LONG_NAME_ATTR_MASK) 
                         return CORRUPT_FAT_ENTRY;
@@ -916,13 +834,10 @@ FAT_GetBiosParameterBlock (BiosParameterBlock * bpb)
       bpb->rootCluster <<= 8;
       bpb->rootCluster |= BootSector[44];
 
-      
       bpb->dataRegionFirstSector = bpb->bootSectorAddress + bpb->reservedSectorCount + (bpb->numberOfFats * bpb->fatSize32);
     }
   else 
-    {
-      return NOT_BOOT_SECTOR;
-    }
+    return NOT_BOOT_SECTOR;
 
   return BOOT_SECTOR_VALID;
 }
@@ -1507,9 +1422,6 @@ pvt_LocateEntriesToCheck  ( uint8_t  * longNameExistsFlag,
   else if (((*attributeByte) & LONG_NAME_ATTR_MASK) == LONG_NAME_ATTR_MASK)
     {
       *longNameExistsFlag = 1;
-      //*longNameStrIndex = 0;
-
-
 
       if ( !(currentSectorContents[ *entry ] & LONG_NAME_LAST_ENTRY_FLAG))
         return CORRUPT_FAT_ENTRY;
