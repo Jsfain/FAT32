@@ -145,7 +145,7 @@ FAT_SetBiosParameterBlock (BiosParameterBlock * bpb)
 
 /*
 ***********************************************************************************************************************
- *                                               SET A CURRENT DIRECTORY
+ *                                                 SETS A DIRECTORY
  *                                        
  * Description : Call this function to set a new current directory. This operates by searching the current directory, 
  *               pointed to by the currentDirectory struct, for a name that matches newDirectoryStr. If a match is
@@ -171,7 +171,7 @@ FAT_SetBiosParameterBlock (BiosParameterBlock * bpb)
 */
 
 uint16_t 
-FAT_SetCurrentDirectory (FatCurrentDirectory * currentDirectory, char * newDirectoryStr, BiosParameterBlock * bpb)
+FAT_SetDirectory (FatCurrentDirectory * currentDirectory, char * newDirectoryStr, BiosParameterBlock * bpb)
 {
   if (pvt_CheckLegalName (newDirectoryStr)) 
     return INVALID_DIR_NAME;
@@ -870,8 +870,6 @@ FAT_PrintFile (FatCurrentDirectory * currentDirectory, char * fileNameStr, BiosP
  * 
  * Argument    : err    This should be an error flag returned by one of the FAT functions. If it is not then this
  *                      output is meaningless. 
- *            
- * Return      : void
 ***********************************************************************************************************************
 */
 
@@ -925,7 +923,7 @@ FAT_PrintError (uint16_t err)
  *                                          (PRIVATE) CHECK FOR LEGAL NAME
  * 
  * Description : This function is called by any FAT function that must match a 'name' string argument to a FAT entry 
- *               name (e.g. FAT_PrintFile or FAT_SetCurrentDirectory). This is used to confirm the name is a legal
+ *               name (e.g. FAT_PrintFile or FAT_SetDirectory). This is used to confirm the name is a legal
  * 
  * Argument    : *nameStr    c-string that the calling function is requesting be verified as a legal FAT name.
  *            
@@ -974,15 +972,13 @@ pvt_CheckLegalName (char * nameStr)
 ***********************************************************************************************************************
  *                                  (PRIVATE) SET CURRENT DIRECTORY TO ITS PARENT
  * 
- * Description : This function is called by FAT_SetCurrentDirectory() if that function has been asked to set an 
+ * Description : This function is called by FAT_SetDirectory() if that function has been asked to set an 
  *               instance of a currentDirectory's struct members to it's parent directory.
  * 
  * Argument    : *currentDirectory     pointer to an instance of a FatCurrentDirectory struct whose members will be
  *                                     updated to point to the parent of the directory currently pointed to by the
  *                                     struct's members.
  *             : *bpb                  pointer to the BiosParameterBlock struct instance.
- *            
- * Return      : void
 ***********************************************************************************************************************
 */
 
@@ -1047,7 +1043,7 @@ pvt_SetCurrentDirectoryToParent (FatCurrentDirectory * currentDirectory, BiosPar
 ***********************************************************************************************************************
  *                           (PRIVATE) SET CURRENT DIRECTORY TO ONE OF ITS CHILD DIRECTORIES
  * 
- * Description : This function is called by FAT_SetCurrentDirectory() if that function has been asked to set an 
+ * Description : This function is called by FAT_SetDirectory() if that function has been asked to set an 
  *               instance of a currentDirectory's struct members to a child directory and a valid matching entry was 
  *               found. This function will only update the struct's members to that of the matching entry. It does
  *               not perform any of the search/compare required to find the match.
@@ -1062,8 +1058,6 @@ pvt_SetCurrentDirectoryToParent (FatCurrentDirectory * currentDirectory, BiosPar
  *                                     struct will be set to. If there is no long name associated with a short name
  *                                     then the longName and shortName members will both be set to the short name.  
  *             : *bpb                  pointer to the BiosParameterBlock struct instance.
- *            
- * Return      : void
 ***********************************************************************************************************************
 */
 
@@ -1127,8 +1121,6 @@ pvt_SetCurrentDirectoryToChild (FatCurrentDirectory * currentDirectory, uint8_t 
  *                                     function is required in order to fully load the long name into the char array,
  *                                     as in the case when a single long name crosses a sector boundary, then this 
  *                                     value will be non-zero.
- *
- * Returns     : void
 ***********************************************************************************************************************
 */
 
@@ -1232,8 +1224,6 @@ pvt_GetNextClusterIndex (uint32_t currentCluster, BiosParameterBlock * bpb)
  *             : entry            location in *sector of the first byte of the short name entry whose fields should be
  *                                printed to the screen.
  *             : entryFilter      byte of ENTRY_FLAGs, used to determine which fields of the entry will be printed.
- * 
- * Returns     : void
 ***********************************************************************************************************************
 */
 
@@ -1409,8 +1399,6 @@ pvt_PrintEntryFields (uint8_t *sector, uint16_t entry, uint8_t entryFilter)
  *                                these fields.
  *             : entry            location in *sector of the first byte of the short name entry whose fields should be
  *                                printed to the screen.
- *
- * Returns     : void
 ***********************************************************************************************************************
 */
 
@@ -1485,8 +1473,6 @@ pvt_PrintShortNameAndType (uint8_t *sector, uint16_t entry)
  *                                of the file is located in the short name entry.
  *             : *fileSector      pointer to an array that holds the short name entry of the file to be printed to the 
  *                                to the screen.
- * 
- * Returns     : void
 ***********************************************************************************************************************
 */
 
@@ -1622,8 +1608,6 @@ pvt_CorrectEntryCheckAndLongNameFlagReset (uint8_t  * longNameExistsFlag, uint8_
  *                                                     512 then the short name is in the next sector.
  *             : *shortNamePositionInNextSector      - Pointer to an integer that specifies the position of the short
  *                                                     name if it is determined to be in the next sector.
- * 
- * Returns     : void
 ***********************************************************************************************************************
 */
 
@@ -1679,8 +1663,6 @@ pvt_SetLongNameFlags ( uint8_t  * longNameExistsFlag,
  *             : clusterNumber                       - This is the current cluster's FAT index. This is required if it
  *                                                     is determined that the next sector is in the next cluster.   
  *             : *bpb                                - pointer to the BiosParameterBlock struct instance.
- * 
- * Returns     : void
 ***********************************************************************************************************************
 */
 

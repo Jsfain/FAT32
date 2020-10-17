@@ -133,7 +133,7 @@ FAT_SetBiosParameterBlock(BiosParameterBlock * bpb);
 
 /*
 ***********************************************************************************************************************
- *                                               SET A CURRENT DIRECTORY
+ *                                                 SETS A DIRECTORY
  *                                        
  * Description : Call this function to set a new current directory. This operates by searching the current directory, 
  *               pointed to by the currentDirectory struct, for a name that matches newDirectoryStr. If a match is
@@ -159,7 +159,7 @@ FAT_SetBiosParameterBlock(BiosParameterBlock * bpb);
 */
 
 uint16_t 
-FAT_SetCurrentDirectory (FatCurrentDirectory * currentDirectory, char * newDirectoryStr, BiosParameterBlock * bpb);
+FAT_SetDirectory (FatCurrentDirectory * currentDirectory, char * newDirectoryStr, BiosParameterBlock * bpb);
 
 
 
