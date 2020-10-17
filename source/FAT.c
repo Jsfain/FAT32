@@ -27,40 +27,19 @@
 ***********************************************************************************************************************
 */
 
-// Descriptions of these private functions are included with their definitions at the bottom of this file.
+// Private function descriptions are only included with their definitions at the bottom of this file.
 
-uint8_t 
-pvt_CorrectEntryCheckAndLongNameFlagReset (uint8_t * longNameExistsFlag, uint8_t * longNameCrossSectorBoundaryFlag, uint8_t * longNameLastSectorEntryFlag, 
-                                           uint16_t * entry, uint16_t * shortNamePositionInCurrentSector, uint16_t * shortNamePositionInNextSector);
-void 
-pvt_SetLongNameFlags (uint8_t * longNameExistsFlag, uint8_t * longNameCrossSectorBoundaryFlag, uint8_t * longNameLastSectorEntryFlag,
-                      uint16_t * entry, uint16_t * shortNamePositionInCurrentSector, uint8_t * currentSectorContents, BiosParameterBlock * bpb);
-void 
-pvt_GetLongNameEntry (int longNameFirstEntry, int longNameLastEntry, uint8_t *sector, char * longNameStr, uint8_t * longNameStrIndex);
-
-void 
-pvt_GetNextSector (uint8_t * nextSectorContents, uint32_t * currentSectorNumberInCluster, uint32_t absoluteCurrentSectorNumber, 
-                   uint32_t clusterNumber,  BiosParameterBlock * bpb);
-uint32_t 
-pvt_GetNextCluster (uint32_t currentCluster, BiosParameterBlock * bpb);
-
-uint8_t 
-pvt_CheckIllegalName (char * nameStr);
-
-void 
-pvt_SetCurrentDirectoryToParent (FatCurrentDirectory * currentDirectory, BiosParameterBlock * bpb);
-
-void 
-pvt_SetCurrentDirectoryToChild (FatCurrentDirectory * currentDirectory, uint8_t *sector, uint16_t shortNamePosition, char * nameStr, BiosParameterBlock * bpb);
-
-void 
-pvt_PrintEntryFields (uint8_t *byte, uint16_t entry, uint8_t entryFilter);
-
-void 
-pvt_PrintShortNameAndType (uint8_t *byte, uint16_t entry, uint8_t attr);
-
-void 
-pvt_PrintFatFile (uint16_t entry, uint8_t *fileSector, BiosParameterBlock * bpb);
+uint8_t pvt_CorrectEntryCheckAndLongNameFlagReset (uint8_t * longNameExistsFlag, uint8_t * longNameCrossSectorBoundaryFlag, uint8_t * longNameLastSectorEntryFlag, uint16_t * entry, uint16_t * shortNamePositionInCurrentSector, uint16_t * shortNamePositionInNextSector);
+void pvt_SetLongNameFlags (uint8_t * longNameExistsFlag, uint8_t * longNameCrossSectorBoundaryFlag, uint8_t * longNameLastSectorEntryFlag, uint16_t * entry, uint16_t * shortNamePositionInCurrentSector, uint8_t * currentSectorContents, BiosParameterBlock * bpb);
+void pvt_GetLongNameEntry (int longNameFirstEntry, int longNameLastEntry, uint8_t *sector, char * longNameStr, uint8_t * longNameStrIndex);
+void pvt_GetNextSector (uint8_t * nextSectorContents, uint32_t * currentSectorNumberInCluster, uint32_t absoluteCurrentSectorNumber, uint32_t clusterNumber,  BiosParameterBlock * bpb);
+uint32_t pvt_GetNextCluster (uint32_t currentCluster, BiosParameterBlock * bpb);
+uint8_t pvt_CheckLegalName (char * nameStr);
+void pvt_SetCurrentDirectoryToParent (FatCurrentDirectory * currentDirectory, BiosParameterBlock * bpb);
+void pvt_SetCurrentDirectoryToChild (FatCurrentDirectory * currentDirectory, uint8_t *sector, uint16_t shortNamePosition, char * nameStr, BiosParameterBlock * bpb);
+void pvt_PrintEntryFields (uint8_t *byte, uint16_t entry, uint8_t entryFilter);
+void pvt_PrintShortNameAndType (uint8_t *byte, uint16_t entry, uint8_t attr);
+void pvt_PrintFatFile (uint16_t entry, uint8_t *fileSector, BiosParameterBlock * bpb);
 
 
 
@@ -73,23 +52,24 @@ pvt_PrintFatFile (uint16_t entry, uint8_t *fileSector, BiosParameterBlock * bpb)
 
 /*
 ***********************************************************************************************************************
- *                                               SET A CURRENT DIRECTORY
- *                                        
- * Description : This function should be called first before implementing any other parts of this FAT module. This 
- *               function will get the necessary values of the FAT volume's Bios Parameter Block and set an instance of 
- *               a BiosParameterBlock struct's members accordingly. The instantiated BiosParameterBlock struct is then 
- *               required to be passed as an argument to any function that requires searching within the FAT volume.
+ *                                   SET MEMBERS OF THE BIOS PARAMETER BLOCK STRUCT
  * 
- * Arguments   : *bpb        instance of a BiosParameterBlock struct.
+ * An instantiated and valid BiosParameterBlock struct is a required argument of any function that accesses the FAT 
+ * volume, therefore this function should be called first before implementing any other parts of this FAT module.
+ *                                         
+ * Description : This function will set the members of a BiosParameterBlock struct instance according to the values
+ *               specified within the FAT volume's Bios Parameter Block / Boot Sector. 
  * 
- * Return      : Boot sector error flag        To print the returned value, pass it to FAT_PrintBootSectorError(err) 
- *                                             If the BiosParameterBlock struct's members were successfully set then to rea 
- *                                   SUCCESS is returned then the currentDirectory struct members were successfully 
- *                                   updated, but any other returned value indicates a failure struct members will not
- *                                   have been modified updated.
- *  
- * Limitations : This function will not work with absolute paths, it will only set a new directory that is a child or
- *               the parent of the current directory. 
+ * Argument    : *bpb    pointer to an instance of a BiosParameterBlock struct.
+ * 
+ * Return      : Boot sector error flag     See the FAT.H header file for a list of these flags. To print the returned
+ *                                          value, pass it to FAT_PrintBootSectorError(err). If the BiosParameterBlock
+ *                                          struct's members have been successfully set then BOOT_SECTOR_VALID is
+ *                                          returned. Any other returned value indicates a failure to set the BPB. 
+ * 
+ * Note        : This function DOES NOT set the values a physical FAT volume's Bios Parameter Block as would be 
+ *               required during formatting of a FAT volume. This module can only read a FAT volume's contents and does
+ *               not have the capability to modify anything on the volume, this includes formatting a FAT volume.
 ***********************************************************************************************************************
 */
 
@@ -163,8 +143,6 @@ FAT_SetBiosParameterBlock (BiosParameterBlock * bpb)
 
 
 
-
-
 /*
 ***********************************************************************************************************************
  *                                               SET A CURRENT DIRECTORY
@@ -195,7 +173,7 @@ FAT_SetBiosParameterBlock (BiosParameterBlock * bpb)
 uint16_t 
 FAT_SetCurrentDirectory (FatCurrentDirectory * currentDirectory, char * newDirectoryStr, BiosParameterBlock * bpb)
 {
-  if (pvt_CheckIllegalName (newDirectoryStr)) 
+  if (pvt_CheckLegalName (newDirectoryStr)) 
     return INVALID_DIR_NAME;
 
   // Current Directory check
@@ -628,7 +606,7 @@ FAT_PrintCurrentDirectory (FatCurrentDirectory * currentDirectory, uint8_t entry
 uint16_t 
 FAT_PrintFile (FatCurrentDirectory * currentDirectory, char * fileNameStr, BiosParameterBlock * bpb)
 {
-  if (pvt_CheckIllegalName (fileNameStr)) 
+  if (pvt_CheckLegalName (fileNameStr)) 
     return INVALID_DIR_NAME;
   
 
@@ -933,12 +911,6 @@ FAT_PrintError (uint16_t err)
 }
 
 
-// **** Boot Sector/BIOS Parameter Block GET Functions ****
-
-
-
-
-
 
 /*
 ***********************************************************************************************************************
@@ -946,9 +918,22 @@ FAT_PrintError (uint16_t err)
 ***********************************************************************************************************************
 */
 
-// returns 0 if name is legal and 1 if name is illegal.
+/*
+***********************************************************************************************************************
+ *                                             CHECK FOR LEGAL NAME
+ * 
+ * Description : This function is called by any FAT function that must match a 'name' string argument to a FAT entry 
+ *               name (e.g. FAT_PrintFile or FAT_SetCurrentDirectory). This is used to confirm the name is a legal
+ * 
+ * Argument    : *nameStr    c-string that the calling function is requesting be verified as a legal FAT name.
+ *            
+ * Return      : 0 if name is LEGAL.
+ *               1 if name is ILLEGAL.
+***********************************************************************************************************************
+*/
+
 uint8_t
-pvt_CheckIllegalName (char * nameStr)
+pvt_CheckLegalName (char * nameStr)
 {
   // illegal if name string is empty or begins with a space character 
   if ((strcmp (nameStr, "") == 0) || (nameStr[0] == ' ')) 
