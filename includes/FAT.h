@@ -152,11 +152,11 @@ FAT_PrintBootSectorError (uint8_t err);
  *                                                 SETS A DIRECTORY
  *                                        
  * Description : Call this function to set a new current directory. This operates by searching the current directory, 
- *               pointed to by the currentDirectory struct, for a name that matches newDirectoryStr. If a match is
- *               found the members of the currentDirectory struct are updated to those corresponding to the matching 
+ *               pointed to by the directory struct, for a name that matches newDirectoryStr. If a match is
+ *               found the members of the directory struct are updated to those corresponding to the matching 
  *               newDirectoryStr entry.
  *
- * Arguments   : *currentDirectory   pointer to a FatDirectory struct whose members must point to a valid
+ * Arguments   : *directory   pointer to a FatDirectory struct whose members must point to a valid
  *                                   FAT32 directory.
  *             : *newDirectoryStr    pointer to a C-string that is the name of the intended new directory. The function
  *                                   takes this and searches the current directory for a matching name. This string
@@ -165,7 +165,7 @@ FAT_PrintBootSectorError (uint8_t err);
  *             : *bpb                pointer to a BiosParameterBlock struct.
  * 
  * Returns     : FAT Error Flag      The returned value can be read by passing it to FAT_PrintError(ErrorFlag). If 
- *                                   SUCCESS is returned then the currentDirectory struct members were successfully 
+ *                                   SUCCESS is returned then the directory struct members were successfully 
  *                                   updated, but any other returned value indicates a failure struct members will not
  *                                   have been modified updated.
  *  
@@ -175,7 +175,7 @@ FAT_PrintBootSectorError (uint8_t err);
 */
 
 uint16_t 
-FAT_SetDirectory (FatDirectory * currentDirectory, char * newDirectoryStr, BiosParameterBlock * bpb);
+FAT_SetDirectory (FatDirectory * directory, char * newDirectoryStr, BiosParameterBlock * bpb);
 
 
 
@@ -187,7 +187,7 @@ FAT_SetDirectory (FatDirectory * currentDirectory, char * newDirectoryStr, BiosP
  *               which associated data (hidden files, creation date, ...) are indicated by the ENTRY_FLAG. See the 
  *               specific ENTRY_FLAGs that can be passed in the FAT.H header file.
  * 
- * Argument    : *currentDirectory   pointer to a FatDirectory struct whose members must be associated with a 
+ * Argument    : *directory   pointer to a FatDirectory struct whose members must be associated with a 
  *                                   valid FAT32 directory.
  *             : entryFilter         byte of ENTRY_FLAGs, used to determine which entries will be printed. Any 
  *                                   combination of flags can be set. If neither LONG_NAME or SHORT_NAME are passed 
@@ -201,7 +201,7 @@ FAT_SetDirectory (FatDirectory * currentDirectory, char * newDirectoryStr, BiosP
 */
 
 uint16_t 
-FAT_PrintCurrentDirectory (FatDirectory *currentDirectory, uint8_t entryFilter, BiosParameterBlock * bpb);
+FAT_PrintCurrentDirectory (FatDirectory * directory, uint8_t entryFilter, BiosParameterBlock * bpb);
 
 
 
@@ -211,7 +211,7 @@ FAT_PrintCurrentDirectory (FatDirectory *currentDirectory, uint8_t entryFilter, 
  * 
  * Description : Prints the contents of a file from the current directory to a terminal/screen.
  * 
- * Arguments   : *currentDirectory   pointer to a FatDirectory struct whose members must be associated with a 
+ * Arguments   : *directory   pointer to a FatDirectory struct whose members must be associated with a 
  *                                   valid FAT32 directory.
  *             : *fileNameStr        ptr to C-string that is the name of the file to be printed to the screen. This
  *                                   must be a long name, unless there is no associated long name with an entry, in 
@@ -225,7 +225,7 @@ FAT_PrintCurrentDirectory (FatDirectory *currentDirectory, uint8_t entryFilter, 
 */
 
 uint16_t 
-FAT_PrintFile (FatDirectory * currentDirectory, char * file, BiosParameterBlock * bpb);
+FAT_PrintFile (FatDirectory * directory, char * file, BiosParameterBlock * bpb);
 
 
 

@@ -32,11 +32,11 @@
 uint8_t pvt_CorrectEntryCheckAndLongNameFlagReset (uint8_t * longNameExistsFlag, uint8_t * longNameCrossSectorBoundaryFlag, uint8_t * longNameLastSectorEntryFlag, uint16_t * entry, uint16_t * shortNamePositionInCurrentSector, uint16_t * shortNamePositionInNextSector);
 void pvt_SetLongNameFlags (uint8_t * longNameExistsFlag, uint8_t * longNameCrossSectorBoundaryFlag, uint8_t * longNameLastSectorEntryFlag, uint16_t entry, uint16_t * shortNamePositionInCurrentSector, uint8_t * currentSectorContents, BiosParameterBlock * bpb);
 void pvt_LoadLongName (int longNameFirstEntry, int longNameLastEntry, uint8_t *sector, char * longNameStr, uint8_t * longNameStrIndex);
-void pvt_GetNextSector (uint8_t * nextSectorContents, uint32_t currentSectorNumberInCluster, uint32_t absoluteCurrentSectorNumber, uint32_t clusterNumber,  BiosParameterBlock * bpb);
-uint32_t pvt_GetNextClusterIndex (uint32_t currentCluster, BiosParameterBlock * bpb);
+void pvt_GetNextSector (uint8_t * nextSectorContents, uint32_t currentSectorNumberInCluster, uint32_t absoluteCurrentSectorNumber, uint32_t clusterIndex,  BiosParameterBlock * bpb);
+uint32_t pvt_GetNextClusterIndex (uint32_t currentClusterIndex, BiosParameterBlock * bpb);
 uint8_t pvt_CheckLegalName (char * nameStr);
-void pvt_SetCurrentDirectoryToParent (FatDirectory * currentDirectory, BiosParameterBlock * bpb);
-void pvt_SetCurrentDirectoryToChild (FatDirectory * currentDirectory, uint8_t *sector, uint16_t shortNamePosition, char * nameStr, BiosParameterBlock * bpb);
+void pvt_SetCurrentDirectoryToParent (FatDirectory * directory, BiosParameterBlock * bpb);
+void pvt_SetCurrentDirectoryToChild (FatDirectory * directory, uint8_t *sector, uint16_t shortNamePosition, char * nameStr, BiosParameterBlock * bpb);
 void pvt_PrintEntryFields (uint8_t *byte, uint16_t entry, uint8_t entryFilter);
 void pvt_PrintShortNameAndType (uint8_t *byte, uint16_t entry);
 void pvt_PrintFatFile (uint16_t entry, uint8_t *fileSector, BiosParameterBlock * bpb);
@@ -190,11 +190,11 @@ FAT_PrintBootSectorError (uint8_t err)
  *                                                 SETS A DIRECTORY
  *                                        
  * Description : Call this function to set a new current directory. This operates by searching the current directory, 
- *               pointed to by the currentDirectory struct, for a name that matches newDirectoryStr. If a match is
- *               found the members of the currentDirectory struct are updated to those corresponding to the matching 
+ *               pointed to by the directory struct, for a name that matches newDirectoryStr. If a match is
+ *               found the members of the directory struct are updated to those corresponding to the matching 
  *               newDirectoryStr entry.
  *
- * Arguments   : *currentDirectory   pointer to a FatDirectory struct whose members must point to a valid
+ * Arguments   : *directory   pointer to a FatDirectory struct whose members must point to a valid
  *                                   FAT32 directory.
  *             : *newDirectoryStr    pointer to a C-string that is the name of the intended new directory. The function
  *                                   takes this and searches the current directory for a matching name. This string
@@ -203,7 +203,7 @@ FAT_PrintBootSectorError (uint8_t err)
  *             : *bpb                pointer to a BiosParameterBlock struct.
  * 
  * Return      : FAT Error Flag      The returned value can be read by passing it to FAT_PrintError(ErrorFlag). If 
- *                                   SUCCESS is returned then the currentDirectory struct members were successfully 
+ *                                   SUCCESS is returned then the directory struct members were successfully 
  *                                   updated, but any other returned value indicates a failure struct members will not
  *                                   have been modified updated.
  *  
@@ -213,7 +213,7 @@ FAT_PrintBootSectorError (uint8_t err)
 */
 
 uint16_t 
-FAT_SetDirectory (FatDirectory * currentDirectory, char * newDirectoryStr, BiosParameterBlock * bpb)
+FAT_SetDirectory (FatDirectory * directory, char * newDirectoryStr, BiosParameterBlock * bpb)
 {
   if (pvt_CheckLegalName (newDirectoryStr)) 
     return INVALID_DIR_NAME;
@@ -225,12 +225,12 @@ FAT_SetDirectory (FatDirectory * currentDirectory, char * newDirectoryStr, BiosP
   // Parent Directory check
   if (!strcmp (newDirectoryStr, ".."))
     {
-      pvt_SetCurrentDirectoryToParent (currentDirectory, bpb);
+      pvt_SetCurrentDirectoryToParent (directory, bpb);
       return SUCCESS;
     }
 
   uint8_t  newDirStrLen = strlen (newDirectoryStr);
-  uint32_t clusterNumber = currentDirectory->FATFirstCluster;
+  uint32_t clusterIndex = directory->FATFirstCluster;
   uint8_t  currentSectorContents[ bpb->bytesPerSector ]; 
   uint32_t absoluteCurrentSectorNumber;
   uint16_t shortNamePositionInCurrentSector = 0;
@@ -243,7 +243,7 @@ FAT_SetDirectory (FatDirectory * currentDirectory, char * newDirectoryStr, BiosP
   uint8_t  longNameExistsFlag = 0; 
   uint8_t  longNameCrossSectorBoundaryFlag = 0;
   uint8_t  longNameLastSectorEntryFlag = 0;
-  uint8_t   entryCorrectionFlag = 0;
+  uint8_t  entryCorrectionFlag = 0;
 
   // ***    Search directory entries of the current directory for match to newDirectoryStr and print if found    *** /
   // loop through the current directory's clusters
@@ -253,7 +253,7 @@ FAT_SetDirectory (FatDirectory * currentDirectory, char * newDirectoryStr, BiosP
       for (uint32_t currentSectorNumberInCluster = 0; currentSectorNumberInCluster < bpb->sectorsPerCluster; currentSectorNumberInCluster++)
         {         
           // load sector bytes into currentSectorContents[]
-          absoluteCurrentSectorNumber = currentSectorNumberInCluster + bpb->dataRegionFirstSector + ((clusterNumber - 2) * bpb->sectorsPerCluster);
+          absoluteCurrentSectorNumber = currentSectorNumberInCluster + bpb->dataRegionFirstSector + ((clusterIndex - 2) * bpb->sectorsPerCluster);
           fat_ReadSingleSector (absoluteCurrentSectorNumber, currentSectorContents);
 
           // loop through entries in the current sector.
@@ -294,7 +294,7 @@ FAT_SetDirectory (FatDirectory * currentDirectory, char * newDirectoryStr, BiosP
 
                       if (longNameCrossSectorBoundaryFlag || longNameLastSectorEntryFlag)
                         {
-                          pvt_GetNextSector (nextSectorContents, currentSectorNumberInCluster, absoluteCurrentSectorNumber, clusterNumber, bpb);
+                          pvt_GetNextSector (nextSectorContents, currentSectorNumberInCluster, absoluteCurrentSectorNumber, clusterIndex, bpb);
                           shortNamePositionInNextSector = (shortNamePositionInCurrentSector) - bpb->bytesPerSector;
                           attributeByte = nextSectorContents[ shortNamePositionInNextSector + 11 ];
 
@@ -316,7 +316,7 @@ FAT_SetDirectory (FatDirectory * currentDirectory, char * newDirectoryStr, BiosP
                                   pvt_LoadLongName (SECTOR_LEN - ENTRY_LEN, (int)entry, currentSectorContents, longNameStr, &longNameStrIndex);
                                   if (!strcmp (newDirectoryStr, longNameStr)) 
                                     {                                                        
-                                      pvt_SetCurrentDirectoryToChild (currentDirectory, nextSectorContents, shortNamePositionInNextSector, newDirectoryStr, bpb);
+                                      pvt_SetCurrentDirectoryToChild (directory, nextSectorContents, shortNamePositionInNextSector, newDirectoryStr, bpb);
                                       return SUCCESS;
                                     }
                                 }
@@ -332,7 +332,7 @@ FAT_SetDirectory (FatDirectory * currentDirectory, char * newDirectoryStr, BiosP
                                   pvt_LoadLongName(SECTOR_LEN - ENTRY_LEN, (int)entry, currentSectorContents, longNameStr, &longNameStrIndex);
                                   if (!strcmp (newDirectoryStr, longNameStr)) 
                                     { 
-                                      pvt_SetCurrentDirectoryToChild (currentDirectory, nextSectorContents, shortNamePositionInNextSector, newDirectoryStr, bpb);
+                                      pvt_SetCurrentDirectoryToChild (directory, nextSectorContents, shortNamePositionInNextSector, newDirectoryStr, bpb);
                                       return SUCCESS;
                                     }
                                 }
@@ -356,7 +356,7 @@ FAT_SetDirectory (FatDirectory * currentDirectory, char * newDirectoryStr, BiosP
                               pvt_LoadLongName (shortNamePositionInCurrentSector - ENTRY_LEN, (int)entry, currentSectorContents, longNameStr, &longNameStrIndex);
                               if  (!strcmp (newDirectoryStr, longNameStr)) 
                                 { 
-                                  pvt_SetCurrentDirectoryToChild (currentDirectory, currentSectorContents, shortNamePositionInCurrentSector, newDirectoryStr, bpb);
+                                  pvt_SetCurrentDirectoryToChild (directory, currentSectorContents, shortNamePositionInCurrentSector, newDirectoryStr, bpb);
                                   return SUCCESS;
                                 }                                       
                             }
@@ -380,7 +380,7 @@ FAT_SetDirectory (FatDirectory * currentDirectory, char * newDirectoryStr, BiosP
                           sn[ newDirStrLen ] = '\0';
                           if (!strcmp (tempDir, sn))
                             { 
-                              pvt_SetCurrentDirectoryToChild (currentDirectory, currentSectorContents, entry, newDirectoryStr, bpb);
+                              pvt_SetCurrentDirectoryToChild (directory, currentSectorContents, entry, newDirectoryStr, bpb);
                               return SUCCESS;
                             }
                         }
@@ -389,7 +389,7 @@ FAT_SetDirectory (FatDirectory * currentDirectory, char * newDirectoryStr, BiosP
             }
         }
     } 
-  while ((clusterNumber = pvt_GetNextClusterIndex(clusterNumber, bpb)) != END_OF_CLUSTER);
+  while ((clusterIndex = pvt_GetNextClusterIndex(clusterIndex, bpb)) != END_OF_CLUSTER);
   
   return END_OF_DIRECTORY;
 }
@@ -404,7 +404,7 @@ FAT_SetDirectory (FatDirectory * currentDirectory, char * newDirectoryStr, BiosP
  *               which associated data (hidden files, creation date, ...) are indicated by the ENTRY_FLAG. See the 
  *               specific ENTRY_FLAGs that can be passed in the FAT.H header file.
  * 
- * Arguments   : *currentDirectory   pointer to a FatDirectory struct whose members must be associated with a 
+ * Arguments   : *directory   pointer to a FatDirectory struct whose members must be associated with a 
  *                                   valid FAT32 directory.
  *             : entryFilter         byte of ENTRY_FLAGs, used to determine which entries will be printed. Any 
  *                                   combination of flags can be set. If neither LONG_NAME or SHORT_NAME are passed 
@@ -418,9 +418,9 @@ FAT_SetDirectory (FatDirectory * currentDirectory, char * newDirectoryStr, BiosP
 */
 
 uint16_t 
-FAT_PrintCurrentDirectory (FatDirectory * currentDirectory, uint8_t entryFilter, BiosParameterBlock * bpb)
+FAT_PrintCurrentDirectory (FatDirectory * directory, uint8_t entryFilter, BiosParameterBlock * bpb)
 {
-  uint32_t clusterNumber = currentDirectory->FATFirstCluster;
+  uint32_t clusterIndex = directory->FATFirstCluster;
 
   uint8_t  currentSectorContents[ bpb->bytesPerSector ];
   uint32_t absoluteCurrentSectorNumber;
@@ -462,7 +462,7 @@ FAT_PrintCurrentDirectory (FatDirectory * currentDirectory, uint8_t entryFilter,
       for (uint32_t currentSectorNumberInCluster = 0; currentSectorNumberInCluster < bpb->sectorsPerCluster; currentSectorNumberInCluster++)
         {
           // load sector bytes into currentSectorContents[]
-          absoluteCurrentSectorNumber = currentSectorNumberInCluster + bpb->dataRegionFirstSector + ((clusterNumber - 2) * bpb->sectorsPerCluster);
+          absoluteCurrentSectorNumber = currentSectorNumberInCluster + bpb->dataRegionFirstSector + ((clusterIndex - 2) * bpb->sectorsPerCluster);
           fat_ReadSingleSector (absoluteCurrentSectorNumber, currentSectorContents);
 
           // loop through entries in the current sector.
@@ -502,7 +502,7 @@ FAT_PrintCurrentDirectory (FatDirectory * currentDirectory, uint8_t entryFilter,
 
                       if (longNameCrossSectorBoundaryFlag || longNameLastSectorEntryFlag)
                         {
-                          pvt_GetNextSector ( nextSectorContents, currentSectorNumberInCluster, absoluteCurrentSectorNumber, clusterNumber, bpb );
+                          pvt_GetNextSector ( nextSectorContents, currentSectorNumberInCluster, absoluteCurrentSectorNumber, clusterIndex, bpb );
 
                           shortNamePositionInNextSector = (shortNamePositionInCurrentSector) - bpb->bytesPerSector;
 
@@ -618,7 +618,7 @@ FAT_PrintCurrentDirectory (FatDirectory * currentDirectory, uint8_t entryFilter,
             }
         }
     }
-  while ((clusterNumber = pvt_GetNextClusterIndex( clusterNumber, bpb )) != END_OF_CLUSTER);
+  while ((clusterIndex = pvt_GetNextClusterIndex( clusterIndex, bpb )) != END_OF_CLUSTER);
   // END: Print entries in the current directory
 
   return END_OF_DIRECTORY;
@@ -632,7 +632,7 @@ FAT_PrintCurrentDirectory (FatDirectory * currentDirectory, uint8_t entryFilter,
  * 
  * Description : Prints the contents of a file from the current directory to a terminal/screen.
  * 
- * Arguments   : *currentDirectory   pointer to a FatDirectory struct whose members must be associated with a 
+ * Arguments   : *directory   pointer to a FatDirectory struct whose members must be associated with a 
  *                                   valid FAT32 directory.
  *             : *fileNameStr        ptr to C-string that is the name of the file to be printed to the screen. This
  *                                   must be a long name, unless there is no associated long name with an entry, in 
@@ -646,7 +646,7 @@ FAT_PrintCurrentDirectory (FatDirectory * currentDirectory, uint8_t entryFilter,
 */
 
 uint16_t 
-FAT_PrintFile (FatDirectory * currentDirectory, char * fileNameStr, BiosParameterBlock * bpb)
+FAT_PrintFile (FatDirectory * directory, char * fileNameStr, BiosParameterBlock * bpb)
 {
   if (pvt_CheckLegalName (fileNameStr)) 
     return INVALID_DIR_NAME;
@@ -654,7 +654,7 @@ FAT_PrintFile (FatDirectory * currentDirectory, char * fileNameStr, BiosParamete
 
   uint8_t fileNameStrLen = strlen(fileNameStr);
 
-  uint32_t clusterNumber = currentDirectory->FATFirstCluster;
+  uint32_t clusterIndex = directory->FATFirstCluster;
   
   uint8_t  currentSectorContents[ bpb->bytesPerSector ];
   uint32_t absoluteCurrentSectorNumber;
@@ -686,7 +686,7 @@ FAT_PrintFile (FatDirectory * currentDirectory, char * fileNameStr, BiosParamete
       for (uint32_t currentSectorNumberInCluster = 0; currentSectorNumberInCluster < bpb->sectorsPerCluster; currentSectorNumberInCluster++)
         {     
           // load sector bytes into currentSectorContents[]
-          absoluteCurrentSectorNumber = currentSectorNumberInCluster + bpb->dataRegionFirstSector + ((clusterNumber - 2) * bpb->sectorsPerCluster);
+          absoluteCurrentSectorNumber = currentSectorNumberInCluster + bpb->dataRegionFirstSector + ((clusterIndex - 2) * bpb->sectorsPerCluster);
           fat_ReadSingleSector (absoluteCurrentSectorNumber, currentSectorContents );
           
           // loop through entries in the current sector.
@@ -727,7 +727,7 @@ FAT_PrintFile (FatDirectory * currentDirectory, char * fileNameStr, BiosParamete
                       if (longNameCrossSectorBoundaryFlag || longNameLastSectorEntryFlag)
                         {
                           
-                          pvt_GetNextSector ( nextSectorContents, currentSectorNumberInCluster, absoluteCurrentSectorNumber, clusterNumber, bpb );
+                          pvt_GetNextSector ( nextSectorContents, currentSectorNumberInCluster, absoluteCurrentSectorNumber, clusterIndex, bpb );
 
                           shortNamePositionInNextSector = (shortNamePositionInCurrentSector) - bpb->bytesPerSector;
 
@@ -897,7 +897,7 @@ FAT_PrintFile (FatDirectory * currentDirectory, char * fileNameStr, BiosParamete
             }
         }
     } 
-  while ( ((clusterNumber = pvt_GetNextClusterIndex (clusterNumber, bpb)) != END_OF_CLUSTER) && (clusCnt < 5));
+  while ( ((clusterIndex = pvt_GetNextClusterIndex (clusterIndex, bpb)) != END_OF_CLUSTER) && (clusCnt < 5));
 
   return FILE_NOT_FOUND; 
 }
@@ -1015,9 +1015,9 @@ pvt_CheckLegalName (char * nameStr)
  *                                  (PRIVATE) SET CURRENT DIRECTORY TO ITS PARENT
  * 
  * Description : This function is called by FAT_SetDirectory() if that function has been asked to set an 
- *               instance of a currentDirectory's struct members to it's parent directory.
+ *               instance of a directory's struct members to it's parent directory.
  * 
- * Argument    : *currentDirectory     pointer to an instance of a FatDirectory struct whose members will be
+ * Argument    : *directory     pointer to an instance of a FatDirectory struct whose members will be
  *                                     updated to point to the parent of the directory currently pointed to by the
  *                                     struct's members.
  *             : *bpb                  pointer to the BiosParameterBlock struct instance.
@@ -1025,14 +1025,14 @@ pvt_CheckLegalName (char * nameStr)
 */
 
 void 
-pvt_SetCurrentDirectoryToParent (FatDirectory * currentDirectory, BiosParameterBlock * bpb)
+pvt_SetCurrentDirectoryToParent (FatDirectory * directory, BiosParameterBlock * bpb)
 {
   uint32_t parentDirectoryFirstCluster;
   uint32_t absoluteCurrentSectorNumber;
   uint8_t  currentSectorContents[bpb->bytesPerSector];
 
   //absoluteCurrentSectorNumber = bpb->dataRegionFirstSector + ((cluster - 2) * bpb->sectorsPerCluster);
-  absoluteCurrentSectorNumber = bpb->dataRegionFirstSector + ((currentDirectory->FATFirstCluster - 2) * bpb->sectorsPerCluster);
+  absoluteCurrentSectorNumber = bpb->dataRegionFirstSector + ((directory->FATFirstCluster - 2) * bpb->sectorsPerCluster);
 
   fat_ReadSingleSector (absoluteCurrentSectorNumber, currentSectorContents);
 
@@ -1045,37 +1045,37 @@ pvt_SetCurrentDirectoryToParent (FatDirectory * currentDirectory, BiosParameterB
   parentDirectoryFirstCluster |= currentSectorContents[58];
 
   // if current directory is root directory, do nothing.
-  if (currentDirectory->FATFirstCluster == bpb->rootCluster); 
+  if (directory->FATFirstCluster == bpb->rootCluster); 
 
   // parent directory is root directory
   else if (parentDirectoryFirstCluster == 0)
     {
-      strcpy (currentDirectory->shortName, "/");
-      strcpy (currentDirectory->shortParentPath, "");
-      strcpy (currentDirectory->longName, "/");
-      strcpy (currentDirectory->longParentPath, "");
-      currentDirectory->FATFirstCluster = bpb->rootCluster;
+      strcpy (directory->shortName, "/");
+      strcpy (directory->shortParentPath, "");
+      strcpy (directory->longName, "/");
+      strcpy (directory->longParentPath, "");
+      directory->FATFirstCluster = bpb->rootCluster;
     }
   else // parent directory is not root directory
     {          
       char tmpShortNamePath[64];
       char tmpLongNamePath[64];
 
-      strlcpy (tmpShortNamePath, currentDirectory->shortParentPath, strlen (currentDirectory->shortParentPath));
-      strlcpy (tmpLongNamePath, currentDirectory->longParentPath,   strlen (currentDirectory->longParentPath ));
+      strlcpy (tmpShortNamePath, directory->shortParentPath, strlen (directory->shortParentPath));
+      strlcpy (tmpLongNamePath, directory->longParentPath,   strlen (directory->longParentPath ));
       
       char *shortNameLastDirectoryInPath = strrchr (tmpShortNamePath, '/');
       char *longNameLastDirectoryInPath  = strrchr (tmpLongNamePath , '/');
       
-      strcpy (currentDirectory->shortName, shortNameLastDirectoryInPath + 1);
-      strcpy (currentDirectory->longName , longNameLastDirectoryInPath  + 1);
+      strcpy (directory->shortName, shortNameLastDirectoryInPath + 1);
+      strcpy (directory->longName , longNameLastDirectoryInPath  + 1);
 
-      strlcpy (currentDirectory->shortParentPath, tmpShortNamePath, 
+      strlcpy (directory->shortParentPath, tmpShortNamePath, 
                 (shortNameLastDirectoryInPath + 2) - tmpShortNamePath);
-      strlcpy (currentDirectory->longParentPath,  tmpLongNamePath, 
+      strlcpy (directory->longParentPath,  tmpLongNamePath, 
                 (longNameLastDirectoryInPath  + 2) -  tmpLongNamePath);
 
-      currentDirectory->FATFirstCluster = parentDirectoryFirstCluster;
+      directory->FATFirstCluster = parentDirectoryFirstCluster;
     }
 }
 
@@ -1086,11 +1086,11 @@ pvt_SetCurrentDirectoryToParent (FatDirectory * currentDirectory, BiosParameterB
  *                           (PRIVATE) SET CURRENT DIRECTORY TO ONE OF ITS CHILD DIRECTORIES
  * 
  * Description : This function is called by FAT_SetDirectory() if that function has been asked to set an 
- *               instance of a currentDirectory's struct members to a child directory and a valid matching entry was 
+ *               instance of a directory's struct members to a child directory and a valid matching entry was 
  *               found. This function will only update the struct's members to that of the matching entry. It does
  *               not perform any of the search/compare required to find the match.
  * 
- * Argument    : *currentDirectory     pointer to an instance of a FatDirectory struct whose members will be
+ * Argument    : *directory     pointer to an instance of a FatDirectory struct whose members will be
  *                                     updated to point to the child directory indicated by *nameStr.
  *             : *sector               pointer to an array that holds the physical sector's contents that contains the 
  *                                     short name of the entry that matches the *nameStr.
@@ -1104,7 +1104,7 @@ pvt_SetCurrentDirectoryToParent (FatDirectory * currentDirectory, BiosParameterB
 */
 
 void
-pvt_SetCurrentDirectoryToChild (FatDirectory * currentDirectory, uint8_t *sector, uint16_t shortNamePosition, char * nameStr, BiosParameterBlock * bpb)
+pvt_SetCurrentDirectoryToChild (FatDirectory * directory, uint8_t *sector, uint16_t shortNamePosition, char * nameStr, BiosParameterBlock * bpb)
 {
   uint32_t dirFirstCluster;
   dirFirstCluster = sector[shortNamePosition + 21];
@@ -1115,7 +1115,7 @@ pvt_SetCurrentDirectoryToChild (FatDirectory * currentDirectory, uint8_t *sector
   dirFirstCluster <<= 8;
   dirFirstCluster |= sector[shortNamePosition + 26];
 
-  currentDirectory->FATFirstCluster = dirFirstCluster;
+  directory->FATFirstCluster = dirFirstCluster;
   
   uint8_t snLen;
   if (strlen(nameStr) < 8) snLen = strlen(nameStr);
@@ -1126,17 +1126,17 @@ pvt_SetCurrentDirectoryToChild (FatDirectory * currentDirectory, uint8_t *sector
     sn[k] = sector[shortNamePosition + k];
   sn[snLen] = '\0';
 
-  strcat (currentDirectory->longParentPath,  currentDirectory->longName );
-  strcat (currentDirectory->shortParentPath, currentDirectory->shortName);
+  strcat (directory->longParentPath,  directory->longName );
+  strcat (directory->shortParentPath, directory->shortName);
 
   // if current directory is not root then append '/'
-  if (currentDirectory->longName[0] != '/') 
-    strcat(currentDirectory->longParentPath, "/"); 
-  strcpy(currentDirectory->longName, nameStr);
+  if (directory->longName[0] != '/') 
+    strcat(directory->longParentPath, "/"); 
+  strcpy(directory->longName, nameStr);
   
-  if (currentDirectory->shortName[0] != '/') 
-    strcat(currentDirectory->shortParentPath, "/");
-  strcpy(currentDirectory->shortName, sn);
+  if (directory->shortName[0] != '/') 
+    strcat(directory->shortParentPath, "/");
+  strcpy(directory->shortName, sn);
 }
 
 
@@ -1214,24 +1214,24 @@ pvt_LoadLongName (int longNameFirstEntry, int longNameLastEntry, uint8_t * secto
  *               clusters in the FATs Data Region. Therefore, to get the cluster number in the data region the value
  *               returned by this function must be subtracted by 2.
  * 
- * Arguments   : *currentCluster       a cluster's FAT index. The value at this index in the FAT is the index of the
+ * Arguments   : *currentClusterIndex       a cluster's FAT index. The value at this index in the FAT is the index of the
  *                                     the next cluster of the file or directory.
  *             : *bpb                  pointer to the BiosParameterBlock struct instance.
  * 
  * Returns     : The FAT index of the next cluster of a file or directory. This is the value stored at the indexed
- *               location in the FAT specified by the value of currentCluster's index. If a value of 0xFFFFFFFF then 
- *               currentCluster is the last cluster of the file/directory.
+ *               location in the FAT specified by the value of currentClusterIndex's index. If a value of 0xFFFFFFFF then 
+ *               currentClusterIndex is the last cluster of the file/directory.
 ***********************************************************************************************************************
 */
 
 uint32_t 
-pvt_GetNextClusterIndex (uint32_t currentCluster, BiosParameterBlock * bpb)
+pvt_GetNextClusterIndex (uint32_t currentClusterIndex, BiosParameterBlock * bpb)
 {
   uint8_t  bytesPerClusterIndex = 4; // for FAT32
   uint16_t numberOfIndexedClustersPerSectorOfFat = bpb->bytesPerSector / bytesPerClusterIndex; // = 128
 
-  uint32_t clusterIndex = currentCluster / numberOfIndexedClustersPerSectorOfFat;
-  uint32_t clusterIndexStartByte = 4 * (currentCluster % numberOfIndexedClustersPerSectorOfFat);
+  uint32_t clusterIndex = currentClusterIndex / numberOfIndexedClustersPerSectorOfFat;
+  uint32_t clusterIndexStartByte = 4 * (currentClusterIndex % numberOfIndexedClustersPerSectorOfFat);
   uint32_t cluster = 0;
 
   uint32_t fatSectorToRead = clusterIndex + bpb->reservedSectorCount;
@@ -1702,19 +1702,19 @@ pvt_SetLongNameFlags ( uint8_t  * longNameExistsFlag,
  *                                                     sector is in the current or the next cluster.
  *             : absoluteCurrentSectorNumber         - This is the the current sector's physical sector number on the
  *                                                     disk hosting the FAT volume.
- *             : clusterNumber                       - This is the current cluster's FAT index. This is required if it
+ *             : clusterIndex                       - This is the current cluster's FAT index. This is required if it
  *                                                     is determined that the next sector is in the next cluster.   
  *             : *bpb                                - pointer to the BiosParameterBlock struct instance.
 ***********************************************************************************************************************
 */
 
 void
-pvt_GetNextSector( uint8_t * nextSectorContents, uint32_t currentSectorNumberInCluster, uint32_t absoluteCurrentSectorNumber, uint32_t clusterNumber,  BiosParameterBlock * bpb )
+pvt_GetNextSector( uint8_t * nextSectorContents, uint32_t currentSectorNumberInCluster, uint32_t absoluteCurrentSectorNumber, uint32_t clusterIndex,  BiosParameterBlock * bpb )
 {
   uint32_t absoluteNextSectorNumber; 
   
   if (currentSectorNumberInCluster >= (bpb->sectorsPerCluster - 1)) 
-    absoluteNextSectorNumber = bpb->dataRegionFirstSector + ((pvt_GetNextClusterIndex (clusterNumber, bpb) - 2) * bpb->sectorsPerCluster);
+    absoluteNextSectorNumber = bpb->dataRegionFirstSector + ((pvt_GetNextClusterIndex (clusterIndex, bpb) - 2) * bpb->sectorsPerCluster);
   else 
     absoluteNextSectorNumber = 1 + absoluteCurrentSectorNumber;
 
