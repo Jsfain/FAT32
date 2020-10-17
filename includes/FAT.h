@@ -104,7 +104,7 @@ typedef struct
 
 
 uint16_t 
-FAT_GetBiosParameterBlock(BiosParameterBlock * bpb);
+FAT_SetBiosParameterBlock(BiosParameterBlock * bpb);
 
 
 /*
@@ -167,19 +167,23 @@ FAT_PrintCurrentDirectory (FatCurrentDirectory *currentDirectory, uint8_t entryF
 
 /*
 ***********************************************************************************************************************
- *                                                  PRINT FILE
+ *                                               PRINT FILE TO SCREEN
  * 
- * DESCRIPTION : Prints the contents of *file to a terminal/screen.
+ * Description : Prints the contents of a file from the current directory to a terminal/screen.
  * 
- * ARGUMENTS   : *currentDirectory      pointer to a FatCurrentDirectory struct whose members must point to a valid
- *                                      FAT32 directory.
- *             : *file                  ptr to string that is the long name of the file to be printed to the 
- *                                      screen. *file can only point to a short name if there is no long name for 
- *                                      that entry.
- *             : *bpb
- * RETURNS     : FAT Error Flag. This can be read by passing it to PrintFatError(ErrorFlag).
+ * Arguments   : *currentDirectory   pointer to a FatCurrentDirectory struct whose members must be associated with a 
+ *                                   valid FAT32 directory.
+ *             : *fileNameStr        ptr to C-string that is the name of the file to be printed to the screen. This
+ *                                   must be a long name, unless there is no associated long name with an entry, in 
+ *                                   which case it can be a short name.
+ *             : *bpb                pointer to a BiosParameterBlock struct.
+ * 
+ * Return      : FAT Error Flag     Returns END_OF_FILE if the function completed successfully and was able to
+ *                                  read in and print a file's contents to the screen. Any other value returned 
+ *                                  indicates an error. Pass the returned value to FAT_PrintError(ErrorFlag).
 ***********************************************************************************************************************
 */
+
 uint16_t 
 FAT_PrintFile (FatCurrentDirectory * currentDirectory, char * file, BiosParameterBlock * bpb);
 

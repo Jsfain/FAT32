@@ -71,6 +71,99 @@ pvt_PrintFatFile (uint16_t entry, uint8_t *fileSector, BiosParameterBlock * bpb)
 */
 
 
+/*
+***********************************************************************************************************************
+ *                                               SET A CURRENT DIRECTORY
+ *                                        
+ * Description : This function should be called first before implementing any other parts of this FAT module. This 
+ *               function will get the necessary values of the FAT volume's Bios Parameter Block and set an instance of 
+ *               a BiosParameterBlock struct's members accordingly. The instantiated BiosParameterBlock struct is then 
+ *               required to be passed as an argument to any function that requires searching within the FAT volume.
+ * 
+ * Arguments   : *bpb        instance of a BiosParameterBlock struct.
+ * 
+ * Return      : Boot sector error flag        To print the returned value, pass it to FAT_PrintBootSectorError(err) 
+ *                                             If the BiosParameterBlock struct's members were successfully set then to rea 
+ *                                   SUCCESS is returned then the currentDirectory struct members were successfully 
+ *                                   updated, but any other returned value indicates a failure struct members will not
+ *                                   have been modified updated.
+ *  
+ * Limitations : This function will not work with absolute paths, it will only set a new directory that is a child or
+ *               the parent of the current directory. 
+***********************************************************************************************************************
+*/
+
+uint16_t 
+FAT_SetBiosParameterBlock (BiosParameterBlock * bpb)
+{
+  uint8_t BootSector[SECTOR_LEN];
+
+  bpb->bootSectorAddress = fat_FindBootSector();
+  
+  if (bpb->bootSectorAddress != 0xFFFFFFFF)
+    {
+      fat_ReadSingleSector (bpb->bootSectorAddress, BootSector);
+    }
+  else
+    {
+      return BOOT_SECTOR_NOT_FOUND;
+    }
+
+  // last two bytes of Boot Sector should be signature bytes.
+  if ((BootSector[SECTOR_LEN - 2] == 0x55) && (BootSector[SECTOR_LEN - 1] == 0xAA))
+    {
+      bpb->bytesPerSector = BootSector[12];
+      bpb->bytesPerSector <<= 8;
+      bpb->bytesPerSector |= BootSector[11];
+      
+      if (bpb->bytesPerSector != SECTOR_LEN) 
+        {
+          return INVALID_BYTES_PER_SECTOR;
+        }
+
+      // secPerClus
+      bpb->sectorsPerCluster = BootSector[13];
+
+      if ((    bpb->sectorsPerCluster != 1 ) && (bpb->sectorsPerCluster != 2  ) && (bpb->sectorsPerCluster != 4 )
+           && (bpb->sectorsPerCluster != 8 ) && (bpb->sectorsPerCluster != 16 ) && (bpb->sectorsPerCluster != 32)
+           && (bpb->sectorsPerCluster != 64) && (bpb->sectorsPerCluster != 128))
+        {
+          return INVALID_SECTORS_PER_CLUSTER;
+        }
+
+      bpb->reservedSectorCount = BootSector[15];
+      bpb->reservedSectorCount <<= 8;
+      bpb->reservedSectorCount |= BootSector[14];
+
+      bpb->numberOfFats = BootSector[16];
+
+      bpb->fatSize32 =  BootSector[39];
+      bpb->fatSize32 <<= 8;
+      bpb->fatSize32 |= BootSector[38];
+      bpb->fatSize32 <<= 8;
+      bpb->fatSize32 |= BootSector[37];
+      bpb->fatSize32 <<= 8;
+      bpb->fatSize32 |= BootSector[36];
+
+      bpb->rootCluster =  BootSector[47];
+      bpb->rootCluster <<= 8;
+      bpb->rootCluster |= BootSector[46];
+      bpb->rootCluster <<= 8;
+      bpb->rootCluster |= BootSector[45];
+      bpb->rootCluster <<= 8;
+      bpb->rootCluster |= BootSector[44];
+
+      bpb->dataRegionFirstSector = bpb->bootSectorAddress + bpb->reservedSectorCount + (bpb->numberOfFats * bpb->fatSize32);
+    }
+  else 
+    return NOT_BOOT_SECTOR;
+
+  return BOOT_SECTOR_VALID;
+}
+
+
+
+
 
 /*
 ***********************************************************************************************************************
@@ -285,7 +378,7 @@ FAT_SetCurrentDirectory (FatCurrentDirectory * currentDirectory, char * newDirec
 
 /*
 ***********************************************************************************************************************
- *                                       PRINT THE ENTRIES OF THE CURRENT DIRECTORY
+ *                               PRINT THE ENTRIES OF THE CURRENT DIRECTORY TO A SCREEN
  * 
  * Description : Prints a list of entries (files and directories) contained in the current directory. Which entries and
  *               which associated data (hidden files, creation date, ...) are indicated by the ENTRY_FLAG. See the 
@@ -515,7 +608,7 @@ FAT_PrintCurrentDirectory (FatCurrentDirectory * currentDirectory, uint8_t entry
 
 /*
 ***********************************************************************************************************************
- *                                                  PRINT FILE TO SCREEN
+ *                                               PRINT FILE TO SCREEN
  * 
  * Description : Prints the contents of a file from the current directory to a terminal/screen.
  * 
@@ -526,7 +619,9 @@ FAT_PrintCurrentDirectory (FatCurrentDirectory * currentDirectory, uint8_t entry
  *                                   which case it can be a short name.
  *             : *bpb                pointer to a BiosParameterBlock struct.
  * 
- * Return      : FAT Error Flag.     This can be read by passing it to PrintFatError(ErrorFlag).
+ * Return      : FAT Error Flag     Returns END_OF_FILE if the function completed successfully and was able to
+ *                                  read in and print a file's contents to the screen. Any other value returned 
+ *                                  indicates an error. Pass the returned value to FAT_PrintError(ErrorFlag).
 ***********************************************************************************************************************
 */
 
@@ -788,7 +883,20 @@ FAT_PrintFile (FatCurrentDirectory * currentDirectory, char * fileNameStr, BiosP
 }
 
 
-// Prints an error code returned by a fat function.
+
+/*
+***********************************************************************************************************************
+ *                                        PRINT ERROR RETURNED BY A FAT FUNCTION
+ * 
+ * Description : Call this function to print an error flag returned by one of the FAT functions to the screen. 
+ * 
+ * Argument    : err    This should be an error flag returned by one of the FAT functions. If it is not then this
+ *                      output is meaningless. 
+ *            
+ * Return      : void
+***********************************************************************************************************************
+*/
+
 void 
 FAT_PrintError (uint16_t err)
 {  
@@ -828,73 +936,7 @@ FAT_PrintError (uint16_t err)
 // **** Boot Sector/BIOS Parameter Block GET Functions ****
 
 
-uint16_t 
-FAT_GetBiosParameterBlock (BiosParameterBlock * bpb)
-{
-  uint8_t BootSector[SECTOR_LEN];
 
-  bpb->bootSectorAddress = fat_FindBootSector();
-  
-  if (bpb->bootSectorAddress != 0xFFFFFFFF)
-    {
-      fat_ReadSingleSector (bpb->bootSectorAddress, BootSector);
-    }
-  else
-    {
-      return BOOT_SECTOR_NOT_FOUND;
-    }
-
-  // last two bytes of Boot Sector should be signature bytes.
-  if ((BootSector[SECTOR_LEN - 2] == 0x55) && (BootSector[SECTOR_LEN - 1] == 0xAA))
-    {
-      bpb->bytesPerSector = BootSector[12];
-      bpb->bytesPerSector <<= 8;
-      bpb->bytesPerSector |= BootSector[11];
-      
-      if (bpb->bytesPerSector != SECTOR_LEN) 
-        {
-          return INVALID_BYTES_PER_SECTOR;
-        }
-
-      // secPerClus
-      bpb->sectorsPerCluster = BootSector[13];
-
-      if ((    bpb->sectorsPerCluster != 1 ) && (bpb->sectorsPerCluster != 2  ) && (bpb->sectorsPerCluster != 4 )
-           && (bpb->sectorsPerCluster != 8 ) && (bpb->sectorsPerCluster != 16 ) && (bpb->sectorsPerCluster != 32)
-           && (bpb->sectorsPerCluster != 64) && (bpb->sectorsPerCluster != 128))
-        {
-          return INVALID_SECTORS_PER_CLUSTER;
-        }
-
-      bpb->reservedSectorCount = BootSector[15];
-      bpb->reservedSectorCount <<= 8;
-      bpb->reservedSectorCount |= BootSector[14];
-
-      bpb->numberOfFats = BootSector[16];
-
-      bpb->fatSize32 =  BootSector[39];
-      bpb->fatSize32 <<= 8;
-      bpb->fatSize32 |= BootSector[38];
-      bpb->fatSize32 <<= 8;
-      bpb->fatSize32 |= BootSector[37];
-      bpb->fatSize32 <<= 8;
-      bpb->fatSize32 |= BootSector[36];
-
-      bpb->rootCluster =  BootSector[47];
-      bpb->rootCluster <<= 8;
-      bpb->rootCluster |= BootSector[46];
-      bpb->rootCluster <<= 8;
-      bpb->rootCluster |= BootSector[45];
-      bpb->rootCluster <<= 8;
-      bpb->rootCluster |= BootSector[44];
-
-      bpb->dataRegionFirstSector = bpb->bootSectorAddress + bpb->reservedSectorCount + (bpb->numberOfFats * bpb->fatSize32);
-    }
-  else 
-    return NOT_BOOT_SECTOR;
-
-  return BOOT_SECTOR_VALID;
-}
 
 
 
