@@ -107,24 +107,33 @@ uint16_t
 FAT_GetBiosParameterBlock(BiosParameterBlock * bpb);
 
 
-
 /*
 ***********************************************************************************************************************
- *                                             SET A CURRENT DIRECTORY
+ *                                               SET A CURRENT DIRECTORY
  *                                        
- * DESCRIPTION : Call this function to set a new current directory by setting the Sets currentDirectory to 
- *               newDirectoryStr, if found, by updating the members of the FatCurrentDirectory struct with values 
- *               corresponding to a matching directory entry for newDirectory.
+ * Description : Call this function to set a new current directory. This operates by searching the current directory, 
+ *               pointed to by the currentDirectory struct, for a name that matches newDirectoryStr. If a match is
+ *               found the members of the currentDirectory struct are updated to those corresponding to the matching 
+ *               newDirectoryStr entry.
  *
- * ARGUMENTS   : *currentDirectory      pointer to a FatCurrentDirectory struct whose members must point to a valid
- *                                      FAT32 directory.
- *             : *newDirectoryStr       pointer to a string that specifies the long name of the intended new directory.
- *                                      newDirectoryStr can only be a short name if there is no long name for the entry.
- *             : *bpb                   Bios Parameter block
+ * Arguments   : *currentDirectory   pointer to a FatCurrentDirectory struct whose members must point to a valid
+ *                                   FAT32 directory.
+ *             : *newDirectoryStr    pointer to a C-string that is the name of the intended new directory. The function
+ *                                   takes this and searches the current directory for a matching name. This string
+ *                                   must be a long name unless a long name does not exist for a given entry. Only then
+ *                                   will a short name be searched.
+ *             : *bpb                pointer to a BiosParameterBlock struct.
  * 
- * RETURNS     : FAT Error Flag         This can be read by passing it to PrintFatError(ErrorFlag).
+ * Returns     : FAT Error Flag      The returned value can be read by passing it to FAT_PrintError(ErrorFlag). If 
+ *                                   SUCCESS is returned then the currentDirectory struct members were successfully 
+ *                                   updated, but any other returned value indicates a failure struct members will not
+ *                                   have been modified updated.
+ *  
+ * Limitation  : This function will not work with absolute paths, it will only set a new directory that is a child or
+ *               the parent of the current directory. 
 ***********************************************************************************************************************
 */
+
 uint16_t 
 FAT_SetCurrentDirectory (FatCurrentDirectory * currentDirectory, char * newDirectoryStr, BiosParameterBlock * bpb);
 
@@ -132,21 +141,27 @@ FAT_SetCurrentDirectory (FatCurrentDirectory * currentDirectory, char * newDirec
 
 /*
 ***********************************************************************************************************************
- *                                       PRINT ENTRIES IN THE CURRENT DIRECTORY
+ *                                       PRINT THE ENTRIES OF THE CURRENT DIRECTORY
  * 
- * DESCRIPTION : Prints the contents of currentDirectory to the screen. Which contents are printed is specified by 
- *               ENTRY_FLAG (see ENTRY FLAGS list above.)
+ * Description : Prints a list of entries (files and directories) contained in the current directory. Which entries and
+ *               which associated data (hidden files, creation date, ...) are indicated by the ENTRY_FLAG. See the 
+ *               specific ENTRY_FLAGs that can be passed in the FAT.H header file.
  * 
- * ARGUMENT    : *currentDirectory       pointer to a FatCurrentDirectory struct whose members must point to a valid
- *                                       FAT32 directory.
- *             : entryFilterFlag
- *             : *bpb
+ * Argument    : *currentDirectory   pointer to a FatCurrentDirectory struct whose members must be associated with a 
+ *                                   valid FAT32 directory.
+ *             : entryFilter         byte of ENTRY_FLAGs, used to determine which entries will be printed. Any 
+ *                                   combination of flags can be set. If neither LONG_NAME or SHORT_NAME are passed 
+ *                                   then no entries will be printed.
+ *             : *bpb                pointer to a BiosParameterBlock struct.
  * 
- * RETURNS     : FAT Error Flag. This can be read by passing it to PrintFatError(ErrorFlag).
+ * Returns     : FAT Error Flag     Returns END_OF_DIRECTORY if the function completed successfully and was able to
+ *                                  read in and print entries until it reached the end of the directory. Any other 
+ *                                  value returned indicates an error. Pass the value to FAT_PrintError(ErrorFlag). 
 ***********************************************************************************************************************
 */
+
 uint16_t 
-FAT_PrintCurrentDirectory (FatCurrentDirectory *currentDirectory, uint8_t entryFilterFlag, BiosParameterBlock * bpb);
+FAT_PrintCurrentDirectory (FatCurrentDirectory *currentDirectory, uint8_t entryFilter, BiosParameterBlock * bpb);
 
 
 

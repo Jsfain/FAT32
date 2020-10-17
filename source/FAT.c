@@ -27,20 +27,31 @@
 ***********************************************************************************************************************
 */
 
+// Descriptions of these private functions are included with their definitions at the bottom of this file.
+
+uint8_t 
+pvt_CorrectEntryCheckAndLongNameFlagReset (uint8_t * longNameExistsFlag, uint8_t * longNameCrossSectorBoundaryFlag, uint8_t * longNameLastSectorEntryFlag, 
+                                           uint16_t * entry, uint16_t * shortNamePositionInCurrentSector, uint16_t * shortNamePositionInNextSector);
+void 
+pvt_SetLongNameFlags (uint8_t * longNameExistsFlag, uint8_t * longNameCrossSectorBoundaryFlag, uint8_t * longNameLastSectorEntryFlag,
+                      uint16_t * entry, uint16_t * shortNamePositionInCurrentSector, uint8_t * currentSectorContents, BiosParameterBlock * bpb);
+void 
+pvt_GetLongNameEntry (int longNameFirstEntry, int longNameLastEntry, uint8_t *sector, char * longNameStr, uint8_t * longNameStrIndex);
+
+void 
+pvt_GetNextSector (uint8_t * nextSectorContents, uint32_t * currentSectorNumberInCluster, uint32_t absoluteCurrentSectorNumber, 
+                   uint32_t clusterNumber,  BiosParameterBlock * bpb);
 uint32_t 
 pvt_GetNextCluster (uint32_t currentCluster, BiosParameterBlock * bpb);
 
-uint8_t // returns 0 if name is legal. 1 if name is illegal
+uint8_t 
 pvt_CheckIllegalName (char * nameStr);
 
-void // updates current directory to the parent directory
+void 
 pvt_SetCurrentDirectoryToParent (FatCurrentDirectory * currentDirectory, BiosParameterBlock * bpb);
 
-void // updates current directory to a child directory
+void 
 pvt_SetCurrentDirectoryToChild (FatCurrentDirectory * currentDirectory, uint8_t *sector, uint16_t shortNamePosition, char * nameStr, BiosParameterBlock * bpb);
-
-void
-pvt_GetLongNameEntry(int longNameFirstEntry, int longNameLastEntry, uint8_t *sector, char * longNameStr, uint8_t * longNameStrIndex);
 
 void 
 pvt_PrintEntryFields (uint8_t *byte, uint16_t entry, uint8_t entryFilter);
@@ -48,20 +59,10 @@ pvt_PrintEntryFields (uint8_t *byte, uint16_t entry, uint8_t entryFilter);
 void 
 pvt_PrintShortNameAndType (uint8_t *byte, uint16_t entry, uint8_t attr);
 
-void
+void 
 pvt_PrintFatFile (uint16_t entry, uint8_t *fileSector, BiosParameterBlock * bpb);
 
 
-uint8_t 
-pvt_CorrectEntryCheckAndResetFlags (  uint8_t * longNameExistsFlag, uint8_t * longNameCrossSectorBoundaryFlag, uint8_t * longNameLastSectorEntryFlag,
-                                      uint16_t * entry, uint16_t * shortNamePositionInCurrentSector, uint16_t * shortNamePositionInNextSector);
-void
-pvt_SetLongNameFlags ( uint8_t  * longNameExistsFlag, uint8_t  * longNameCrossSectorBoundaryFlag, uint8_t  * longNameLastSectorEntryFlag,
-                       uint16_t * entry, uint16_t * shortNamePositionInCurrentSector, uint8_t  * currentSectorContents, BiosParameterBlock * bpb);
-
-void
-pvt_GetNextSector( uint8_t * nextSectorContents, uint32_t * currentSectorNumberInCluster, uint32_t absoluteCurrentSectorNumber, 
-                   uint32_t clusterNumber,  BiosParameterBlock * bpb );
 
 /*
 ***********************************************************************************************************************
@@ -70,8 +71,34 @@ pvt_GetNextSector( uint8_t * nextSectorContents, uint32_t * currentSectorNumberI
 */
 
 
-// Set currentDirectory to newDirectoryStr if found.
-// Return a Fat Error Flag
+
+/*
+***********************************************************************************************************************
+ *                                               SET A CURRENT DIRECTORY
+ *                                        
+ * Description : Call this function to set a new current directory. This operates by searching the current directory, 
+ *               pointed to by the currentDirectory struct, for a name that matches newDirectoryStr. If a match is
+ *               found the members of the currentDirectory struct are updated to those corresponding to the matching 
+ *               newDirectoryStr entry.
+ *
+ * Arguments   : *currentDirectory   pointer to a FatCurrentDirectory struct whose members must point to a valid
+ *                                   FAT32 directory.
+ *             : *newDirectoryStr    pointer to a C-string that is the name of the intended new directory. The function
+ *                                   takes this and searches the current directory for a matching name. This string
+ *                                   must be a long name unless a long name does not exist for a given entry. Only then
+ *                                   will a short name be searched.
+ *             : *bpb                pointer to a BiosParameterBlock struct.
+ * 
+ * Return      : FAT Error Flag      The returned value can be read by passing it to FAT_PrintError(ErrorFlag). If 
+ *                                   SUCCESS is returned then the currentDirectory struct members were successfully 
+ *                                   updated, but any other returned value indicates a failure struct members will not
+ *                                   have been modified updated.
+ *  
+ * Limitations : This function will not work with absolute paths, it will only set a new directory that is a child or
+ *               the parent of the current directory. 
+***********************************************************************************************************************
+*/
+
 uint16_t 
 FAT_SetCurrentDirectory (FatCurrentDirectory * currentDirectory, char * newDirectoryStr, BiosParameterBlock * bpb)
 {
@@ -89,31 +116,23 @@ FAT_SetCurrentDirectory (FatCurrentDirectory * currentDirectory, char * newDirec
       return SUCCESS;
     }
 
-
   uint8_t  newDirStrLen = strlen (newDirectoryStr);
-
   uint32_t clusterNumber = currentDirectory->FATFirstCluster;
-
   uint8_t  currentSectorContents[ bpb->bytesPerSector ]; 
   uint32_t absoluteCurrentSectorNumber;
   uint16_t shortNamePositionInCurrentSector = 0;
-
   uint8_t  nextSectorContents[ bpb->bytesPerSector ];
   uint16_t shortNamePositionInNextSector = 0;
-
   uint8_t  attributeByte;
-
   char     longNameStr[ LONG_NAME_LEN_MAX ];
   uint8_t  longNameStrIndex = 0;
-
   // Long Name flags
   uint8_t  longNameExistsFlag = 0; 
   uint8_t  longNameCrossSectorBoundaryFlag = 0;
   uint8_t  longNameLastSectorEntryFlag = 0;
-  
   uint8_t   entryCorrectionFlag = 0;
 
-  // ***     Search directories in current directory for match to newDirectoryStr and print if found    *** /
+  // ***    Search directory entries of the current directory for match to newDirectoryStr and print if found    *** /
   // loop through the current directory's clusters
   do
     {
@@ -127,7 +146,7 @@ FAT_SetCurrentDirectory (FatCurrentDirectory * currentDirectory, char * newDirec
           // loop through entries in the current sector.
           for (uint16_t entry = 0; entry < SECTOR_LEN; entry = entry + ENTRY_LEN)
             {
-              entryCorrectionFlag = pvt_CorrectEntryCheckAndResetFlags ( &longNameExistsFlag, &longNameCrossSectorBoundaryFlag, &longNameLastSectorEntryFlag,
+              entryCorrectionFlag = pvt_CorrectEntryCheckAndLongNameFlagReset ( &longNameExistsFlag, &longNameCrossSectorBoundaryFlag, &longNameLastSectorEntryFlag,
                                                                          &entry, &shortNamePositionInCurrentSector, &shortNamePositionInNextSector);
               
               if (entryCorrectionFlag == 1)
@@ -162,11 +181,9 @@ FAT_SetCurrentDirectory (FatCurrentDirectory * currentDirectory, char * newDirec
 
                       if (longNameCrossSectorBoundaryFlag || longNameLastSectorEntryFlag)
                         {
-                          pvt_GetNextSector ( nextSectorContents, &currentSectorNumberInCluster, absoluteCurrentSectorNumber, clusterNumber, bpb );
-
+                          pvt_GetNextSector (nextSectorContents, &currentSectorNumberInCluster, absoluteCurrentSectorNumber, clusterNumber, bpb);
                           shortNamePositionInNextSector = (shortNamePositionInCurrentSector) - bpb->bytesPerSector;
-
-                          attributeByte = nextSectorContents[ (shortNamePositionInNextSector) + 11 ];
+                          attributeByte = nextSectorContents[ shortNamePositionInNextSector + 11 ];
 
                           // If shortNamePositionInNextSector points to long name entry then something is wrong.
                           if ((attributeByte & LONG_NAME_ATTR_MASK) == LONG_NAME_ATTR_MASK) 
@@ -259,14 +276,34 @@ FAT_SetCurrentDirectory (FatCurrentDirectory * currentDirectory, char * newDirec
             }
         }
     } 
-  while ((clusterNumber = pvt_GetNextCluster(clusterNumber, bpb) != END_OF_CLUSTER);
+  while ((clusterNumber = pvt_GetNextCluster(clusterNumber, bpb)) != END_OF_CLUSTER);
   
   return END_OF_DIRECTORY;
 }
 
-// Prints long and/or short name entries found in the current directory as well
-// as prints the entry's associated fields as specified by entryFilter.
-// Returns a Fat Error Flag
+
+
+/*
+***********************************************************************************************************************
+ *                                       PRINT THE ENTRIES OF THE CURRENT DIRECTORY
+ * 
+ * Description : Prints a list of entries (files and directories) contained in the current directory. Which entries and
+ *               which associated data (hidden files, creation date, ...) are indicated by the ENTRY_FLAG. See the 
+ *               specific ENTRY_FLAGs that can be passed in the FAT.H header file.
+ * 
+ * Arguments   : *currentDirectory   pointer to a FatCurrentDirectory struct whose members must be associated with a 
+ *                                   valid FAT32 directory.
+ *             : entryFilter         byte of ENTRY_FLAGs, used to determine which entries will be printed. Any 
+ *                                   combination of flags can be set. If neither LONG_NAME or SHORT_NAME are passed 
+ *                                   then no entries will be printed.
+ *             : *bpb                pointer to a BiosParameterBlock struct.
+ * 
+ * Return      : FAT Error Flag     Returns END_OF_DIRECTORY if the function completed successfully and was able to
+ *                                  read in and print entries until it reached the end of the directory. Any other 
+ *                                  value returned indicates an error. Pass the value to FAT_PrintError(ErrorFlag). 
+***********************************************************************************************************************
+*/
+
 uint16_t 
 FAT_PrintCurrentDirectory (FatCurrentDirectory * currentDirectory, uint8_t entryFilter, BiosParameterBlock * bpb)
 {
@@ -318,7 +355,7 @@ FAT_PrintCurrentDirectory (FatCurrentDirectory * currentDirectory, uint8_t entry
           // loop through entries in the current sector.
           for (uint16_t entry = 0; entry < bpb->bytesPerSector; entry = entry + ENTRY_LEN)
             {
-              entryCorrectionFlag = pvt_CorrectEntryCheckAndResetFlags ( &longNameExistsFlag, &longNameCrossSectorBoundaryFlag, &longNameLastSectorEntryFlag,
+              entryCorrectionFlag = pvt_CorrectEntryCheckAndLongNameFlagReset ( &longNameExistsFlag, &longNameCrossSectorBoundaryFlag, &longNameLastSectorEntryFlag,
                                                                          &entry, &shortNamePositionInCurrentSector, &shortNamePositionInNextSector);
               
               if (entryCorrectionFlag == 1)
@@ -475,8 +512,24 @@ FAT_PrintCurrentDirectory (FatCurrentDirectory * currentDirectory, uint8_t entry
 }
 
 
-// Prints the contents of file specified by *fileNameStr to the screen.
-// Returns a Fat Error Flag
+
+/*
+***********************************************************************************************************************
+ *                                                  PRINT FILE TO SCREEN
+ * 
+ * Description : Prints the contents of a file from the current directory to a terminal/screen.
+ * 
+ * Arguments   : *currentDirectory   pointer to a FatCurrentDirectory struct whose members must be associated with a 
+ *                                   valid FAT32 directory.
+ *             : *fileNameStr        ptr to C-string that is the name of the file to be printed to the screen. This
+ *                                   must be a long name, unless there is no associated long name with an entry, in 
+ *                                   which case it can be a short name.
+ *             : *bpb                pointer to a BiosParameterBlock struct.
+ * 
+ * Return      : FAT Error Flag.     This can be read by passing it to PrintFatError(ErrorFlag).
+***********************************************************************************************************************
+*/
+
 uint16_t 
 FAT_PrintFile (FatCurrentDirectory * currentDirectory, char * fileNameStr, BiosParameterBlock * bpb)
 {
@@ -524,7 +577,7 @@ FAT_PrintFile (FatCurrentDirectory * currentDirectory, char * fileNameStr, BiosP
           // loop through entries in the current sector.
           for (uint16_t entry = 0; entry < bpb->bytesPerSector; entry = entry + ENTRY_LEN)
             { 
-              entryCorrectionFlag = pvt_CorrectEntryCheckAndResetFlags ( &longNameExistsFlag, &longNameCrossSectorBoundaryFlag, &longNameLastSectorEntryFlag,
+              entryCorrectionFlag = pvt_CorrectEntryCheckAndLongNameFlagReset ( &longNameExistsFlag, &longNameCrossSectorBoundaryFlag, &longNameLastSectorEntryFlag,
                                                                          &entry, &shortNamePositionInCurrentSector, &shortNamePositionInNextSector);
                                                       
               if (entryCorrectionFlag == 1)
@@ -586,7 +639,7 @@ FAT_PrintFile (FatCurrentDirectory * currentDirectory, char * fileNameStr, BiosP
                                   if(!strcmp (fileNameStr,longNameStr))
                                     { 
                                       pvt_PrintFatFile (shortNamePositionInNextSector, nextSectorContents, bpb); 
-                                      return SUCCESS;
+                                      return END_OF_FILE;
                                     }
                                 }
 
@@ -606,7 +659,7 @@ FAT_PrintFile (FatCurrentDirectory * currentDirectory, char * fileNameStr, BiosP
                                   if ( !strcmp(fileNameStr, longNameStr))
                                     { 
                                       pvt_PrintFatFile (shortNamePositionInNextSector, nextSectorContents, bpb); 
-                                      return SUCCESS;
+                                      return END_OF_FILE;
                                     }                                            
                                 }
                               else 
@@ -637,7 +690,7 @@ FAT_PrintFile (FatCurrentDirectory * currentDirectory, char * fileNameStr, BiosP
                               if ( !strcmp (fileNameStr, longNameStr))
                                 { 
                                   pvt_PrintFatFile(shortNamePositionInCurrentSector, currentSectorContents, bpb); 
-                                  return SUCCESS;
+                                  return END_OF_FILE;
                                 }                                                                                    
                             }
                         }           
@@ -721,7 +774,7 @@ FAT_PrintFile (FatCurrentDirectory * currentDirectory, char * fileNameStr, BiosP
                           if(match)
                             {
                               pvt_PrintFatFile (entry, currentSectorContents, bpb);
-                              return SUCCESS;
+                              return END_OF_FILE;
                             }
                         }
                     }
@@ -851,8 +904,7 @@ FAT_GetBiosParameterBlock (BiosParameterBlock * bpb)
 ***********************************************************************************************************************
 */
 
-
-// returns 1 if the name is an illegal FAT name.
+// returns 0 if name is legal and 1 if name is illegal.
 uint8_t
 pvt_CheckIllegalName (char * nameStr)
 {
@@ -887,7 +939,7 @@ pvt_CheckIllegalName (char * nameStr)
   return 1; // legal name
 }
 
-
+// updates the current directory struct members to point to the parent directory.
 void // sets the current directory to the parent directory
 pvt_SetCurrentDirectoryToParent (FatCurrentDirectory * currentDirectory, BiosParameterBlock * bpb)
 {
@@ -943,7 +995,7 @@ pvt_SetCurrentDirectoryToParent (FatCurrentDirectory * currentDirectory, BiosPar
     }
 }
 
-
+// updates the current directory struct memebers to point to a child of the current directory.
 void // sets the current directory to a child of the current directory
 pvt_SetCurrentDirectoryToChild (FatCurrentDirectory * currentDirectory, uint8_t *sector, uint16_t shortNamePosition, char * nameStr, BiosParameterBlock * bpb)
 {
@@ -980,7 +1032,7 @@ pvt_SetCurrentDirectoryToChild (FatCurrentDirectory * currentDirectory, uint8_t 
   strcpy(currentDirectory->shortName, sn);
 }
 
-
+// loads long name entry into the longNameStr char array.
 void
 pvt_GetLongNameEntry(int longNameFirstEntry, int longNameLastEntry, uint8_t * sector, char * longNameStr, uint8_t * longNameStrIndex)
 {
@@ -1359,8 +1411,13 @@ pvt_PrintFatFile (uint16_t entry, uint8_t *fileSector, BiosParameterBlock * bpb)
 
 
 
+
+// Checks if entry is pointing to the correct location in the current sector. If not, then the calling function will
+// need to break and get the next sector. This uses the current state of the longName flags to determine if a correction
+// is needed, after the longName flags are read, the function will then reset these flags 0.
+// Returns 1 if the a correction is needed, in which case the calling function should break and get the next sector.
 uint8_t 
-pvt_CorrectEntryCheckAndResetFlags (  uint8_t  * longNameExistsFlag, 
+pvt_CorrectEntryCheckAndLongNameFlagReset (  uint8_t  * longNameExistsFlag, 
                                       uint8_t  * longNameCrossSectorBoundaryFlag, 
                                       uint8_t  * longNameLastSectorEntryFlag,
                                       uint16_t * entry,
@@ -1397,7 +1454,7 @@ pvt_CorrectEntryCheckAndResetFlags (  uint8_t  * longNameExistsFlag,
 }    
 
 
-
+// sets the long name flags. These flags specify how a long name, and its associated short name, are distributed among sectors.
 void
 pvt_SetLongNameFlags ( uint8_t  * longNameExistsFlag, 
                        uint8_t  * longNameCrossSectorBoundaryFlag, 
@@ -1431,7 +1488,7 @@ pvt_SetLongNameFlags ( uint8_t  * longNameExistsFlag,
     }
 }    
 
-
+// gets the contents of the next sector when a short name and its long name are distributed across a sector boundary.
 void
 pvt_GetNextSector( uint8_t * nextSectorContents, uint32_t * currentSectorNumberInCluster, uint32_t absoluteCurrentSectorNumber, uint32_t clusterNumber,  BiosParameterBlock * bpb )
 {
