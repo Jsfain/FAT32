@@ -103,8 +103,32 @@ typedef struct
 
 
 
+/*
+***********************************************************************************************************************
+ *                                   SET MEMBERS OF THE BIOS PARAMETER BLOCK STRUCT
+ * 
+ * An instantiated and valid BiosParameterBlock struct is a required argument of any function that accesses the FAT 
+ * volume, therefore this function should be called first before implementing any other parts of this FAT module.
+ *                                         
+ * Description : This function will set the members of a BiosParameterBlock struct instance according to the values
+ *               specified within the FAT volume's Bios Parameter Block / Boot Sector. 
+ * 
+ * Argument    : *bpb    pointer to an instance of a BiosParameterBlock struct.
+ * 
+ * Return      : Boot sector error flag     See the FAT.H header file for a list of these flags. To print the returned
+ *                                          value, pass it to FAT_PrintBootSectorError(err). If the BiosParameterBlock
+ *                                          struct's members have been successfully set then BOOT_SECTOR_VALID is
+ *                                          returned. Any other returned value indicates a failure to set the BPB. 
+ * 
+ * Note        : This function DOES NOT set the values a physical FAT volume's Bios Parameter Block as would be 
+ *               required during formatting of a FAT volume. This module can only read a FAT volume's contents and does
+ *               not have the capability to modify anything on the volume, this includes formatting a FAT volume.
+***********************************************************************************************************************
+*/
+
 uint16_t 
 FAT_SetBiosParameterBlock(BiosParameterBlock * bpb);
+
 
 
 /*

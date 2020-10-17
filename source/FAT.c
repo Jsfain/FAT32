@@ -30,15 +30,15 @@
 // Private function descriptions are only included with their definitions at the bottom of this file.
 
 uint8_t pvt_CorrectEntryCheckAndLongNameFlagReset (uint8_t * longNameExistsFlag, uint8_t * longNameCrossSectorBoundaryFlag, uint8_t * longNameLastSectorEntryFlag, uint16_t * entry, uint16_t * shortNamePositionInCurrentSector, uint16_t * shortNamePositionInNextSector);
-void pvt_SetLongNameFlags (uint8_t * longNameExistsFlag, uint8_t * longNameCrossSectorBoundaryFlag, uint8_t * longNameLastSectorEntryFlag, uint16_t * entry, uint16_t * shortNamePositionInCurrentSector, uint8_t * currentSectorContents, BiosParameterBlock * bpb);
-void pvt_GetLongNameEntry (int longNameFirstEntry, int longNameLastEntry, uint8_t *sector, char * longNameStr, uint8_t * longNameStrIndex);
-void pvt_GetNextSector (uint8_t * nextSectorContents, uint32_t * currentSectorNumberInCluster, uint32_t absoluteCurrentSectorNumber, uint32_t clusterNumber,  BiosParameterBlock * bpb);
-uint32_t pvt_GetNextCluster (uint32_t currentCluster, BiosParameterBlock * bpb);
+void pvt_SetLongNameFlags (uint8_t * longNameExistsFlag, uint8_t * longNameCrossSectorBoundaryFlag, uint8_t * longNameLastSectorEntryFlag, uint16_t entry, uint16_t * shortNamePositionInCurrentSector, uint8_t * currentSectorContents, BiosParameterBlock * bpb);
+void pvt_LoadLongName (int longNameFirstEntry, int longNameLastEntry, uint8_t *sector, char * longNameStr, uint8_t * longNameStrIndex);
+void pvt_GetNextSector (uint8_t * nextSectorContents, uint32_t currentSectorNumberInCluster, uint32_t absoluteCurrentSectorNumber, uint32_t clusterNumber,  BiosParameterBlock * bpb);
+uint32_t pvt_GetNextClusterIndex (uint32_t currentCluster, BiosParameterBlock * bpb);
 uint8_t pvt_CheckLegalName (char * nameStr);
 void pvt_SetCurrentDirectoryToParent (FatCurrentDirectory * currentDirectory, BiosParameterBlock * bpb);
 void pvt_SetCurrentDirectoryToChild (FatCurrentDirectory * currentDirectory, uint8_t *sector, uint16_t shortNamePosition, char * nameStr, BiosParameterBlock * bpb);
 void pvt_PrintEntryFields (uint8_t *byte, uint16_t entry, uint8_t entryFilter);
-void pvt_PrintShortNameAndType (uint8_t *byte, uint16_t entry, uint8_t attr);
+void pvt_PrintShortNameAndType (uint8_t *byte, uint16_t entry);
 void pvt_PrintFatFile (uint16_t entry, uint8_t *fileSector, BiosParameterBlock * bpb);
 
 
@@ -248,11 +248,11 @@ FAT_SetCurrentDirectory (FatCurrentDirectory * currentDirectory, char * newDirec
 
 
                       pvt_SetLongNameFlags ( &longNameExistsFlag, &longNameCrossSectorBoundaryFlag, &longNameLastSectorEntryFlag,
-                                             &entry, &shortNamePositionInCurrentSector, currentSectorContents, bpb);
+                                             entry, &shortNamePositionInCurrentSector, currentSectorContents, bpb);
 
                       if (longNameCrossSectorBoundaryFlag || longNameLastSectorEntryFlag)
                         {
-                          pvt_GetNextSector (nextSectorContents, &currentSectorNumberInCluster, absoluteCurrentSectorNumber, clusterNumber, bpb);
+                          pvt_GetNextSector (nextSectorContents, currentSectorNumberInCluster, absoluteCurrentSectorNumber, clusterNumber, bpb);
                           shortNamePositionInNextSector = (shortNamePositionInCurrentSector) - bpb->bytesPerSector;
                           attributeByte = nextSectorContents[ shortNamePositionInNextSector + 11 ];
 
@@ -270,8 +270,8 @@ FAT_SetCurrentDirectory (FatCurrentDirectory * currentDirectory, char * newDirec
                                     return CORRUPT_FAT_ENTRY;
 
                                   // load long name entry that crosses sector boundary into longNameStr[]
-                                  pvt_GetLongNameEntry (shortNamePositionInNextSector - ENTRY_LEN, 0, nextSectorContents, longNameStr, &longNameStrIndex);
-                                  pvt_GetLongNameEntry (SECTOR_LEN - ENTRY_LEN, (int)entry, currentSectorContents, longNameStr, &longNameStrIndex);
+                                  pvt_LoadLongName (shortNamePositionInNextSector - ENTRY_LEN, 0, nextSectorContents, longNameStr, &longNameStrIndex);
+                                  pvt_LoadLongName (SECTOR_LEN - ENTRY_LEN, (int)entry, currentSectorContents, longNameStr, &longNameStrIndex);
                                   if (!strcmp (newDirectoryStr, longNameStr)) 
                                     {                                                        
                                       pvt_SetCurrentDirectoryToChild (currentDirectory, nextSectorContents, shortNamePositionInNextSector, newDirectoryStr, bpb);
@@ -287,7 +287,7 @@ FAT_SetCurrentDirectory (FatCurrentDirectory * currentDirectory, char * newDirec
                                     return CORRUPT_FAT_ENTRY;
 
                                   // load long name entry into longNameStr[]
-                                  pvt_GetLongNameEntry(SECTOR_LEN - ENTRY_LEN, (int)entry, currentSectorContents, longNameStr, &longNameStrIndex);
+                                  pvt_LoadLongName(SECTOR_LEN - ENTRY_LEN, (int)entry, currentSectorContents, longNameStr, &longNameStrIndex);
                                   if (!strcmp (newDirectoryStr, longNameStr)) 
                                     { 
                                       pvt_SetCurrentDirectoryToChild (currentDirectory, nextSectorContents, shortNamePositionInNextSector, newDirectoryStr, bpb);
@@ -311,7 +311,7 @@ FAT_SetCurrentDirectory (FatCurrentDirectory * currentDirectory, char * newDirec
                           if ((attributeByte & DIRECTORY_ENTRY_ATTR_FLAG))
                             {
                               // load long name entry into longNameStr[]
-                              pvt_GetLongNameEntry (shortNamePositionInCurrentSector - ENTRY_LEN, (int)entry, currentSectorContents, longNameStr, &longNameStrIndex);
+                              pvt_LoadLongName (shortNamePositionInCurrentSector - ENTRY_LEN, (int)entry, currentSectorContents, longNameStr, &longNameStrIndex);
                               if  (!strcmp (newDirectoryStr, longNameStr)) 
                                 { 
                                   pvt_SetCurrentDirectoryToChild (currentDirectory, currentSectorContents, shortNamePositionInCurrentSector, newDirectoryStr, bpb);
@@ -347,7 +347,7 @@ FAT_SetCurrentDirectory (FatCurrentDirectory * currentDirectory, char * newDirec
             }
         }
     } 
-  while ((clusterNumber = pvt_GetNextCluster(clusterNumber, bpb)) != END_OF_CLUSTER);
+  while ((clusterNumber = pvt_GetNextClusterIndex(clusterNumber, bpb)) != END_OF_CLUSTER);
   
   return END_OF_DIRECTORY;
 }
@@ -456,11 +456,11 @@ FAT_PrintCurrentDirectory (FatCurrentDirectory * currentDirectory, uint8_t entry
                         longNameStr[k] = '\0';
 
                       pvt_SetLongNameFlags ( &longNameExistsFlag, &longNameCrossSectorBoundaryFlag, &longNameLastSectorEntryFlag, 
-                                             &entry, &shortNamePositionInCurrentSector, currentSectorContents, bpb);  
+                                             entry, &shortNamePositionInCurrentSector, currentSectorContents, bpb);  
 
                       if (longNameCrossSectorBoundaryFlag || longNameLastSectorEntryFlag)
                         {
-                          pvt_GetNextSector ( nextSectorContents, &currentSectorNumberInCluster, absoluteCurrentSectorNumber, clusterNumber, bpb );
+                          pvt_GetNextSector ( nextSectorContents, currentSectorNumberInCluster, absoluteCurrentSectorNumber, clusterNumber, bpb );
 
                           shortNamePositionInNextSector = (shortNamePositionInCurrentSector) - bpb->bytesPerSector;
 
@@ -477,7 +477,7 @@ FAT_PrintCurrentDirectory (FatCurrentDirectory * currentDirectory, uint8_t entry
                               if (entryFilter & SHORT_NAME)
                                 {
                                   pvt_PrintEntryFields(nextSectorContents, shortNamePositionInNextSector, entryFilter);
-                                  pvt_PrintShortNameAndType(nextSectorContents, shortNamePositionInNextSector, attributeByte);
+                                  pvt_PrintShortNameAndType(nextSectorContents, shortNamePositionInNextSector);
                                 }
 
                               if (entryFilter & LONG_NAME)
@@ -497,8 +497,8 @@ FAT_PrintCurrentDirectory (FatCurrentDirectory * currentDirectory, uint8_t entry
                                         print_str("   <FILE>    ");
                                       
                                       // load long name entry into longNameStr[]
-                                      pvt_GetLongNameEntry (shortNamePositionInNextSector - ENTRY_LEN, 0, nextSectorContents, longNameStr, &longNameStrIndex);
-                                      pvt_GetLongNameEntry (SECTOR_LEN - ENTRY_LEN, (int)entry, currentSectorContents, longNameStr, &longNameStrIndex);
+                                      pvt_LoadLongName (shortNamePositionInNextSector - ENTRY_LEN, 0, nextSectorContents, longNameStr, &longNameStrIndex);
+                                      pvt_LoadLongName (SECTOR_LEN - ENTRY_LEN, (int)entry, currentSectorContents, longNameStr, &longNameStrIndex);
 
                                       print_str(longNameStr);
                                     }
@@ -518,7 +518,7 @@ FAT_PrintCurrentDirectory (FatCurrentDirectory * currentDirectory, uint8_t entry
                                         print_str("   <FILE>    ");
                                       
                                       // load long name entry into longNameStr[]
-                                      pvt_GetLongNameEntry (SECTOR_LEN - ENTRY_LEN, (int)entry, currentSectorContents, longNameStr, &longNameStrIndex);
+                                      pvt_LoadLongName (SECTOR_LEN - ENTRY_LEN, (int)entry, currentSectorContents, longNameStr, &longNameStrIndex);
 
                                       print_str(longNameStr); 
                                     }
@@ -539,7 +539,7 @@ FAT_PrintCurrentDirectory (FatCurrentDirectory * currentDirectory, uint8_t entry
                               if (entryFilter & SHORT_NAME)
                                 {
                                   pvt_PrintEntryFields (currentSectorContents, shortNamePositionInCurrentSector, entryFilter);
-                                  pvt_PrintShortNameAndType (currentSectorContents, shortNamePositionInCurrentSector, attributeByte);
+                                  pvt_PrintShortNameAndType (currentSectorContents, shortNamePositionInCurrentSector);
                                 }
                               
                               if (entryFilter & LONG_NAME)
@@ -556,7 +556,7 @@ FAT_PrintCurrentDirectory (FatCurrentDirectory * currentDirectory, uint8_t entry
                                     print_str("   <FILE>    ");
 
                                   // load long name entry into longNameStr[]
-                                  pvt_GetLongNameEntry (shortNamePositionInCurrentSector - ENTRY_LEN, (int)entry, currentSectorContents, longNameStr, &longNameStrIndex);
+                                  pvt_LoadLongName (shortNamePositionInCurrentSector - ENTRY_LEN, (int)entry, currentSectorContents, longNameStr, &longNameStrIndex);
 
                                   print_str(longNameStr);                                       
                                 }
@@ -569,14 +569,14 @@ FAT_PrintCurrentDirectory (FatCurrentDirectory * currentDirectory, uint8_t entry
                       if ( (!(attributeByte & HIDDEN_ATTR_FLAG)) || ((attributeByte & HIDDEN_ATTR_FLAG) && (entryFilter & HIDDEN)))
                         {
                           pvt_PrintEntryFields(currentSectorContents, entry, entryFilter);
-                          pvt_PrintShortNameAndType(currentSectorContents, entry, attributeByte);
+                          pvt_PrintShortNameAndType(currentSectorContents, entry);
                         }
                     }
                 }          
             }
         }
     }
-  while ((clusterNumber = pvt_GetNextCluster( clusterNumber, bpb )) != END_OF_CLUSTER);
+  while ((clusterNumber = pvt_GetNextClusterIndex( clusterNumber, bpb )) != END_OF_CLUSTER);
   // END: Print entries in the current directory
 
   return END_OF_DIRECTORY;
@@ -680,12 +680,12 @@ FAT_PrintFile (FatCurrentDirectory * currentDirectory, char * fileNameStr, BiosP
                         longNameStr[k] = '\0';
 
                       pvt_SetLongNameFlags ( &longNameExistsFlag, &longNameCrossSectorBoundaryFlag, &longNameLastSectorEntryFlag,
-                                             &entry, &shortNamePositionInCurrentSector, currentSectorContents,bpb);
+                                             entry, &shortNamePositionInCurrentSector, currentSectorContents,bpb);
                       
                       if (longNameCrossSectorBoundaryFlag || longNameLastSectorEntryFlag)
                         {
                           
-                          pvt_GetNextSector ( nextSectorContents, &currentSectorNumberInCluster, absoluteCurrentSectorNumber, clusterNumber, bpb );
+                          pvt_GetNextSector ( nextSectorContents, currentSectorNumberInCluster, absoluteCurrentSectorNumber, clusterNumber, bpb );
 
                           shortNamePositionInNextSector = (shortNamePositionInCurrentSector) - bpb->bytesPerSector;
 
@@ -705,8 +705,8 @@ FAT_PrintFile (FatCurrentDirectory * currentDirectory, char * fileNameStr, BiosP
                                     return CORRUPT_FAT_ENTRY; 
                                   
                                   // load long name entry into longNameStr[]
-                                  pvt_GetLongNameEntry (shortNamePositionInNextSector - ENTRY_LEN, 0, nextSectorContents, longNameStr, &longNameStrIndex);
-                                  pvt_GetLongNameEntry (SECTOR_LEN - ENTRY_LEN, (int)entry, currentSectorContents, longNameStr, &longNameStrIndex);
+                                  pvt_LoadLongName (shortNamePositionInNextSector - ENTRY_LEN, 0, nextSectorContents, longNameStr, &longNameStrIndex);
+                                  pvt_LoadLongName (SECTOR_LEN - ENTRY_LEN, (int)entry, currentSectorContents, longNameStr, &longNameStrIndex);
                                   
                                   // print file contents if a matching entry was found
                                   if(!strcmp (fileNameStr,longNameStr))
@@ -726,7 +726,7 @@ FAT_PrintFile (FatCurrentDirectory * currentDirectory, char * fileNameStr, BiosP
                                     return CORRUPT_FAT_ENTRY;                                                                  
                                       
                                   // read long name into longNameStr
-                                  pvt_GetLongNameEntry (SECTOR_LEN - ENTRY_LEN, (int)entry, currentSectorContents, longNameStr, &longNameStrIndex);
+                                  pvt_LoadLongName (SECTOR_LEN - ENTRY_LEN, (int)entry, currentSectorContents, longNameStr, &longNameStrIndex);
 
                                   // print file contents if a matching entry was found
                                   if ( !strcmp(fileNameStr, longNameStr))
@@ -757,7 +757,7 @@ FAT_PrintFile (FatCurrentDirectory * currentDirectory, char * fileNameStr, BiosP
                                 return CORRUPT_FAT_ENTRY;
 
                               // read long name into longNameStr
-                              pvt_GetLongNameEntry (shortNamePositionInCurrentSector - ENTRY_LEN, (int)entry, currentSectorContents, longNameStr, &longNameStrIndex);
+                              pvt_LoadLongName (shortNamePositionInCurrentSector - ENTRY_LEN, (int)entry, currentSectorContents, longNameStr, &longNameStrIndex);
 
                               // print file contents if a matching entry was found
                               if ( !strcmp (fileNameStr, longNameStr))
@@ -855,7 +855,7 @@ FAT_PrintFile (FatCurrentDirectory * currentDirectory, char * fileNameStr, BiosP
             }
         }
     } 
-  while ( ((clusterNumber = pvt_GetNextCluster (clusterNumber,bpb)) != END_OF_CLUSTER) && (clusCnt < 5));
+  while ( ((clusterNumber = pvt_GetNextClusterIndex (clusterNumber, bpb)) != END_OF_CLUSTER) && (clusCnt < 5));
 
   return FILE_NOT_FOUND; 
 }
@@ -918,9 +918,11 @@ FAT_PrintError (uint16_t err)
 ***********************************************************************************************************************
 */
 
+
+
 /*
 ***********************************************************************************************************************
- *                                             CHECK FOR LEGAL NAME
+ *                                          (PRIVATE) CHECK FOR LEGAL NAME
  * 
  * Description : This function is called by any FAT function that must match a 'name' string argument to a FAT entry 
  *               name (e.g. FAT_PrintFile or FAT_SetCurrentDirectory). This is used to confirm the name is a legal
@@ -966,8 +968,25 @@ pvt_CheckLegalName (char * nameStr)
   return 1; // legal name
 }
 
-// updates the current directory struct members to point to the parent directory.
-void // sets the current directory to the parent directory
+
+
+/*
+***********************************************************************************************************************
+ *                                  (PRIVATE) SET CURRENT DIRECTORY TO ITS PARENT
+ * 
+ * Description : This function is called by FAT_SetCurrentDirectory() if that function has been asked to set an 
+ *               instance of a currentDirectory's struct members to it's parent directory.
+ * 
+ * Argument    : *currentDirectory     pointer to an instance of a FatCurrentDirectory struct whose members will be
+ *                                     updated to point to the parent of the directory currently pointed to by the
+ *                                     struct's members.
+ *             : *bpb                  pointer to the BiosParameterBlock struct instance.
+ *            
+ * Return      : void
+***********************************************************************************************************************
+*/
+
+void 
 pvt_SetCurrentDirectoryToParent (FatCurrentDirectory * currentDirectory, BiosParameterBlock * bpb)
 {
   uint32_t parentDirectoryFirstCluster;
@@ -1022,8 +1041,33 @@ pvt_SetCurrentDirectoryToParent (FatCurrentDirectory * currentDirectory, BiosPar
     }
 }
 
-// updates the current directory struct memebers to point to a child of the current directory.
-void // sets the current directory to a child of the current directory
+
+
+/*
+***********************************************************************************************************************
+ *                           (PRIVATE) SET CURRENT DIRECTORY TO ONE OF ITS CHILD DIRECTORIES
+ * 
+ * Description : This function is called by FAT_SetCurrentDirectory() if that function has been asked to set an 
+ *               instance of a currentDirectory's struct members to a child directory and a valid matching entry was 
+ *               found. This function will only update the struct's members to that of the matching entry. It does
+ *               not perform any of the search/compare required to find the match.
+ * 
+ * Argument    : *currentDirectory     pointer to an instance of a FatCurrentDirectory struct whose members will be
+ *                                     updated to point to the child directory indicated by *nameStr.
+ *             : *sector               pointer to an array that holds the physical sector's contents that contains the 
+ *                                     short name of the entry that matches the *nameStr.
+ *             : shortNamePosition     integer that specifies the first position in *sector where the 32-byte short
+ *                                     name entry begins.
+ *             : *nameStr              pointer to a C-string that specifies the longName member of the currenDirectory
+ *                                     struct will be set to. If there is no long name associated with a short name
+ *                                     then the longName and shortName members will both be set to the short name.  
+ *             : *bpb                  pointer to the BiosParameterBlock struct instance.
+ *            
+ * Return      : void
+***********************************************************************************************************************
+*/
+
+void
 pvt_SetCurrentDirectoryToChild (FatCurrentDirectory * currentDirectory, uint8_t *sector, uint16_t shortNamePosition, char * nameStr, BiosParameterBlock * bpb)
 {
   uint32_t dirFirstCluster;
@@ -1059,9 +1103,37 @@ pvt_SetCurrentDirectoryToChild (FatCurrentDirectory * currentDirectory, uint8_t 
   strcpy(currentDirectory->shortName, sn);
 }
 
-// loads long name entry into the longNameStr char array.
+
+
+/*
+***********************************************************************************************************************
+ *                                  (PRIVATE) LOAD A LONG NAME ENTRY INTO A C-STRING
+ * 
+ * Description : This function is called by any of the FAT functions that need to read in a long name from a FAT
+ *               directory into a C-string. This function is called twice if a long name crosses a sector boundary, and
+ *               the *longNameStrIndex will point to the position in the c-string to begin loading the string char's
+ * 
+ * Arguments   : longNameFirstEntry    integer that points to the position in *sector that is the lowest order entry
+ *                                     of the long name in the sector array.
+ *             : longNameLastEntry     integer that points to the position in *sector that is the highest order entry
+ *                                     of the long name in sector array.
+ *             : *sector               pointer to an array that holds the physical sector's contents containing the 
+ *                                     the entries of the long name to load into the c-string.
+ *             : *longNameStr          pointer to a null terminated char array (C-string) that will be loaded with the
+ *                                     long name characters from the sector.
+ *             : *longNameStrIndex     pointer to an integer that specifies the position in *longNameStr where the
+ *                                     first character will be loaded when this function is called. This function will
+ *                                     update this value as the characters are loaded. If a subsequent call to this
+ *                                     function is required in order to fully load the long name into the char array,
+ *                                     as in the case when a single long name crosses a sector boundary, then this 
+ *                                     value will be non-zero.
+ *
+ * Returns     : void
+***********************************************************************************************************************
+*/
+
 void
-pvt_GetLongNameEntry(int longNameFirstEntry, int longNameLastEntry, uint8_t * sector, char * longNameStr, uint8_t * longNameStrIndex)
+pvt_LoadLongName (int longNameFirstEntry, int longNameLastEntry, uint8_t * sector, char * longNameStr, uint8_t * longNameStrIndex)
 {
   for (int i = longNameFirstEntry; i >= longNameLastEntry; i = i - ENTRY_LEN)
     {                                              
@@ -1099,25 +1171,27 @@ pvt_GetLongNameEntry(int longNameFirstEntry, int longNameLastEntry, uint8_t * se
 
 
 
-
 /*
 ***********************************************************************************************************************
- *                                           (PRIVATE) GET NEXT CLUSTER
+ *                                        (PRIVATE) GET THE NEXT CLUSTER FAT INDEX
  *
- * DESCRIPTION : Used by the fat functions to get the location of next cluster in a directory or file from the FAT.
+ * Description : Used by the FAT functions to get the location of the next cluster in a directory or file. The value  
+ *               returned points to the cluster's index in the FAT. This value is offset by two when counting the 
+ *               clusters in the FATs Data Region. Therefore, to get the cluster number in the data region the value
+ *               returned by this function must be subtracted by 2.
  * 
- * ARGUMENTS 
- * (1) *byte : pointer to the current directory sector loaded in memory.
- * (2) entry : entry is the first byte location of the short name in byte[].
- * (3) entryFilter  : indicates which fields of the short name entry to print.
+ * Arguments   : *currentCluster       a cluster's FAT index. The value at this index in the FAT is the index of the
+ *                                     the next cluster of the file or directory.
+ *             : *bpb                  pointer to the BiosParameterBlock struct instance.
  * 
- * RETURNS
- * FAT cluster index pointed to by the current cluster. 
- * If 0xFFFFFFFF then End Of File / Directory
+ * Returns     : The FAT index of the next cluster of a file or directory. This is the value stored at the indexed
+ *               location in the FAT specified by the value of currentCluster's index. If a value of 0xFFFFFFFF then 
+ *               currentCluster is the last cluster of the file/directory.
 ***********************************************************************************************************************
 */
+
 uint32_t 
-pvt_GetNextCluster (uint32_t currentCluster, BiosParameterBlock * bpb)
+pvt_GetNextClusterIndex (uint32_t currentCluster, BiosParameterBlock * bpb)
 {
   uint8_t  bytesPerClusterIndex = 4; // for FAT32
   uint16_t numberOfIndexedClustersPerSectorOfFat = bpb->bytesPerSector / bytesPerClusterIndex; // = 128
@@ -1145,16 +1219,24 @@ pvt_GetNextCluster (uint32_t currentCluster, BiosParameterBlock * bpb)
 
 
 
-/******************************************************************************
- * DESCRIPTION
- * private function used by PrintFatCurrentDirectoryContents() to print the
- * non-name fields of a directory entry according to entryFilter.
+/*
+***********************************************************************************************************************
+ *                                        (PRIVATE) PRINTS THE FIELDS OF FAT ENTRY
+ *
+ * Description : Used by FAT_PrintCurrentDirectory() to print the fields associated with an entry, such as creation or last
+ *               modified date/time, file size, etc... Which fields are printed is determined by the entryFilter flags
  * 
- * ARGUMENTS 
- * (1) *byte : pointer to the current directory sector loaded in memory.
- * (2) entry : entry is the first byte location of the short name in byte[].
- * (3) entryFilter  : indicates which fields of the short name entry to print.  
-******************************************************************************/
+ * Arguments   : *sector          pointer to an array that holds the short name of the entry that is being printed
+ *                                to the screen. Only the short name entry of a short name/long name combination holds
+ *                                these fields.
+ *             : entry            location in *sector of the first byte of the short name entry whose fields should be
+ *                                printed to the screen.
+ *             : entryFilter      byte of ENTRY_FLAGs, used to determine which fields of the entry will be printed.
+ * 
+ * Returns     : void
+***********************************************************************************************************************
+*/
+
 void 
 pvt_PrintEntryFields (uint8_t *sector, uint16_t entry, uint8_t entryFilter)
 {
@@ -1316,18 +1398,24 @@ pvt_PrintEntryFields (uint8_t *sector, uint16_t entry, uint8_t entryFilter)
 
 
 
-/******************************************************************************
- * DESCRIPTION
- * private function used by PrintFatCurrentDirectoryContents() to print the 
- * short name entry and its entry type (DIR / FILE).
+/*
+***********************************************************************************************************************
+ *                                              (PRIVATE) PRINT SHORT NAME
+ *
+ * Description : Used by FAT_PrintCurrentDirectory to the short name of an fat file or directory.
  * 
- * ARGUMENTS 
- * (1) *byte : pointer to the current directory sector loaded in memory.
- * (2) entry : entry is the first byte location of the short name in byte[].
- * (3) attr  : attribute byte of the short name entry.  
-*******************************************************************************/
+ * Arguments   : *sector          pointer to an array that holds the short name of the entry that is being printed
+ *                                to the screen. Only the short name entry of a short name/long name combination holds
+ *                                these fields.
+ *             : entry            location in *sector of the first byte of the short name entry whose fields should be
+ *                                printed to the screen.
+ *
+ * Returns     : void
+***********************************************************************************************************************
+*/
+
 void 
-pvt_PrintShortNameAndType (uint8_t *sector, uint16_t entry, uint8_t attr)
+pvt_PrintShortNameAndType (uint8_t *sector, uint16_t entry)
 {
   char sn[9];
   char ext[5];
@@ -1338,7 +1426,7 @@ pvt_PrintShortNameAndType (uint8_t *sector, uint16_t entry, uint8_t attr)
     }
   sn[8] = '\0';
 
-  //print_str(" ENTRY = 0x"); print_hex(entry);
+  uint8_t attr = sector[entry + 11];
   if (attr & 0x10)
     {
       print_str ("    <DIR>    ");
@@ -1386,15 +1474,22 @@ pvt_PrintShortNameAndType (uint8_t *sector, uint16_t entry, uint8_t attr)
 
 
 
-/******************************************************************************
- * DESCRIPTION
- * private function used by PrintFatFileContents() to print a file's contents.
+/*
+***********************************************************************************************************************
+ *                                              (PRIVATE) PRINT A FAT FILE
+ *
+ * Description : Used by FAT_PrintFile() to actually print the fat file.
  * 
- * ARGUMENTS 
- * (1) entry : entry is the first byte location of the short name in byte[].
- * (2) *fileSector : pointer to an array loaded with the directory sector that
- *                   contains the file name entry for the file to be printed.
-*******************************************************************************/
+ * Arguments   : entry            location in *fileSector of the first byte of the short name entry of the file whose 
+ *                                contents will be printed to the screen. This is required as the first cluster index 
+ *                                of the file is located in the short name entry.
+ *             : *fileSector      pointer to an array that holds the short name entry of the file to be printed to the 
+ *                                to the screen.
+ * 
+ * Returns     : void
+***********************************************************************************************************************
+*/
+
 void 
 pvt_PrintFatFile (uint16_t entry, uint8_t *fileSector, BiosParameterBlock * bpb)
   {
@@ -1433,26 +1528,48 @@ pvt_PrintFatFile (uint16_t entry, uint8_t *fileSector, BiosParameterBlock * bpb)
               }
           }
       } 
-    while( ( (cluster = pvt_GetNextCluster(cluster,bpb)) != END_OF_CLUSTER ) );
+    while( ( (cluster = pvt_GetNextClusterIndex(cluster,bpb)) != END_OF_CLUSTER ) );
   }
 
 
 
+/*
+***********************************************************************************************************************
+ *                         (PRIVATE) CORRECTS WHERE ENTRY IS POINTING AND RESEST LONG NAME FLAGS
+ *
+ * Description : Used by the FAT functions when searching through a directory. A correction may need to be made so that
+ *               entry is pointing to the correct location. This function uses the long name flag settings passed as
+ *               arguments to determine if the adjustment needs to be made and makes the adjustment, if the correct
+ *               entry is still in the current sector. If the correct entry is in the next sector, however, then the 
+ *               function will exit with a value of 1 so that the next sector can be retrieved. Once the next sector 
+ *               is retrieved, then this function is called again so that the entry correction can be made and the long 
+ *               name flags.
+ * 
+ * Arguments   : *longNameExistsFlag                   if this flag is set then a long name existed for the previous 
+ *                                                     entry that was checked. Reset by this function.
+ *             : *longNameCrossSectorBoundaryFlag      if this flag is set then the long name of the previous entry 
+ *                                                     crossed a sector boundary. Reset by this function.
+ *             : *longNameLastSectorEntryFlag          if this flag is set then the long name of the previous entry was
+ *                                                     entirely in the current sector, however, its corresponding short
+ *                                                     name was in the next sector. Reset by this function
+ *             : *entry                                pointer to an integer that specifies the location in the current
+ *                                                     sector that will be checked/read in in the subsequent execution
+ *                                                     of the calling function. This value will be updated by this
+ *                                                     function if a correction to it is required. 
+ *             : *shortNamePositionInCurrentSector     pointer to an integer that specifies the position of this 
+ *                                                     variable that was set for the previous entry checked.
+ *             : *shortNamePositionInNextSector        pointer to an integer that specifies the position of this
+ *                                                     variable, if it was set, for the previous entry checked.
+ * 
+ * Returns     : 1 if it is determined that the next entry to check is in the next sector.
+ *             : 0 if the next entry to check is in the current sector.
+***********************************************************************************************************************
+*/
 
-// Checks if entry is pointing to the correct location in the current sector. If not, then the calling function will
-// need to break and get the next sector. This uses the current state of the longName flags to determine if a correction
-// is needed, after the longName flags are read, the function will then reset these flags 0.
-// Returns 1 if the a correction is needed, in which case the calling function should break and get the next sector.
 uint8_t 
-pvt_CorrectEntryCheckAndLongNameFlagReset (  uint8_t  * longNameExistsFlag, 
-                                      uint8_t  * longNameCrossSectorBoundaryFlag, 
-                                      uint8_t  * longNameLastSectorEntryFlag,
-                                      uint16_t * entry,
-                                      uint16_t * shortNamePositionInCurrentSector,
-                                      uint16_t * shortNamePositionInNextSector
-                                  )
+pvt_CorrectEntryCheckAndLongNameFlagReset (uint8_t  * longNameExistsFlag, uint8_t  * longNameCrossSectorBoundaryFlag, uint8_t  * longNameLastSectorEntryFlag,
+                                           uint16_t * entry, uint16_t * shortNamePositionInCurrentSector, uint16_t * shortNamePositionInNextSector)
 {  
-  // ensure 'entry' is pointing to correct location in current sector.
   if ( (*longNameExistsFlag))
     {
       if ( (*shortNamePositionInCurrentSector) >= (SECTOR_LEN - ENTRY_LEN))
@@ -1481,12 +1598,40 @@ pvt_CorrectEntryCheckAndLongNameFlagReset (  uint8_t  * longNameExistsFlag,
 }    
 
 
-// sets the long name flags. These flags specify how a long name, and its associated short name, are distributed among sectors.
+
+/*
+***********************************************************************************************************************
+ *                                       (PRIVATE) SET THE LONG NAME FLAGS
+ *
+ * Description : Used by the FAT functions to set the long name flags, if it was determined that a long name exists, 
+ *               for the current entry begin checked / read in. This also sets the shortNamePositionInCurrentSector.
+ * 
+ * Arguments   : *longNameExistsFlag                 - This flag is automatically set to 1 by this function to indicate
+ *                                                     a long exists for this entry.
+ *             : *longNameCrossSectorBoundaryFlag    - This flag will be set to 1 if the long name is found to cross a 
+ *                                                     a sector boundary.
+ *             : *longNameLastSectorEntryFlag        - This flag will be set to 1 if the long name is entirely in the 
+ *                                                     current sector, but its short name is in the next sector.
+ *             :  entry                              - Integer that specifies the location in the current
+ *                                                     sector that will be checked/read in in the subsequent execution
+ *                                                     of the calling function. This value will be updated by this
+ *                                                     function if a correction to it is required. 
+ *             : *shortNamePositionInCurrentSector   - This value is set by this function, and is a pointer to an 
+ *                                                     integer that specifies the position of the short name relative 
+ *                                                     to the first byte of the current sector. If this is greater than
+ *                                                     512 then the short name is in the next sector.
+ *             : *shortNamePositionInNextSector      - Pointer to an integer that specifies the position of the short
+ *                                                     name if it is determined to be in the next sector.
+ * 
+ * Returns     : void
+***********************************************************************************************************************
+*/
+
 void
 pvt_SetLongNameFlags ( uint8_t  * longNameExistsFlag, 
                        uint8_t  * longNameCrossSectorBoundaryFlag, 
                        uint8_t  * longNameLastSectorEntryFlag,
-                       uint16_t * entry,
+                       uint16_t   entry,
                        uint16_t * shortNamePositionInCurrentSector,
                        uint8_t  * currentSectorContents,
                        BiosParameterBlock * bpb
@@ -1495,9 +1640,9 @@ pvt_SetLongNameFlags ( uint8_t  * longNameExistsFlag,
   *longNameExistsFlag = 1;
 
   // number of entries required by the long name
-  uint8_t longNameOrder = LONG_NAME_ORDINAL_MASK & currentSectorContents[*entry]; 
+  uint8_t longNameOrder = LONG_NAME_ORDINAL_MASK & currentSectorContents[entry]; 
                                   
-  *shortNamePositionInCurrentSector = (*entry) + (ENTRY_LEN * longNameOrder);
+  *shortNamePositionInCurrentSector = (entry) + (ENTRY_LEN * longNameOrder);
   
   // if the short name position is greater than 511 (bytePerSector-1) then the short name is in the next sector.
   if ((*shortNamePositionInCurrentSector) >= bpb->bytesPerSector)
@@ -1515,14 +1660,37 @@ pvt_SetLongNameFlags ( uint8_t  * longNameExistsFlag,
     }
 }    
 
-// gets the contents of the next sector when a short name and its long name are distributed across a sector boundary.
+
+
+/*
+***********************************************************************************************************************
+ *                             (PRIVATE) LOAD THE CONTENTS OF THE NEXT SECTOR INTO AN ARRAY
+ *
+ * Description : Used by the FAT functions to load the contents of the next file or directory sector into the 
+ *               *nextSectorContents array if it is foudn that a long / short name combo crosses the sector boundary.
+ * 
+ * Arguments   : *nextSectorContents                 - Pointer to an array that will be loaded with the contents of the
+ *                                                     next sector of a file or directory.
+ *             : currentSectorNumberInCluster        - Integer that specifies the current sector number relative to the
+ *                                                     current cluster. This value is used to determine if the next
+ *                                                     sector is in the current or the next cluster.
+ *             : absoluteCurrentSectorNumber         - This is the the current sector's physical sector number on the
+ *                                                     disk hosting the FAT volume.
+ *             : clusterNumber                       - This is the current cluster's FAT index. This is required if it
+ *                                                     is determined that the next sector is in the next cluster.   
+ *             : *bpb                                - pointer to the BiosParameterBlock struct instance.
+ * 
+ * Returns     : void
+***********************************************************************************************************************
+*/
+
 void
-pvt_GetNextSector( uint8_t * nextSectorContents, uint32_t * currentSectorNumberInCluster, uint32_t absoluteCurrentSectorNumber, uint32_t clusterNumber,  BiosParameterBlock * bpb )
+pvt_GetNextSector( uint8_t * nextSectorContents, uint32_t currentSectorNumberInCluster, uint32_t absoluteCurrentSectorNumber, uint32_t clusterNumber,  BiosParameterBlock * bpb )
 {
   uint32_t absoluteNextSectorNumber; 
   
-  if ((*currentSectorNumberInCluster) >= (bpb->sectorsPerCluster - 1)) 
-    absoluteNextSectorNumber = bpb->dataRegionFirstSector + ((pvt_GetNextCluster (clusterNumber, bpb) - 2) * bpb->sectorsPerCluster);
+  if (currentSectorNumberInCluster >= (bpb->sectorsPerCluster - 1)) 
+    absoluteNextSectorNumber = bpb->dataRegionFirstSector + ((pvt_GetNextClusterIndex (clusterNumber, bpb) - 2) * bpb->sectorsPerCluster);
   else 
     absoluteNextSectorNumber = 1 + absoluteCurrentSectorNumber;
 
