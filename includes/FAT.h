@@ -99,7 +99,7 @@ typedef struct
                                // for short names not currently supported.
     char shortParentPath[256]; // short name path to PARENT directory.
     uint32_t FATFirstCluster;  // Index of first cluster of current directory.
-} FatCurrentDirectory;
+} FatDirectory;
 
 
 
@@ -140,7 +140,7 @@ FAT_SetBiosParameterBlock(BiosParameterBlock * bpb);
  *               found the members of the currentDirectory struct are updated to those corresponding to the matching 
  *               newDirectoryStr entry.
  *
- * Arguments   : *currentDirectory   pointer to a FatCurrentDirectory struct whose members must point to a valid
+ * Arguments   : *currentDirectory   pointer to a FatDirectory struct whose members must point to a valid
  *                                   FAT32 directory.
  *             : *newDirectoryStr    pointer to a C-string that is the name of the intended new directory. The function
  *                                   takes this and searches the current directory for a matching name. This string
@@ -159,7 +159,7 @@ FAT_SetBiosParameterBlock(BiosParameterBlock * bpb);
 */
 
 uint16_t 
-FAT_SetDirectory (FatCurrentDirectory * currentDirectory, char * newDirectoryStr, BiosParameterBlock * bpb);
+FAT_SetDirectory (FatDirectory * currentDirectory, char * newDirectoryStr, BiosParameterBlock * bpb);
 
 
 
@@ -171,7 +171,7 @@ FAT_SetDirectory (FatCurrentDirectory * currentDirectory, char * newDirectoryStr
  *               which associated data (hidden files, creation date, ...) are indicated by the ENTRY_FLAG. See the 
  *               specific ENTRY_FLAGs that can be passed in the FAT.H header file.
  * 
- * Argument    : *currentDirectory   pointer to a FatCurrentDirectory struct whose members must be associated with a 
+ * Argument    : *currentDirectory   pointer to a FatDirectory struct whose members must be associated with a 
  *                                   valid FAT32 directory.
  *             : entryFilter         byte of ENTRY_FLAGs, used to determine which entries will be printed. Any 
  *                                   combination of flags can be set. If neither LONG_NAME or SHORT_NAME are passed 
@@ -185,7 +185,7 @@ FAT_SetDirectory (FatCurrentDirectory * currentDirectory, char * newDirectoryStr
 */
 
 uint16_t 
-FAT_PrintCurrentDirectory (FatCurrentDirectory *currentDirectory, uint8_t entryFilter, BiosParameterBlock * bpb);
+FAT_PrintCurrentDirectory (FatDirectory *currentDirectory, uint8_t entryFilter, BiosParameterBlock * bpb);
 
 
 
@@ -195,7 +195,7 @@ FAT_PrintCurrentDirectory (FatCurrentDirectory *currentDirectory, uint8_t entryF
  * 
  * Description : Prints the contents of a file from the current directory to a terminal/screen.
  * 
- * Arguments   : *currentDirectory   pointer to a FatCurrentDirectory struct whose members must be associated with a 
+ * Arguments   : *currentDirectory   pointer to a FatDirectory struct whose members must be associated with a 
  *                                   valid FAT32 directory.
  *             : *fileNameStr        ptr to C-string that is the name of the file to be printed to the screen. This
  *                                   must be a long name, unless there is no associated long name with an entry, in 
@@ -209,7 +209,7 @@ FAT_PrintCurrentDirectory (FatCurrentDirectory *currentDirectory, uint8_t entryF
 */
 
 uint16_t 
-FAT_PrintFile (FatCurrentDirectory * currentDirectory, char * file, BiosParameterBlock * bpb);
+FAT_PrintFile (FatDirectory * currentDirectory, char * file, BiosParameterBlock * bpb);
 
 
 

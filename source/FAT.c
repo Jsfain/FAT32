@@ -35,8 +35,8 @@ void pvt_LoadLongName (int longNameFirstEntry, int longNameLastEntry, uint8_t *s
 void pvt_GetNextSector (uint8_t * nextSectorContents, uint32_t currentSectorNumberInCluster, uint32_t absoluteCurrentSectorNumber, uint32_t clusterNumber,  BiosParameterBlock * bpb);
 uint32_t pvt_GetNextClusterIndex (uint32_t currentCluster, BiosParameterBlock * bpb);
 uint8_t pvt_CheckLegalName (char * nameStr);
-void pvt_SetCurrentDirectoryToParent (FatCurrentDirectory * currentDirectory, BiosParameterBlock * bpb);
-void pvt_SetCurrentDirectoryToChild (FatCurrentDirectory * currentDirectory, uint8_t *sector, uint16_t shortNamePosition, char * nameStr, BiosParameterBlock * bpb);
+void pvt_SetCurrentDirectoryToParent (FatDirectory * currentDirectory, BiosParameterBlock * bpb);
+void pvt_SetCurrentDirectoryToChild (FatDirectory * currentDirectory, uint8_t *sector, uint16_t shortNamePosition, char * nameStr, BiosParameterBlock * bpb);
 void pvt_PrintEntryFields (uint8_t *byte, uint16_t entry, uint8_t entryFilter);
 void pvt_PrintShortNameAndType (uint8_t *byte, uint16_t entry);
 void pvt_PrintFatFile (uint16_t entry, uint8_t *fileSector, BiosParameterBlock * bpb);
@@ -152,7 +152,7 @@ FAT_SetBiosParameterBlock (BiosParameterBlock * bpb)
  *               found the members of the currentDirectory struct are updated to those corresponding to the matching 
  *               newDirectoryStr entry.
  *
- * Arguments   : *currentDirectory   pointer to a FatCurrentDirectory struct whose members must point to a valid
+ * Arguments   : *currentDirectory   pointer to a FatDirectory struct whose members must point to a valid
  *                                   FAT32 directory.
  *             : *newDirectoryStr    pointer to a C-string that is the name of the intended new directory. The function
  *                                   takes this and searches the current directory for a matching name. This string
@@ -171,7 +171,7 @@ FAT_SetBiosParameterBlock (BiosParameterBlock * bpb)
 */
 
 uint16_t 
-FAT_SetDirectory (FatCurrentDirectory * currentDirectory, char * newDirectoryStr, BiosParameterBlock * bpb)
+FAT_SetDirectory (FatDirectory * currentDirectory, char * newDirectoryStr, BiosParameterBlock * bpb)
 {
   if (pvt_CheckLegalName (newDirectoryStr)) 
     return INVALID_DIR_NAME;
@@ -362,7 +362,7 @@ FAT_SetDirectory (FatCurrentDirectory * currentDirectory, char * newDirectoryStr
  *               which associated data (hidden files, creation date, ...) are indicated by the ENTRY_FLAG. See the 
  *               specific ENTRY_FLAGs that can be passed in the FAT.H header file.
  * 
- * Arguments   : *currentDirectory   pointer to a FatCurrentDirectory struct whose members must be associated with a 
+ * Arguments   : *currentDirectory   pointer to a FatDirectory struct whose members must be associated with a 
  *                                   valid FAT32 directory.
  *             : entryFilter         byte of ENTRY_FLAGs, used to determine which entries will be printed. Any 
  *                                   combination of flags can be set. If neither LONG_NAME or SHORT_NAME are passed 
@@ -376,7 +376,7 @@ FAT_SetDirectory (FatCurrentDirectory * currentDirectory, char * newDirectoryStr
 */
 
 uint16_t 
-FAT_PrintCurrentDirectory (FatCurrentDirectory * currentDirectory, uint8_t entryFilter, BiosParameterBlock * bpb)
+FAT_PrintCurrentDirectory (FatDirectory * currentDirectory, uint8_t entryFilter, BiosParameterBlock * bpb)
 {
   uint32_t clusterNumber = currentDirectory->FATFirstCluster;
 
@@ -590,7 +590,7 @@ FAT_PrintCurrentDirectory (FatCurrentDirectory * currentDirectory, uint8_t entry
  * 
  * Description : Prints the contents of a file from the current directory to a terminal/screen.
  * 
- * Arguments   : *currentDirectory   pointer to a FatCurrentDirectory struct whose members must be associated with a 
+ * Arguments   : *currentDirectory   pointer to a FatDirectory struct whose members must be associated with a 
  *                                   valid FAT32 directory.
  *             : *fileNameStr        ptr to C-string that is the name of the file to be printed to the screen. This
  *                                   must be a long name, unless there is no associated long name with an entry, in 
@@ -604,7 +604,7 @@ FAT_PrintCurrentDirectory (FatCurrentDirectory * currentDirectory, uint8_t entry
 */
 
 uint16_t 
-FAT_PrintFile (FatCurrentDirectory * currentDirectory, char * fileNameStr, BiosParameterBlock * bpb)
+FAT_PrintFile (FatDirectory * currentDirectory, char * fileNameStr, BiosParameterBlock * bpb)
 {
   if (pvt_CheckLegalName (fileNameStr)) 
     return INVALID_DIR_NAME;
@@ -975,7 +975,7 @@ pvt_CheckLegalName (char * nameStr)
  * Description : This function is called by FAT_SetDirectory() if that function has been asked to set an 
  *               instance of a currentDirectory's struct members to it's parent directory.
  * 
- * Argument    : *currentDirectory     pointer to an instance of a FatCurrentDirectory struct whose members will be
+ * Argument    : *currentDirectory     pointer to an instance of a FatDirectory struct whose members will be
  *                                     updated to point to the parent of the directory currently pointed to by the
  *                                     struct's members.
  *             : *bpb                  pointer to the BiosParameterBlock struct instance.
@@ -983,7 +983,7 @@ pvt_CheckLegalName (char * nameStr)
 */
 
 void 
-pvt_SetCurrentDirectoryToParent (FatCurrentDirectory * currentDirectory, BiosParameterBlock * bpb)
+pvt_SetCurrentDirectoryToParent (FatDirectory * currentDirectory, BiosParameterBlock * bpb)
 {
   uint32_t parentDirectoryFirstCluster;
   uint32_t absoluteCurrentSectorNumber;
@@ -1048,7 +1048,7 @@ pvt_SetCurrentDirectoryToParent (FatCurrentDirectory * currentDirectory, BiosPar
  *               found. This function will only update the struct's members to that of the matching entry. It does
  *               not perform any of the search/compare required to find the match.
  * 
- * Argument    : *currentDirectory     pointer to an instance of a FatCurrentDirectory struct whose members will be
+ * Argument    : *currentDirectory     pointer to an instance of a FatDirectory struct whose members will be
  *                                     updated to point to the child directory indicated by *nameStr.
  *             : *sector               pointer to an array that holds the physical sector's contents that contains the 
  *                                     short name of the entry that matches the *nameStr.
@@ -1062,7 +1062,7 @@ pvt_SetCurrentDirectoryToParent (FatCurrentDirectory * currentDirectory, BiosPar
 */
 
 void
-pvt_SetCurrentDirectoryToChild (FatCurrentDirectory * currentDirectory, uint8_t *sector, uint16_t shortNamePosition, char * nameStr, BiosParameterBlock * bpb)
+pvt_SetCurrentDirectoryToChild (FatDirectory * currentDirectory, uint8_t *sector, uint16_t shortNamePosition, char * nameStr, BiosParameterBlock * bpb)
 {
   uint32_t dirFirstCluster;
   dirFirstCluster = sector[shortNamePosition + 21];
