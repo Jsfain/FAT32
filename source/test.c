@@ -64,6 +64,8 @@ int main(void)
         BiosParameterBlock bpb;
         uint16_t err;
         err = FAT_SetBiosParameterBlock(&bpb);
+        print_str("\n\r SetBiosParameterBlock() returned ");
+        FAT_PrintBootSectorError((uint8_t)err);
       /*
         print_str("\n\n\r **** BIOS PARAMTERS ****");
         print_str("\n\r bytesPerSector    = "); print_dec(bpb.bytesPerSector);

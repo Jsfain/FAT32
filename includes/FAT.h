@@ -61,12 +61,12 @@
 #define ALL            (CREATION | LAST_ACCESS | LAST_MODIFIED)
 
 // Boot Sector Error Flags
-#define CORRUPT_BOOT_SECTOR              0x0001
-#define NOT_BOOT_SECTOR                  0x0002
-#define INVALID_BYTES_PER_SECTOR         0x0004
-#define INVALID_SECTORS_PER_CLUSTER      0x0008
-#define BOOT_SECTOR_NOT_FOUND            0x0010
-#define BOOT_SECTOR_VALID                0x0020
+#define CORRUPT_BOOT_SECTOR              0x01
+#define NOT_BOOT_SECTOR                  0x02
+#define INVALID_BYTES_PER_SECTOR         0x04
+#define INVALID_SECTORS_PER_CLUSTER      0x08
+#define BOOT_SECTOR_NOT_FOUND            0x10
+#define BOOT_SECTOR_VALID                0x20
 
 // Interface Error Flags : These errors are to be applied by the phyiscal interface.
 #define READ_SECTOR_ERROR       0x01
@@ -90,7 +90,7 @@ typedef struct
 } BiosParameterBlock;
 
 
-// Struct to hold parameters for the current directory.
+// Struct to hold parameters of a FAT directory.
 typedef struct
 {
     char longName[256];        // max 255 characters + '\0'
@@ -126,8 +126,24 @@ typedef struct
 ***********************************************************************************************************************
 */
 
-uint16_t 
+uint8_t 
 FAT_SetBiosParameterBlock(BiosParameterBlock * bpb);
+
+
+
+/*
+***********************************************************************************************************************
+ *                                        PRINT ERROR RETURNED BY FAT_SetBiosParameterBlock
+ * 
+ * Description : Call this function to print an error flag returned by the function FAT_SetBiosParameterBlock(). 
+ * 
+ * Argument    : err    This should be an error flag returned the function FAT_SetBiosParameterBlock(). If it is not 
+ *                      then the output is meaningless.
+***********************************************************************************************************************
+*/
+
+void 
+FAT_PrintBootSectorError (uint8_t err);
 
 
 

@@ -73,7 +73,7 @@ void pvt_PrintFatFile (uint16_t entry, uint8_t *fileSector, BiosParameterBlock *
 ***********************************************************************************************************************
 */
 
-uint16_t 
+uint8_t 
 FAT_SetBiosParameterBlock (BiosParameterBlock * bpb)
 {
   uint8_t BootSector[SECTOR_LEN];
@@ -139,6 +139,48 @@ FAT_SetBiosParameterBlock (BiosParameterBlock * bpb)
     return NOT_BOOT_SECTOR;
 
   return BOOT_SECTOR_VALID;
+}
+
+
+
+/*
+***********************************************************************************************************************
+ *                                        PRINT ERROR RETURNED BY FAT_SetBiosParameterBlock
+ * 
+ * Description : Call this function to print an error flag returned by the function FAT_SetBiosParameterBlock(). 
+ * 
+ * Argument    : err    This should be an error flag returned the function FAT_SetBiosParameterBlock(). If it is not 
+ *                      then the output is meaningless.
+***********************************************************************************************************************
+*/
+
+void 
+FAT_PrintBootSectorError (uint8_t err)
+{  
+  switch(err)
+  {
+    case BOOT_SECTOR_VALID : 
+      print_str("BOOT_SECTOR_VALID ");
+      break;
+    case CORRUPT_BOOT_SECTOR :
+      print_str("CORRUPT_BOOT_SECTOR ");
+      break;
+    case NOT_BOOT_SECTOR :
+      print_str("NOT_BOOT_SECTOR ");
+      break;
+    case INVALID_BYTES_PER_SECTOR:
+      print_str("INVALID_BYTES_PER_SECTOR");
+      break;
+    case INVALID_SECTORS_PER_CLUSTER:
+      print_str("INVALID_SECTORS_PER_CLUSTER");
+      break;
+    case BOOT_SECTOR_NOT_FOUND:
+      print_str("BOOT_SECTOR_NOT_FOUND");
+      break;
+    default:
+      print_str("UNKNOWN_ERROR");
+      break;
+  }
 }
 
 
