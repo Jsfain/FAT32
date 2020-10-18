@@ -41,6 +41,11 @@
 #define LONG_NAME_ORDINAL_MASK    0x3F
 #define END_OF_CLUSTER            0x0FFFFFFF
 
+// Long Name Flags
+#define LONG_NAME_EXISTS_FLAG                  0x01
+#define LONG_NAME_CROSSES_SECTOR_BOUNDARY_FLAG 0x02
+#define LONG_NAME_LAST_SECTOR_ENTRY_FLAG       0x04
+
 // Error Flags
 #define SUCCESS              0x000
 #define INVALID_FILE_NAME    0x001

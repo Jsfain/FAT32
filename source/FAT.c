@@ -29,8 +29,8 @@
 
 // Private function descriptions are only included with their definitions at the bottom of this file.
 
-uint8_t pvt_CorrectEntryCheckAndLongNameFlagReset (uint8_t * longNameExistsFlag, uint8_t * longNameCrossSectorBoundaryFlag, uint8_t * longNameLastSectorEntryFlag, uint16_t * entry, uint16_t * shortNamePositionInCurrentSector, uint16_t * shortNamePositionInNextSector);
-void pvt_SetLongNameFlags (uint8_t * longNameExistsFlag, uint8_t * longNameCrossSectorBoundaryFlag, uint8_t * longNameLastSectorEntryFlag, uint16_t entry, uint16_t * shortNamePositionInCurrentSector, uint8_t * currentSectorContents, BiosParameterBlock * bpb);
+uint8_t pvt_CorrectEntryCheckAndLongNameFlagReset (uint8_t * longNameFlags, uint16_t * entry, uint16_t * shortNamePositionInCurrentSector, uint16_t * shortNamePositionInNextSector);
+void pvt_SetLongNameFlags (uint8_t * longNameFlags, uint16_t entry, uint16_t * shortNamePositionInCurrentSector, uint8_t  * currentSectorContents, BiosParameterBlock * bpb);
 void pvt_LoadLongName (int longNameFirstEntry, int longNameLastEntry, uint8_t *sector, char * longNameStr, uint8_t * longNameStrIndex);
 void pvt_GetNextSector (uint8_t * nextSectorContents, uint32_t currentSectorNumberInCluster, uint32_t absoluteCurrentSectorNumber, uint32_t clusterIndex,  BiosParameterBlock * bpb);
 uint32_t pvt_GetNextClusterIndex (uint32_t currentClusterIndex, BiosParameterBlock * bpb);
@@ -239,10 +239,7 @@ FAT_SetDirectory (FatDirectory * directory, char * newDirectoryStr, BiosParamete
   uint8_t  attributeByte;
   char     longNameStr[ LONG_NAME_LEN_MAX ];
   uint8_t  longNameStrIndex = 0;
-  // Long Name flags
-  uint8_t  longNameExistsFlag = 0; 
-  uint8_t  longNameCrossSectorBoundaryFlag = 0;
-  uint8_t  longNameLastSectorEntryFlag = 0;
+  uint8_t  longNameFlags = 0;
   uint8_t  entryCorrectionFlag = 0;
 
   // ***    Search directory entries of the current directory for match to newDirectoryStr and print if found    *** /
@@ -259,18 +256,15 @@ FAT_SetDirectory (FatDirectory * directory, char * newDirectoryStr, BiosParamete
           // loop through entries in the current sector.
           for (uint16_t entry = 0; entry < SECTOR_LEN; entry = entry + ENTRY_LEN)
             {
-              entryCorrectionFlag = pvt_CorrectEntryCheckAndLongNameFlagReset ( &longNameExistsFlag, &longNameCrossSectorBoundaryFlag, &longNameLastSectorEntryFlag,
-                                                                         &entry, &shortNamePositionInCurrentSector, &shortNamePositionInNextSector);
-              
+              entryCorrectionFlag = pvt_CorrectEntryCheckAndLongNameFlagReset ( &longNameFlags, &entry, &shortNamePositionInCurrentSector, &shortNamePositionInNextSector);
               if (entryCorrectionFlag == 1)
                 {
                   entryCorrectionFlag = 0;
                   break;    
                 }
-
               // If first value of entry is 0 then all subsequent entries are empty.
-              if (currentSectorContents[ entry ] == 0) 
-                return END_OF_DIRECTORY;
+              if (currentSectorContents[ entry ] == 0)
+                { /*print_str("\n\r entry = "); print_dec(entry);*/ return END_OF_DIRECTORY; }
 
               // entry is marked for deletion. Do nothing.
               if (currentSectorContents[ entry ] != 0xE5)
@@ -288,11 +282,8 @@ FAT_SetDirectory (FatDirectory * directory, char * newDirectoryStr, BiosParamete
                       for (uint8_t k = 0; k < LONG_NAME_LEN_MAX; k++) 
                         longNameStr[k] = '\0';
 
-
-                      pvt_SetLongNameFlags ( &longNameExistsFlag, &longNameCrossSectorBoundaryFlag, &longNameLastSectorEntryFlag,
-                                             entry, &shortNamePositionInCurrentSector, currentSectorContents, bpb);
-
-                      if (longNameCrossSectorBoundaryFlag || longNameLastSectorEntryFlag)
+                      pvt_SetLongNameFlags ( &longNameFlags, entry, &shortNamePositionInCurrentSector, currentSectorContents, bpb);
+                      if (longNameFlags & (LONG_NAME_CROSSES_SECTOR_BOUNDARY_FLAG | LONG_NAME_LAST_SECTOR_ENTRY_FLAG))
                         {
                           pvt_GetNextSector (nextSectorContents, currentSectorNumberInCluster, absoluteCurrentSectorNumber, clusterIndex, bpb);
                           shortNamePositionInNextSector = (shortNamePositionInCurrentSector) - bpb->bytesPerSector;
@@ -306,7 +297,7 @@ FAT_SetDirectory (FatDirectory * directory, char * newDirectoryStr, BiosParamete
                           if (attributeByte & DIRECTORY_ENTRY_ATTR_FLAG)
                             {                                                           
                               // If long name crosses sector boundary
-                              if (longNameCrossSectorBoundaryFlag)
+                              if (longNameFlags & LONG_NAME_CROSSES_SECTOR_BOUNDARY_FLAG)
                                 {
                                   if ((nextSectorContents[ shortNamePositionInNextSector - ENTRY_LEN ] & LONG_NAME_ORDINAL_MASK) != 1)
                                     return CORRUPT_FAT_ENTRY;
@@ -322,8 +313,8 @@ FAT_SetDirectory (FatDirectory * directory, char * newDirectoryStr, BiosParamete
                                 }
 
                               // All entries for long name are in current sector but short name is in next sector
-                              else if (longNameLastSectorEntryFlag)
-                                {
+                              else if (longNameFlags & LONG_NAME_LAST_SECTOR_ENTRY_FLAG)
+                               {
                                   // confirm last entry of current sector is the first entry of the long name
                                   if ((currentSectorContents[ SECTOR_LEN - ENTRY_LEN ] & LONG_NAME_ORDINAL_MASK) != 1)
                                     return CORRUPT_FAT_ENTRY;
@@ -421,24 +412,15 @@ uint16_t
 FAT_PrintCurrentDirectory (FatDirectory * directory, uint8_t entryFilter, BiosParameterBlock * bpb)
 {
   uint32_t clusterIndex = directory->FATFirstCluster;
-
   uint8_t  currentSectorContents[ bpb->bytesPerSector ];
   uint32_t absoluteCurrentSectorNumber;
   uint16_t shortNamePositionInCurrentSector = 0;
-
   uint8_t  nextSectorContents[ bpb->bytesPerSector ];
   uint16_t shortNamePositionInNextSector = 0;
-
   uint8_t  attributeByte;
-
   char     longNameStr[ LONG_NAME_LEN_MAX ];
   uint8_t  longNameStrIndex = 0;
-
-  // Long Name flags
-  uint8_t longNameExistsFlag = 0; 
-  uint8_t longNameCrossSectorBoundaryFlag = 0;
-  uint8_t longNameLastSectorEntryFlag = 0;
-
+  uint8_t longNameFlags = 0;
   uint8_t   entryCorrectionFlag = 0;
 
   // Prints column headers according to entryFilter
@@ -468,9 +450,7 @@ FAT_PrintCurrentDirectory (FatDirectory * directory, uint8_t entryFilter, BiosPa
           // loop through entries in the current sector.
           for (uint16_t entry = 0; entry < bpb->bytesPerSector; entry = entry + ENTRY_LEN)
             {
-              entryCorrectionFlag = pvt_CorrectEntryCheckAndLongNameFlagReset ( &longNameExistsFlag, &longNameCrossSectorBoundaryFlag, &longNameLastSectorEntryFlag,
-                                                                         &entry, &shortNamePositionInCurrentSector, &shortNamePositionInNextSector);
-              
+              entryCorrectionFlag = pvt_CorrectEntryCheckAndLongNameFlagReset ( &longNameFlags, &entry, &shortNamePositionInCurrentSector, &shortNamePositionInNextSector);
               if (entryCorrectionFlag == 1)
                 {
                   entryCorrectionFlag = 0;
@@ -484,7 +464,7 @@ FAT_PrintCurrentDirectory (FatDirectory * directory, uint8_t entryFilter, BiosPa
               // entry is marked for deletion. Do nothing.
               if (currentSectorContents[ entry ] != 0xE5)
                 {
-                  attributeByte = currentSectorContents[ (entry) + 11 ];
+                  attributeByte = currentSectorContents[ entry + 11 ];
                   
                   // if entry being checked is a long name entry
                   if ((attributeByte & LONG_NAME_ATTR_MASK) == LONG_NAME_ATTR_MASK)
@@ -496,16 +476,13 @@ FAT_PrintCurrentDirectory (FatDirectory * directory, uint8_t entryFilter, BiosPa
 
                       for (uint8_t k = 0; k < LONG_NAME_LEN_MAX; k++) 
                         longNameStr[k] = '\0';
+ 
+                      pvt_SetLongNameFlags ( &longNameFlags, entry, &shortNamePositionInCurrentSector, currentSectorContents, bpb);
 
-                      pvt_SetLongNameFlags ( &longNameExistsFlag, &longNameCrossSectorBoundaryFlag, &longNameLastSectorEntryFlag, 
-                                             entry, &shortNamePositionInCurrentSector, currentSectorContents, bpb);  
-
-                      if (longNameCrossSectorBoundaryFlag || longNameLastSectorEntryFlag)
+                      if (longNameFlags & (LONG_NAME_CROSSES_SECTOR_BOUNDARY_FLAG | LONG_NAME_LAST_SECTOR_ENTRY_FLAG))
                         {
                           pvt_GetNextSector ( nextSectorContents, currentSectorNumberInCluster, absoluteCurrentSectorNumber, clusterIndex, bpb );
-
                           shortNamePositionInNextSector = (shortNamePositionInCurrentSector) - bpb->bytesPerSector;
-
                           attributeByte = nextSectorContents[ (shortNamePositionInNextSector) + 11 ];
                           
                           // if shortNamePositionInNextSector points to a long name entry then something is wrong.
@@ -515,7 +492,6 @@ FAT_PrintCurrentDirectory (FatDirectory * directory, uint8_t entryFilter, BiosPa
                           // print if hidden attribute flag is not set OR if it is set AND the hidden filter flag is set.
                           if ( (!(attributeByte & HIDDEN_ATTR_FLAG)) || ((attributeByte & HIDDEN_ATTR_FLAG) && (entryFilter & HIDDEN)))
                             {                                                           
-                              
                               if (entryFilter & SHORT_NAME)
                                 {
                                   pvt_PrintEntryFields(nextSectorContents, shortNamePositionInNextSector, entryFilter);
@@ -525,7 +501,7 @@ FAT_PrintCurrentDirectory (FatDirectory * directory, uint8_t entryFilter, BiosPa
                               if (entryFilter & LONG_NAME)
                                 {
                                   // entries for long name cross sector boundary
-                                  if ((longNameCrossSectorBoundaryFlag == 1) && (longNameLastSectorEntryFlag == 0))
+                                  if (longNameFlags & LONG_NAME_CROSSES_SECTOR_BOUNDARY_FLAG)
                                     {
                                       // Confirm entry preceding short name is first entry of a long name.
                                       if ((nextSectorContents[ shortNamePositionInNextSector - ENTRY_LEN ] & LONG_NAME_ORDINAL_MASK) != 1) 
@@ -546,7 +522,7 @@ FAT_PrintCurrentDirectory (FatDirectory * directory, uint8_t entryFilter, BiosPa
                                     }
 
                                   // all entries for long name are in current sector but short name is in next sector
-                                  else if ((longNameCrossSectorBoundaryFlag == 0) && (longNameLastSectorEntryFlag == 1))
+                                  else if (longNameFlags & LONG_NAME_LAST_SECTOR_ENTRY_FLAG)
                                     {
                                       // confirm last entry of current sector is the first entry of the long name
                                       if ((currentSectorContents[ SECTOR_LEN - ENTRY_LEN] & LONG_NAME_ORDINAL_MASK) != 1) 
@@ -565,7 +541,7 @@ FAT_PrintCurrentDirectory (FatDirectory * directory, uint8_t entryFilter, BiosPa
                                       print_str(longNameStr); 
                                     }
                                   else 
-                                    return CORRUPT_FAT_ENTRY;
+                                    { print_str("\n\r this one?"); return CORRUPT_FAT_ENTRY;}
                                 }
                             }
                         }
@@ -653,26 +629,16 @@ FAT_PrintFile (FatDirectory * directory, char * fileNameStr, BiosParameterBlock 
   
 
   uint8_t fileNameStrLen = strlen(fileNameStr);
-
   uint32_t clusterIndex = directory->FATFirstCluster;
-  
   uint8_t  currentSectorContents[ bpb->bytesPerSector ];
   uint32_t absoluteCurrentSectorNumber;
   uint16_t shortNamePositionInCurrentSector = 0;
-
   uint8_t  nextSectorContents[ bpb->bytesPerSector ];
   uint16_t shortNamePositionInNextSector = 0;
-
   uint8_t  attributeByte;
-
   char     longNameStr[LONG_NAME_LEN_MAX];
   uint8_t  longNameStrIndex = 0;
-
-  // long name flags. Set to 1 if true for current name
-  uint8_t longNameExistsFlag = 0; 
-  uint8_t longNameCrossSectorBoundaryFlag = 0;
-  uint8_t longNameLastSectorEntryFlag = 0;
-
+  uint8_t longNameFlags = 0;
   uint8_t entryCorrectionFlag = 0;
 
   // ***     Search files in current directory for match to fileNameStr and print if found    *** /
@@ -692,9 +658,7 @@ FAT_PrintFile (FatDirectory * directory, char * fileNameStr, BiosParameterBlock 
           // loop through entries in the current sector.
           for (uint16_t entry = 0; entry < bpb->bytesPerSector; entry = entry + ENTRY_LEN)
             { 
-              entryCorrectionFlag = pvt_CorrectEntryCheckAndLongNameFlagReset ( &longNameExistsFlag, &longNameCrossSectorBoundaryFlag, &longNameLastSectorEntryFlag,
-                                                                         &entry, &shortNamePositionInCurrentSector, &shortNamePositionInNextSector);
-                                                      
+              entryCorrectionFlag = pvt_CorrectEntryCheckAndLongNameFlagReset ( &longNameFlags, &entry, &shortNamePositionInCurrentSector, &shortNamePositionInNextSector);
               if (entryCorrectionFlag == 1)
                 {
                   entryCorrectionFlag = 0;
@@ -721,17 +685,12 @@ FAT_PrintFile (FatDirectory * directory, char * fileNameStr, BiosParameterBlock 
                       for (uint8_t k = 0; k < LONG_NAME_LEN_MAX; k++) 
                         longNameStr[k] = '\0';
 
-                      pvt_SetLongNameFlags ( &longNameExistsFlag, &longNameCrossSectorBoundaryFlag, &longNameLastSectorEntryFlag,
-                                             entry, &shortNamePositionInCurrentSector, currentSectorContents,bpb);
-                      
-                      if (longNameCrossSectorBoundaryFlag || longNameLastSectorEntryFlag)
+                      pvt_SetLongNameFlags ( &longNameFlags, entry, &shortNamePositionInCurrentSector, currentSectorContents, bpb);
+                      if (longNameFlags & (LONG_NAME_CROSSES_SECTOR_BOUNDARY_FLAG | LONG_NAME_LAST_SECTOR_ENTRY_FLAG))
                         {
-                          
-                          pvt_GetNextSector ( nextSectorContents, currentSectorNumberInCluster, absoluteCurrentSectorNumber, clusterIndex, bpb );
-
-                          shortNamePositionInNextSector = (shortNamePositionInCurrentSector) - bpb->bytesPerSector;
-
-                          attributeByte = nextSectorContents[ (shortNamePositionInNextSector) + 11 ];
+                          pvt_GetNextSector (nextSectorContents, currentSectorNumberInCluster, absoluteCurrentSectorNumber, clusterIndex, bpb );
+                          shortNamePositionInNextSector = shortNamePositionInCurrentSector - bpb->bytesPerSector;
+                          attributeByte = nextSectorContents[ shortNamePositionInNextSector + 11 ];
                           
                           // If shortNamePositionInNextSector points to long name entry then something is wrong.
                           if ((attributeByte & LONG_NAME_ATTR_MASK) == LONG_NAME_ATTR_MASK) 
@@ -740,7 +699,7 @@ FAT_PrintFile (FatDirectory * directory, char * fileNameStr, BiosParameterBlock 
                           // Only proceed if entry points to a file (i.e. directory flag is not set)
                           if ( !(attributeByte & DIRECTORY_ENTRY_ATTR_FLAG))
                             {                                                           
-                              if ((longNameCrossSectorBoundaryFlag == 1) && (longNameLastSectorEntryFlag == 0))
+                              if (longNameFlags & LONG_NAME_CROSSES_SECTOR_BOUNDARY_FLAG)
                                 {
                                   // if entry immediately before the short name entry is not the ORDER = 1 entry of a long name then something is wrong
                                   if ((nextSectorContents[ shortNamePositionInNextSector - ENTRY_LEN ] & LONG_NAME_ORDINAL_MASK) != 1) 
@@ -759,7 +718,7 @@ FAT_PrintFile (FatDirectory * directory, char * fileNameStr, BiosParameterBlock 
                                 }
 
                               // Long name is entirely in the current sector, but its short name is the first entry of the next sector
-                              else if ((longNameCrossSectorBoundaryFlag == 0) && (longNameLastSectorEntryFlag == 1))
+                              else if (longNameFlags & LONG_NAME_LAST_SECTOR_ENTRY_FLAG)
                                 {
                                   longNameStrIndex = 0;
 
@@ -1593,7 +1552,7 @@ pvt_PrintFatFile (uint16_t entry, uint8_t *fileSector, BiosParameterBlock * bpb)
  *             : 0 if the next entry to check is in the current sector.
 ***********************************************************************************************************************
 */
-
+/*
 uint8_t 
 pvt_CorrectEntryCheckAndLongNameFlagReset (uint8_t  * longNameExistsFlag, uint8_t  * longNameCrossSectorBoundaryFlag, uint8_t  * longNameLastSectorEntryFlag,
                                            uint16_t * entry, uint16_t * shortNamePositionInCurrentSector, uint16_t * shortNamePositionInNextSector)
@@ -1623,7 +1582,42 @@ pvt_CorrectEntryCheckAndLongNameFlagReset (uint8_t  * longNameExistsFlag, uint8_
       *longNameExistsFlag = 0;
     }
   return 0;
+}   
+
+*/
+// ************
+
+uint8_t 
+pvt_CorrectEntryCheckAndLongNameFlagReset (uint8_t  * longNameFlags, uint16_t * entry, uint16_t * shortNamePositionInCurrentSector, uint16_t * shortNamePositionInNextSector)
+{  
+  if ((*longNameFlags) & LONG_NAME_EXISTS_FLAG)
+    {
+      if ( (*shortNamePositionInCurrentSector) >= (SECTOR_LEN - ENTRY_LEN))
+        {
+          if ((*entry) != 0)
+            return 1; // need to get the next sector
+          else 
+            (*shortNamePositionInCurrentSector) = -ENTRY_LEN;
+        }
+
+      if ((*longNameFlags) & (LONG_NAME_CROSSES_SECTOR_BOUNDARY_FLAG | LONG_NAME_LAST_SECTOR_ENTRY_FLAG))
+        {
+          *entry = (*shortNamePositionInNextSector) + ENTRY_LEN; 
+          *shortNamePositionInNextSector = 0;
+        }
+      else 
+        {
+          *entry = (*shortNamePositionInCurrentSector) + ENTRY_LEN;
+          *shortNamePositionInCurrentSector = 0;
+        }
+      *longNameFlags = 0;
+    }
+
+  return 0;
 }    
+
+// ************
+
 
 
 
@@ -1652,7 +1646,7 @@ pvt_CorrectEntryCheckAndLongNameFlagReset (uint8_t  * longNameExistsFlag, uint8_
  *                                                     name if it is determined to be in the next sector.
 ***********************************************************************************************************************
 */
-
+/*
 void
 pvt_SetLongNameFlags ( uint8_t  * longNameExistsFlag, 
                        uint8_t  * longNameCrossSectorBoundaryFlag, 
@@ -1685,8 +1679,36 @@ pvt_SetLongNameFlags ( uint8_t  * longNameExistsFlag,
         }
     }
 }    
+*/
 
+void
+pvt_SetLongNameFlags ( uint8_t  * longNameFlags,
+                          uint16_t   entry,
+                          uint16_t * shortNamePositionInCurrentSector,
+                          uint8_t  * currentSectorContents,
+                          BiosParameterBlock * bpb
+                     )
+{
+  *longNameFlags |= LONG_NAME_EXISTS_FLAG;
 
+  // number of entries required by the long name
+  uint8_t longNameOrder = LONG_NAME_ORDINAL_MASK & currentSectorContents[entry]; 
+                                  
+  *shortNamePositionInCurrentSector = entry + (ENTRY_LEN * longNameOrder);
+  
+  // if the short name position is greater than 511 (bytePerSector-1) then the short name is in the next sector.
+  if ((*shortNamePositionInCurrentSector) >= bpb->bytesPerSector)
+    {
+      if ((*shortNamePositionInCurrentSector) > bpb->bytesPerSector)
+        {
+          *longNameFlags |= LONG_NAME_CROSSES_SECTOR_BOUNDARY_FLAG;
+        }
+      else if (*shortNamePositionInCurrentSector == SECTOR_LEN)
+        {
+          *longNameFlags |= LONG_NAME_LAST_SECTOR_ENTRY_FLAG;
+        }
+    }
+}   
 
 /*
 ***********************************************************************************************************************
