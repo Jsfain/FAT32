@@ -29,7 +29,7 @@
 
 // Private function descriptions are only included with their definitions at the bottom of this file.
 
-uint8_t pvt_CorrectEntryCheckAndLongNameFlagReset (uint8_t * lnFlags, uint16_t * entry, uint16_t * snPosCurrSec, uint16_t * snPosNextSec);
+uint8_t pvt_CorrectEntryCheck (uint8_t * lnFlags, uint16_t * entry, uint16_t * snPosCurrSec, uint16_t * snPosNextSec);
 void pvt_SetLongNameFlags (uint8_t * lnFlags, uint16_t entry, uint16_t * snPosCurrSec, uint8_t  * currSecArr, BPB * bpb);
 void pvt_LoadLongName (int longNameFirstEntry, int longNameLastEntry, uint8_t *sector, char * longNameStr, uint8_t * lnStrIndx);
 void pvt_GetNextSector (uint8_t * nextSecArr, uint32_t currSecNumInClus, uint32_t currSecNumPhys, uint32_t clusIndx,  BPB * bpb);
@@ -78,11 +78,11 @@ FAT_SetBiosParameterBlock (BPB * bpb)
 {
   uint8_t BootSector[SECTOR_LEN];
 
-  bpb->bootSectorAddress = fat_FindBootSector();
+  bpb->bootSecAddr = fat_FindBootSector();
   
-  if (bpb->bootSectorAddress != 0xFFFFFFFF)
+  if (bpb->bootSecAddr != 0xFFFFFFFF)
     {
-      fat_ReadSingleSector (bpb->bootSectorAddress, BootSector);
+      fat_ReadSingleSector (bpb->bootSecAddr, BootSector);
     }
   else
     {
@@ -92,30 +92,30 @@ FAT_SetBiosParameterBlock (BPB * bpb)
   // last two bytes of Boot Sector should be signature bytes.
   if ((BootSector[SECTOR_LEN - 2] == 0x55) && (BootSector[SECTOR_LEN - 1] == 0xAA))
     {
-      bpb->bytesPerSector = BootSector[12];
-      bpb->bytesPerSector <<= 8;
-      bpb->bytesPerSector |= BootSector[11];
+      bpb->bytesPerSec = BootSector[12];
+      bpb->bytesPerSec <<= 8;
+      bpb->bytesPerSec |= BootSector[11];
       
-      if (bpb->bytesPerSector != SECTOR_LEN) 
+      if (bpb->bytesPerSec != SECTOR_LEN) 
         {
           return INVALID_BYTES_PER_SECTOR;
         }
 
       // secPerClus
-      bpb->sectorsPerCluster = BootSector[13];
+      bpb->secPerClus = BootSector[13];
 
-      if ((    bpb->sectorsPerCluster != 1 ) && (bpb->sectorsPerCluster != 2  ) && (bpb->sectorsPerCluster != 4 )
-           && (bpb->sectorsPerCluster != 8 ) && (bpb->sectorsPerCluster != 16 ) && (bpb->sectorsPerCluster != 32)
-           && (bpb->sectorsPerCluster != 64) && (bpb->sectorsPerCluster != 128))
+      if ((    bpb->secPerClus != 1 ) && (bpb->secPerClus != 2  ) && (bpb->secPerClus != 4 )
+           && (bpb->secPerClus != 8 ) && (bpb->secPerClus != 16 ) && (bpb->secPerClus != 32)
+           && (bpb->secPerClus != 64) && (bpb->secPerClus != 128))
         {
           return INVALID_SECTORS_PER_CLUSTER;
         }
 
-      bpb->reservedSectorCount = BootSector[15];
-      bpb->reservedSectorCount <<= 8;
-      bpb->reservedSectorCount |= BootSector[14];
+      bpb->rsvdSecCnt = BootSector[15];
+      bpb->rsvdSecCnt <<= 8;
+      bpb->rsvdSecCnt |= BootSector[14];
 
-      bpb->numberOfFats = BootSector[16];
+      bpb->numOfFats = BootSector[16];
 
       bpb->fatSize32 =  BootSector[39];
       bpb->fatSize32 <<= 8;
@@ -125,15 +125,15 @@ FAT_SetBiosParameterBlock (BPB * bpb)
       bpb->fatSize32 <<= 8;
       bpb->fatSize32 |= BootSector[36];
 
-      bpb->rootCluster =  BootSector[47];
-      bpb->rootCluster <<= 8;
-      bpb->rootCluster |= BootSector[46];
-      bpb->rootCluster <<= 8;
-      bpb->rootCluster |= BootSector[45];
-      bpb->rootCluster <<= 8;
-      bpb->rootCluster |= BootSector[44];
+      bpb->rootClus =  BootSector[47];
+      bpb->rootClus <<= 8;
+      bpb->rootClus |= BootSector[46];
+      bpb->rootClus <<= 8;
+      bpb->rootClus |= BootSector[45];
+      bpb->rootClus <<= 8;
+      bpb->rootClus |= BootSector[44];
 
-      bpb->dataRegionFirstSector = bpb->bootSectorAddress + bpb->reservedSectorCount + (bpb->numberOfFats * bpb->fatSize32);
+      bpb->dataRegionFirstSector = bpb->bootSecAddr + bpb->rsvdSecCnt + (bpb->numOfFats * bpb->fatSize32);
     }
   else 
     return NOT_BOOT_SECTOR;
@@ -231,10 +231,10 @@ FAT_SetDirectory (FatDir * Dir, char * newDirStr, BPB * bpb)
 
   uint8_t  newDirStrLen = strlen (newDirStr);
   uint32_t clusIndx = Dir->FATFirstCluster;
-  uint8_t  currSecArr[ bpb->bytesPerSector ]; 
+  uint8_t  currSecArr[ bpb->bytesPerSec ]; 
   uint32_t currSecNumPhys;
   uint16_t snPosCurrSec = 0;
-  uint8_t  nextSecArr[ bpb->bytesPerSector ];
+  uint8_t  nextSecArr[ bpb->bytesPerSec ];
   uint16_t snPosNextSec = 0;
   uint8_t  attributeByte;
   char     longNameStr[ LONG_NAME_LEN_MAX ];
@@ -244,24 +244,28 @@ FAT_SetDirectory (FatDir * Dir, char * newDirStr, BPB * bpb)
 
   do
     {
-      for (uint32_t currSecNumInClus = 0; currSecNumInClus < bpb->sectorsPerCluster; currSecNumInClus++)
+      for (uint32_t currSecNumInClus = 0; currSecNumInClus < bpb->secPerClus; currSecNumInClus++)
         {         
           // load sector bytes into currSecArr[]
-          currSecNumPhys = currSecNumInClus + bpb->dataRegionFirstSector + ((clusIndx - 2) * bpb->sectorsPerCluster);
+          currSecNumPhys = currSecNumInClus + bpb->dataRegionFirstSector + ((clusIndx - 2) * bpb->secPerClus);
           fat_ReadSingleSector (currSecNumPhys, currSecArr);
 
           // loop through entries in the current sector.
           for (uint16_t entry = 0; entry < SECTOR_LEN; entry = entry + ENTRY_LEN)
             {
-              entryCorrectionFlag = pvt_CorrectEntryCheckAndLongNameFlagReset ( &lnFlags, &entry, &snPosCurrSec, &snPosNextSec);
+              entryCorrectionFlag = pvt_CorrectEntryCheck ( &lnFlags, &entry, &snPosCurrSec, &snPosNextSec);
               if (entryCorrectionFlag == 1)
                 {
                   entryCorrectionFlag = 0;
                   break;    
                 }
+
+              // reset long name flags
+              lnFlags = 0;
+
               // If first value of entry is 0 then all subsequent entries are empty.
               if (currSecArr[ entry ] == 0)
-                { /*print_str("\n\r entry = "); print_dec(entry);*/ return END_OF_DIRECTORY; }
+                return END_OF_DIRECTORY;
 
               // entry is marked for deletion. Do nothing.
               if (currSecArr[ entry ] != 0xE5)
@@ -283,7 +287,7 @@ FAT_SetDirectory (FatDir * Dir, char * newDirStr, BPB * bpb)
                       if (lnFlags & (LONG_NAME_CROSSES_SECTOR_BOUNDARY_FLAG | LONG_NAME_LAST_SECTOR_ENTRY_FLAG))
                         {
                           pvt_GetNextSector (nextSecArr, currSecNumInClus, currSecNumPhys, clusIndx, bpb);
-                          snPosNextSec = (snPosCurrSec) - bpb->bytesPerSector;
+                          snPosNextSec = (snPosCurrSec) - bpb->bytesPerSec;
                           attributeByte = nextSecArr[ snPosNextSec + 11 ];
 
                           // If snPosNextSec points to long name entry then something is wrong.
@@ -409,10 +413,10 @@ uint16_t
 FAT_PrintCurrentDirectory (FatDir * Dir, uint8_t entryFilter, BPB * bpb)
 {
   uint32_t clusIndx = Dir->FATFirstCluster;
-  uint8_t  currSecArr[ bpb->bytesPerSector ];
+  uint8_t  currSecArr[ bpb->bytesPerSec ];
   uint32_t currSecNumPhys;
   uint16_t snPosCurrSec = 0;
-  uint8_t  nextSecArr[ bpb->bytesPerSector ];
+  uint8_t  nextSecArr[ bpb->bytesPerSec ];
   uint16_t snPosNextSec = 0;
   uint8_t  attributeByte;
   char     longNameStr[ LONG_NAME_LEN_MAX ];
@@ -438,21 +442,24 @@ FAT_PrintCurrentDirectory (FatDir * Dir, uint8_t entryFilter, BPB * bpb)
   do 
     {
       // loop through sectors in the current cluster
-      for (uint32_t currSecNumInClus = 0; currSecNumInClus < bpb->sectorsPerCluster; currSecNumInClus++)
+      for (uint32_t currSecNumInClus = 0; currSecNumInClus < bpb->secPerClus; currSecNumInClus++)
         {
           // load sector bytes into currSecArr[]
-          currSecNumPhys = currSecNumInClus + bpb->dataRegionFirstSector + ((clusIndx - 2) * bpb->sectorsPerCluster);
+          currSecNumPhys = currSecNumInClus + bpb->dataRegionFirstSector + ((clusIndx - 2) * bpb->secPerClus);
           fat_ReadSingleSector (currSecNumPhys, currSecArr);
 
           // loop through entries in the current sector.
-          for (uint16_t entry = 0; entry < bpb->bytesPerSector; entry = entry + ENTRY_LEN)
+          for (uint16_t entry = 0; entry < bpb->bytesPerSec; entry = entry + ENTRY_LEN)
             {
-              entryCorrectionFlag = pvt_CorrectEntryCheckAndLongNameFlagReset ( &lnFlags, &entry, &snPosCurrSec, &snPosNextSec);
+              entryCorrectionFlag = pvt_CorrectEntryCheck ( &lnFlags, &entry, &snPosCurrSec, &snPosNextSec);
               if (entryCorrectionFlag == 1)
                 {
                   entryCorrectionFlag = 0;
                   break;    
                 }
+
+              // reset long name flags
+              lnFlags = 0;
 
               // If first value of entry is 0 then all subsequent entries are empty.
               if (currSecArr[ entry ] == 0) 
@@ -479,7 +486,7 @@ FAT_PrintCurrentDirectory (FatDir * Dir, uint8_t entryFilter, BPB * bpb)
                       if (lnFlags & (LONG_NAME_CROSSES_SECTOR_BOUNDARY_FLAG | LONG_NAME_LAST_SECTOR_ENTRY_FLAG))
                         {
                           pvt_GetNextSector ( nextSecArr, currSecNumInClus, currSecNumPhys, clusIndx, bpb );
-                          snPosNextSec = (snPosCurrSec) - bpb->bytesPerSector;
+                          snPosNextSec = (snPosCurrSec) - bpb->bytesPerSec;
                           attributeByte = nextSecArr[ (snPosNextSec) + 11 ];
                           
                           // if snPosNextSec points to a long name entry then something is wrong.
@@ -627,10 +634,10 @@ FAT_PrintFile (FatDir * Dir, char * fileNameStr, BPB * bpb)
 
   uint8_t fileNameStrLen = strlen(fileNameStr);
   uint32_t clusIndx = Dir->FATFirstCluster;
-  uint8_t  currSecArr[ bpb->bytesPerSector ];
+  uint8_t  currSecArr[ bpb->bytesPerSec ];
   uint32_t currSecNumPhys;
   uint16_t snPosCurrSec = 0;
-  uint8_t  nextSecArr[ bpb->bytesPerSector ];
+  uint8_t  nextSecArr[ bpb->bytesPerSec ];
   uint16_t snPosNextSec = 0;
   uint8_t  attributeByte;
   char     longNameStr[LONG_NAME_LEN_MAX];
@@ -646,22 +653,25 @@ FAT_PrintFile (FatDir * Dir, char * fileNameStr, BPB * bpb)
     {
       clusCnt++;
       // loop through sectors in current cluster.
-      for (uint32_t currSecNumInClus = 0; currSecNumInClus < bpb->sectorsPerCluster; currSecNumInClus++)
+      for (uint32_t currSecNumInClus = 0; currSecNumInClus < bpb->secPerClus; currSecNumInClus++)
         {     
           // load sector bytes into currSecArr[]
-          currSecNumPhys = currSecNumInClus + bpb->dataRegionFirstSector + ((clusIndx - 2) * bpb->sectorsPerCluster);
+          currSecNumPhys = currSecNumInClus + bpb->dataRegionFirstSector + ((clusIndx - 2) * bpb->secPerClus);
           fat_ReadSingleSector (currSecNumPhys, currSecArr );
           
           // loop through entries in the current sector.
-          for (uint16_t entry = 0; entry < bpb->bytesPerSector; entry = entry + ENTRY_LEN)
+          for (uint16_t entry = 0; entry < bpb->bytesPerSec; entry = entry + ENTRY_LEN)
             { 
-              entryCorrectionFlag = pvt_CorrectEntryCheckAndLongNameFlagReset ( &lnFlags, &entry, &snPosCurrSec, &snPosNextSec);
+              entryCorrectionFlag = pvt_CorrectEntryCheck ( &lnFlags, &entry, &snPosCurrSec, &snPosNextSec);
               if (entryCorrectionFlag == 1)
                 {
                   entryCorrectionFlag = 0;
                   break;    
                 }
               
+              // reset long name flags
+              lnFlags = 0;
+
               // If first value of entry is 0 then all subsequent entries are empty.
               if (currSecArr[ entry ] == 0) 
                 return END_OF_DIRECTORY;
@@ -686,7 +696,7 @@ FAT_PrintFile (FatDir * Dir, char * fileNameStr, BPB * bpb)
                       if (lnFlags & (LONG_NAME_CROSSES_SECTOR_BOUNDARY_FLAG | LONG_NAME_LAST_SECTOR_ENTRY_FLAG))
                         {
                           pvt_GetNextSector (nextSecArr, currSecNumInClus, currSecNumPhys, clusIndx, bpb );
-                          snPosNextSec = snPosCurrSec - bpb->bytesPerSector;
+                          snPosNextSec = snPosCurrSec - bpb->bytesPerSec;
                           attributeByte = nextSecArr[ snPosNextSec + 11 ];
                           
                           // If snPosNextSec points to long name entry then something is wrong.
@@ -985,10 +995,10 @@ pvt_SetCurrentDirectoryToParent (FatDir * Dir, BPB * bpb)
 {
   uint32_t parentDirectoryFirstCluster;
   uint32_t currSecNumPhys;
-  uint8_t  currSecArr[bpb->bytesPerSector];
+  uint8_t  currSecArr[bpb->bytesPerSec];
 
-  //currSecNumPhys = bpb->dataRegionFirstSector + ((cluster - 2) * bpb->sectorsPerCluster);
-  currSecNumPhys = bpb->dataRegionFirstSector + ((Dir->FATFirstCluster - 2) * bpb->sectorsPerCluster);
+  //currSecNumPhys = bpb->dataRegionFirstSector + ((cluster - 2) * bpb->secPerClus);
+  currSecNumPhys = bpb->dataRegionFirstSector + ((Dir->FATFirstCluster - 2) * bpb->secPerClus);
 
   fat_ReadSingleSector (currSecNumPhys, currSecArr);
 
@@ -1001,7 +1011,7 @@ pvt_SetCurrentDirectoryToParent (FatDir * Dir, BPB * bpb)
   parentDirectoryFirstCluster |= currSecArr[58];
 
   // if current Dir is root Dir, do nothing.
-  if (Dir->FATFirstCluster == bpb->rootCluster); 
+  if (Dir->FATFirstCluster == bpb->rootClus); 
 
   // parent Dir is root Dir
   else if (parentDirectoryFirstCluster == 0)
@@ -1010,7 +1020,7 @@ pvt_SetCurrentDirectoryToParent (FatDir * Dir, BPB * bpb)
       strcpy (Dir->shortParentPath, "");
       strcpy (Dir->longName, "/");
       strcpy (Dir->longParentPath, "");
-      Dir->FATFirstCluster = bpb->rootCluster;
+      Dir->FATFirstCluster = bpb->rootClus;
     }
   else // parent Dir is not root Dir
     {          
@@ -1184,15 +1194,15 @@ uint32_t
 pvt_GetNextClusterIndex (uint32_t currentClusterIndex, BPB * bpb)
 {
   uint8_t  bytesPerClusterIndex = 4; // for FAT32
-  uint16_t numberOfIndexedClustersPerSectorOfFat = bpb->bytesPerSector / bytesPerClusterIndex; // = 128
+  uint16_t numberOfIndexedClustersPerSectorOfFat = bpb->bytesPerSec / bytesPerClusterIndex; // = 128
 
   uint32_t clusIndx = currentClusterIndex / numberOfIndexedClustersPerSectorOfFat;
   uint32_t clusterIndexStartByte = 4 * (currentClusterIndex % numberOfIndexedClustersPerSectorOfFat);
   uint32_t cluster = 0;
 
-  uint32_t fatSectorToRead = clusIndx + bpb->reservedSectorCount;
+  uint32_t fatSectorToRead = clusIndx + bpb->rsvdSecCnt;
 
-  uint8_t SectorContents[bpb->bytesPerSector];
+  uint8_t SectorContents[bpb->bytesPerSec];
 
   fat_ReadSingleSector (fatSectorToRead, SectorContents);
 
@@ -1493,12 +1503,12 @@ pvt_PrintFatFile (uint16_t entry, uint8_t *fileSector, BPB * bpb)
     do
       {
         print_str("\n\n\r");   
-        for(uint32_t currSecNumInClus = 0; currSecNumInClus < bpb->sectorsPerCluster; currSecNumInClus++) 
+        for(uint32_t currSecNumInClus = 0; currSecNumInClus < bpb->secPerClus; currSecNumInClus++) 
           {
-            currSecNumPhys = currSecNumInClus + bpb->dataRegionFirstSector + ( (cluster - 2) * bpb->sectorsPerCluster );
+            currSecNumPhys = currSecNumInClus + bpb->dataRegionFirstSector + ( (cluster - 2) * bpb->secPerClus );
 
             fat_ReadSingleSector (currSecNumPhys, fileSector);
-            for (uint16_t k = 0; k < bpb->bytesPerSector; k++)  
+            for (uint16_t k = 0; k < bpb->bytesPerSec; k++)  
               {
                 if (fileSector[k] == '\n') 
                   {
@@ -1549,43 +1559,9 @@ pvt_PrintFatFile (uint16_t entry, uint8_t *fileSector, BPB * bpb)
  *             : 0 if the next entry to check is in the current sector.
 ***********************************************************************************************************************
 */
-/*
-uint8_t 
-pvt_CorrectEntryCheckAndLongNameFlagReset (uint8_t  * longNameExistsFlag, uint8_t  * longNameCrossSectorBoundaryFlag, uint8_t  * longNameLastSectorEntryFlag,
-                                           uint16_t * entry, uint16_t * snPosCurrSec, uint16_t * snPosNextSec)
-{  
-  if ( (*longNameExistsFlag))
-    {
-      if ( (*snPosCurrSec) >= (SECTOR_LEN - ENTRY_LEN))
-        {
-          if ((*entry) != 0)
-            return 1; // need to get the next sector
-          else 
-            (*snPosCurrSec) = -ENTRY_LEN;
-        }
-
-      if ((*longNameCrossSectorBoundaryFlag) || (*longNameLastSectorEntryFlag))
-        {
-          *entry = (*snPosNextSec) + ENTRY_LEN; 
-          *snPosNextSec = 0; 
-          *longNameCrossSectorBoundaryFlag = 0; 
-          *longNameLastSectorEntryFlag = 0;
-        }
-      else 
-        {
-          *entry = (*snPosCurrSec) + ENTRY_LEN; 
-          *snPosCurrSec = 0;
-        }
-      *longNameExistsFlag = 0;
-    }
-  return 0;
-}   
-
-*/
-// ************
 
 uint8_t 
-pvt_CorrectEntryCheckAndLongNameFlagReset (uint8_t  * lnFlags, uint16_t * entry, uint16_t * snPosCurrSec, uint16_t * snPosNextSec)
+pvt_CorrectEntryCheck (uint8_t  * lnFlags, uint16_t * entry, uint16_t * snPosCurrSec, uint16_t * snPosNextSec)
 {  
   if ((*lnFlags) & LONG_NAME_EXISTS_FLAG)
     {
@@ -1607,7 +1583,6 @@ pvt_CorrectEntryCheckAndLongNameFlagReset (uint8_t  * lnFlags, uint16_t * entry,
           *entry = (*snPosCurrSec) + ENTRY_LEN;
           *snPosCurrSec = 0;
         }
-      *lnFlags = 0;
     }
 
   return 0;
@@ -1643,40 +1618,6 @@ pvt_CorrectEntryCheckAndLongNameFlagReset (uint8_t  * lnFlags, uint16_t * entry,
  *                                                     name if it is determined to be in the next sector.
 ***********************************************************************************************************************
 */
-/*
-void
-pvt_SetLongNameFlags ( uint8_t  * longNameExistsFlag, 
-                       uint8_t  * longNameCrossSectorBoundaryFlag, 
-                       uint8_t  * longNameLastSectorEntryFlag,
-                       uint16_t   entry,
-                       uint16_t * snPosCurrSec,
-                       uint8_t  * currSecArr,
-                       BPB * bpb
-                     )
-{
-  *longNameExistsFlag = 1;
-
-  // number of entries required by the long name
-  uint8_t longNameOrder = LONG_NAME_ORDINAL_MASK & currSecArr[entry]; 
-                                  
-  *snPosCurrSec = (entry) + (ENTRY_LEN * longNameOrder);
-  
-  // if the short name position is greater than 511 (bytePerSector-1) then the short name is in the next sector.
-  if ((*snPosCurrSec) >= bpb->bytesPerSector)
-    {
-      if ((*snPosCurrSec) > bpb->bytesPerSector)
-        {
-          *longNameCrossSectorBoundaryFlag = 1;
-          *longNameLastSectorEntryFlag = 0;
-        }
-      else if (*snPosCurrSec == SECTOR_LEN)
-        {
-          *longNameCrossSectorBoundaryFlag = 0;
-          *longNameLastSectorEntryFlag = 1;
-        }
-    }
-}    
-*/
 
 void
 pvt_SetLongNameFlags ( uint8_t  * lnFlags,
@@ -1694,9 +1635,9 @@ pvt_SetLongNameFlags ( uint8_t  * lnFlags,
   *snPosCurrSec = entry + (ENTRY_LEN * longNameOrder);
   
   // if the short name position is greater than 511 (bytePerSector-1) then the short name is in the next sector.
-  if ((*snPosCurrSec) >= bpb->bytesPerSector)
+  if ((*snPosCurrSec) >= bpb->bytesPerSec)
     {
-      if ((*snPosCurrSec) > bpb->bytesPerSector)
+      if ((*snPosCurrSec) > bpb->bytesPerSec)
         {
           *lnFlags |= LONG_NAME_CROSSES_SECTOR_BOUNDARY_FLAG;
         }
@@ -1732,8 +1673,8 @@ pvt_GetNextSector( uint8_t * nextSecArr, uint32_t currSecNumInClus, uint32_t cur
 {
   uint32_t absoluteNextSectorNumber; 
   
-  if (currSecNumInClus >= (bpb->sectorsPerCluster - 1)) 
-    absoluteNextSectorNumber = bpb->dataRegionFirstSector + ((pvt_GetNextClusterIndex (clusIndx, bpb) - 2) * bpb->sectorsPerCluster);
+  if (currSecNumInClus >= (bpb->secPerClus - 1)) 
+    absoluteNextSectorNumber = bpb->dataRegionFirstSector + ((pvt_GetNextClusterIndex (clusIndx, bpb) - 2) * bpb->secPerClus);
   else 
     absoluteNextSectorNumber = 1 + currSecNumPhys;
 

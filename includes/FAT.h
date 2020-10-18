@@ -82,14 +82,14 @@
 // Struct to hold certain parameters of the Boot Sector / BIOS Parameter Block as well as some calculated values
 typedef struct BPB
 {
-    uint16_t bytesPerSector;
-    uint8_t  sectorsPerCluster;
-    uint16_t reservedSectorCount;
-    uint8_t  numberOfFats;
+    uint16_t bytesPerSec;
+    uint8_t  secPerClus;
+    uint16_t rsvdSecCnt;
+    uint8_t  numOfFats;
     uint32_t fatSize32;
-    uint32_t rootCluster;
+    uint32_t rootClus;
 
-    uint32_t bootSectorAddress;
+    uint32_t bootSecAddr;
     uint32_t dataRegionFirstSector;
 } BPB;
 

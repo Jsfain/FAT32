@@ -68,21 +68,21 @@ int main(void)
         FAT_PrintBootSectorError((uint8_t)err);
       /*
         print_str("\n\n\r **** BIOS PARAMTERS ****");
-        print_str("\n\r bytesPerSector    = "); print_dec(bpb.bytesPerSector);
-        print_str("\n\r sectorsPerCluster = "); print_dec(bpb.sectorsPerCluster);
-        print_str("\n\r reservedSectorCount = "); print_dec(bpb.reservedSectorCount);
-        print_str("\n\r numberOfFats = "); print_dec(bpb.numberOfFats);
+        print_str("\n\r bytesPerSec    = "); print_dec(bpb.bytesPerSec);
+        print_str("\n\r secPerClus = "); print_dec(bpb.secPerClus);
+        print_str("\n\r rsvdSecCnt = "); print_dec(bpb.rsvdSecCnt);
+        print_str("\n\r numOfFats = "); print_dec(bpb.numOfFats);
         print_str("\n\r fatSize32 = "); print_dec(bpb.fatSize32);
-        print_str("\n\r rootCluster = "); print_dec(bpb.rootCluster);
+        print_str("\n\r rootClus = "); print_dec(bpb.rootClus);
 
-        print_str("\n\r bootSectorAddress = "); print_dec(bpb.bootSectorAddress);
+        print_str("\n\r bootSecAddr = "); print_dec(bpb.bootSecAddr);
         print_str("\n\r dataRegionFirstSector = "); print_dec(bpb.dataRegionFirstSector);
       */
         //uint32_t bootSectorLocation;
         //bootSectorLocation = fat_FindBootSector();
         //print_str("\n\r boot sector is at block number "); print_dec(bootSectorLocation);
         //initialize current working directory to the root directory
-        FatDir cwd = {"/","","/","", bpb.rootCluster};
+        FatDir cwd = {"/","","/","", bpb.rootClus};
         //uint16_t err = 0;
         //FAT_PrintCurrentDirectory(&cwd, LONG_NAME|HIDDEN);
         //FAT_PrintError(err);
