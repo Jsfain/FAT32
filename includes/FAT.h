@@ -80,7 +80,7 @@
 
 
 // Struct to hold certain parameters of the Boot Sector / BIOS Parameter Block as well as some calculated values
-typedef struct
+typedef struct BPB
 {
     uint16_t bytesPerSector;
     uint8_t  sectorsPerCluster;
@@ -91,8 +91,7 @@ typedef struct
 
     uint32_t bootSectorAddress;
     uint32_t dataRegionFirstSector;
-
-} BiosParameterBlock;
+} BPB;
 
 
 // Struct to hold parameters of a FAT directory.
@@ -112,16 +111,16 @@ typedef struct
 ***********************************************************************************************************************
  *                                   SET MEMBERS OF THE BIOS PARAMETER BLOCK STRUCT
  * 
- * An instantiated and valid BiosParameterBlock struct is a required argument of any function that accesses the FAT 
+ * An instantiated and valid BPB struct is a required argument of any function that accesses the FAT 
  * volume, therefore this function should be called first before implementing any other parts of this FAT module.
  *                                         
- * Description : This function will set the members of a BiosParameterBlock struct instance according to the values
+ * Description : This function will set the members of a BPB struct instance according to the values
  *               specified within the FAT volume's Bios Parameter Block / Boot Sector. 
  * 
- * Argument    : *bpb    pointer to an instance of a BiosParameterBlock struct.
+ * Argument    : *bpb    pointer to an instance of a BPB struct.
  * 
  * Return      : Boot sector error flag     See the FAT.H header file for a list of these flags. To print the returned
- *                                          value, pass it to FAT_PrintBootSectorError(err). If the BiosParameterBlock
+ *                                          value, pass it to FAT_PrintBootSectorError(err). If the BPB
  *                                          struct's members have been successfully set then BOOT_SECTOR_VALID is
  *                                          returned. Any other returned value indicates a failure to set the BPB. 
  * 
@@ -132,7 +131,7 @@ typedef struct
 */
 
 uint8_t 
-FAT_SetBiosParameterBlock(BiosParameterBlock * bpb);
+FAT_SetBiosParameterBlock(BPB * bpb);
 
 
 
@@ -167,7 +166,7 @@ FAT_PrintBootSectorError (uint8_t err);
  *                                   takes this and searches the current directory for a matching name. This string
  *                                   must be a long name unless a long name does not exist for a given entry. Only then
  *                                   will a short name be searched.
- *             : *bpb                pointer to a BiosParameterBlock struct.
+ *             : *bpb                pointer to a BPB struct.
  * 
  * Returns     : FAT Error Flag      The returned value can be read by passing it to FAT_PrintError(ErrorFlag). If 
  *                                   SUCCESS is returned then the directory struct members were successfully 
@@ -180,7 +179,7 @@ FAT_PrintBootSectorError (uint8_t err);
 */
 
 uint16_t 
-FAT_SetDirectory (FatDirectory * directory, char * newDirectoryStr, BiosParameterBlock * bpb);
+FAT_SetDirectory (FatDirectory * directory, char * newDirectoryStr, BPB * bpb);
 
 
 
@@ -197,7 +196,7 @@ FAT_SetDirectory (FatDirectory * directory, char * newDirectoryStr, BiosParamete
  *             : entryFilter         byte of ENTRY_FLAGs, used to determine which entries will be printed. Any 
  *                                   combination of flags can be set. If neither LONG_NAME or SHORT_NAME are passed 
  *                                   then no entries will be printed.
- *             : *bpb                pointer to a BiosParameterBlock struct.
+ *             : *bpb                pointer to a BPB struct.
  * 
  * Returns     : FAT Error Flag     Returns END_OF_DIRECTORY if the function completed successfully and was able to
  *                                  read in and print entries until it reached the end of the directory. Any other 
@@ -206,7 +205,7 @@ FAT_SetDirectory (FatDirectory * directory, char * newDirectoryStr, BiosParamete
 */
 
 uint16_t 
-FAT_PrintCurrentDirectory (FatDirectory * directory, uint8_t entryFilter, BiosParameterBlock * bpb);
+FAT_PrintCurrentDirectory (FatDirectory * directory, uint8_t entryFilter, BPB * bpb);
 
 
 
@@ -221,7 +220,7 @@ FAT_PrintCurrentDirectory (FatDirectory * directory, uint8_t entryFilter, BiosPa
  *             : *fileNameStr        ptr to C-string that is the name of the file to be printed to the screen. This
  *                                   must be a long name, unless there is no associated long name with an entry, in 
  *                                   which case it can be a short name.
- *             : *bpb                pointer to a BiosParameterBlock struct.
+ *             : *bpb                pointer to a BPB struct.
  * 
  * Return      : FAT Error Flag     Returns END_OF_FILE if the function completed successfully and was able to
  *                                  read in and print a file's contents to the screen. Any other value returned 
@@ -230,7 +229,7 @@ FAT_PrintCurrentDirectory (FatDirectory * directory, uint8_t entryFilter, BiosPa
 */
 
 uint16_t 
-FAT_PrintFile (FatDirectory * directory, char * file, BiosParameterBlock * bpb);
+FAT_PrintFile (FatDirectory * directory, char * file, BPB * bpb);
 
 
 

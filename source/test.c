@@ -61,7 +61,7 @@ int main(void)
     if(initResponse==OUT_OF_IDLE) // initialization successful
     {          
         print_str("\n\rGetting BPB");
-        BiosParameterBlock bpb;
+        BPB bpb;
         uint16_t err;
         err = FAT_SetBiosParameterBlock(&bpb);
         print_str("\n\r SetBiosParameterBlock() returned ");

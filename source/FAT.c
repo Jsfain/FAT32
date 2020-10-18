@@ -30,16 +30,16 @@
 // Private function descriptions are only included with their definitions at the bottom of this file.
 
 uint8_t pvt_CorrectEntryCheckAndLongNameFlagReset (uint8_t * longNameFlags, uint16_t * entry, uint16_t * shortNamePositionInCurrentSector, uint16_t * shortNamePositionInNextSector);
-void pvt_SetLongNameFlags (uint8_t * longNameFlags, uint16_t entry, uint16_t * shortNamePositionInCurrentSector, uint8_t  * currentSectorContents, BiosParameterBlock * bpb);
+void pvt_SetLongNameFlags (uint8_t * longNameFlags, uint16_t entry, uint16_t * shortNamePositionInCurrentSector, uint8_t  * currentSectorContents, BPB * bpb);
 void pvt_LoadLongName (int longNameFirstEntry, int longNameLastEntry, uint8_t *sector, char * longNameStr, uint8_t * longNameStrIndex);
-void pvt_GetNextSector (uint8_t * nextSectorContents, uint32_t currentSectorNumberInCluster, uint32_t absoluteCurrentSectorNumber, uint32_t clusterIndex,  BiosParameterBlock * bpb);
-uint32_t pvt_GetNextClusterIndex (uint32_t currentClusterIndex, BiosParameterBlock * bpb);
+void pvt_GetNextSector (uint8_t * nextSectorContents, uint32_t currentSectorNumberInCluster, uint32_t absoluteCurrentSectorNumber, uint32_t clusterIndex,  BPB * bpb);
+uint32_t pvt_GetNextClusterIndex (uint32_t currentClusterIndex, BPB * bpb);
 uint8_t pvt_CheckLegalName (char * nameStr);
-void pvt_SetCurrentDirectoryToParent (FatDirectory * directory, BiosParameterBlock * bpb);
-void pvt_SetCurrentDirectoryToChild (FatDirectory * directory, uint8_t *sector, uint16_t shortNamePosition, char * nameStr, BiosParameterBlock * bpb);
+void pvt_SetCurrentDirectoryToParent (FatDirectory * directory, BPB * bpb);
+void pvt_SetCurrentDirectoryToChild (FatDirectory * directory, uint8_t *sector, uint16_t shortNamePosition, char * nameStr, BPB * bpb);
 void pvt_PrintEntryFields (uint8_t *byte, uint16_t entry, uint8_t entryFilter);
 void pvt_PrintShortNameAndType (uint8_t *byte, uint16_t entry);
-void pvt_PrintFatFile (uint16_t entry, uint8_t *fileSector, BiosParameterBlock * bpb);
+void pvt_PrintFatFile (uint16_t entry, uint8_t *fileSector, BPB * bpb);
 
 
 
@@ -54,16 +54,16 @@ void pvt_PrintFatFile (uint16_t entry, uint8_t *fileSector, BiosParameterBlock *
 ***********************************************************************************************************************
  *                                   SET MEMBERS OF THE BIOS PARAMETER BLOCK STRUCT
  * 
- * An instantiated and valid BiosParameterBlock struct is a required argument of any function that accesses the FAT 
+ * An instantiated and valid BPB struct is a required argument of any function that accesses the FAT 
  * volume, therefore this function should be called first before implementing any other parts of this FAT module.
  *                                         
- * Description : This function will set the members of a BiosParameterBlock struct instance according to the values
+ * Description : This function will set the members of a BPB struct instance according to the values
  *               specified within the FAT volume's Bios Parameter Block / Boot Sector. 
  * 
- * Argument    : *bpb    pointer to an instance of a BiosParameterBlock struct.
+ * Argument    : *bpb    pointer to an instance of a BPB struct.
  * 
  * Return      : Boot sector error flag     See the FAT.H header file for a list of these flags. To print the returned
- *                                          value, pass it to FAT_PrintBootSectorError(err). If the BiosParameterBlock
+ *                                          value, pass it to FAT_PrintBootSectorError(err). If the BPB
  *                                          struct's members have been successfully set then BOOT_SECTOR_VALID is
  *                                          returned. Any other returned value indicates a failure to set the BPB. 
  * 
@@ -74,7 +74,7 @@ void pvt_PrintFatFile (uint16_t entry, uint8_t *fileSector, BiosParameterBlock *
 */
 
 uint8_t 
-FAT_SetBiosParameterBlock (BiosParameterBlock * bpb)
+FAT_SetBiosParameterBlock (BPB * bpb)
 {
   uint8_t BootSector[SECTOR_LEN];
 
@@ -200,7 +200,7 @@ FAT_PrintBootSectorError (uint8_t err)
  *                                   takes this and searches the current directory for a matching name. This string
  *                                   must be a long name unless a long name does not exist for a given entry. Only then
  *                                   will a short name be searched.
- *             : *bpb                pointer to a BiosParameterBlock struct.
+ *             : *bpb                pointer to a BPB struct.
  * 
  * Return      : FAT Error Flag      The returned value can be read by passing it to FAT_PrintError(ErrorFlag). If 
  *                                   SUCCESS is returned then the directory struct members were successfully 
@@ -213,7 +213,7 @@ FAT_PrintBootSectorError (uint8_t err)
 */
 
 uint16_t 
-FAT_SetDirectory (FatDirectory * directory, char * newDirectoryStr, BiosParameterBlock * bpb)
+FAT_SetDirectory (FatDirectory * directory, char * newDirectoryStr, BPB * bpb)
 {
   if (pvt_CheckLegalName (newDirectoryStr)) 
     return INVALID_DIR_NAME;
@@ -400,7 +400,7 @@ FAT_SetDirectory (FatDirectory * directory, char * newDirectoryStr, BiosParamete
  *             : entryFilter         byte of ENTRY_FLAGs, used to determine which entries will be printed. Any 
  *                                   combination of flags can be set. If neither LONG_NAME or SHORT_NAME are passed 
  *                                   then no entries will be printed.
- *             : *bpb                pointer to a BiosParameterBlock struct.
+ *             : *bpb                pointer to a BPB struct.
  * 
  * Return      : FAT Error Flag     Returns END_OF_DIRECTORY if the function completed successfully and was able to
  *                                  read in and print entries until it reached the end of the directory. Any other 
@@ -409,7 +409,7 @@ FAT_SetDirectory (FatDirectory * directory, char * newDirectoryStr, BiosParamete
 */
 
 uint16_t 
-FAT_PrintCurrentDirectory (FatDirectory * directory, uint8_t entryFilter, BiosParameterBlock * bpb)
+FAT_PrintCurrentDirectory (FatDirectory * directory, uint8_t entryFilter, BPB * bpb)
 {
   uint32_t clusterIndex = directory->FATFirstCluster;
   uint8_t  currentSectorContents[ bpb->bytesPerSector ];
@@ -613,7 +613,7 @@ FAT_PrintCurrentDirectory (FatDirectory * directory, uint8_t entryFilter, BiosPa
  *             : *fileNameStr        ptr to C-string that is the name of the file to be printed to the screen. This
  *                                   must be a long name, unless there is no associated long name with an entry, in 
  *                                   which case it can be a short name.
- *             : *bpb                pointer to a BiosParameterBlock struct.
+ *             : *bpb                pointer to a BPB struct.
  * 
  * Return      : FAT Error Flag     Returns END_OF_FILE if the function completed successfully and was able to
  *                                  read in and print a file's contents to the screen. Any other value returned 
@@ -622,7 +622,7 @@ FAT_PrintCurrentDirectory (FatDirectory * directory, uint8_t entryFilter, BiosPa
 */
 
 uint16_t 
-FAT_PrintFile (FatDirectory * directory, char * fileNameStr, BiosParameterBlock * bpb)
+FAT_PrintFile (FatDirectory * directory, char * fileNameStr, BPB * bpb)
 {
   if (pvt_CheckLegalName (fileNameStr)) 
     return INVALID_DIR_NAME;
@@ -979,12 +979,12 @@ pvt_CheckLegalName (char * nameStr)
  * Argument    : *directory     pointer to an instance of a FatDirectory struct whose members will be
  *                                     updated to point to the parent of the directory currently pointed to by the
  *                                     struct's members.
- *             : *bpb                  pointer to the BiosParameterBlock struct instance.
+ *             : *bpb                  pointer to the BPB struct instance.
 ***********************************************************************************************************************
 */
 
 void 
-pvt_SetCurrentDirectoryToParent (FatDirectory * directory, BiosParameterBlock * bpb)
+pvt_SetCurrentDirectoryToParent (FatDirectory * directory, BPB * bpb)
 {
   uint32_t parentDirectoryFirstCluster;
   uint32_t absoluteCurrentSectorNumber;
@@ -1058,12 +1058,12 @@ pvt_SetCurrentDirectoryToParent (FatDirectory * directory, BiosParameterBlock * 
  *             : *nameStr              pointer to a C-string that specifies the longName member of the currenDirectory
  *                                     struct will be set to. If there is no long name associated with a short name
  *                                     then the longName and shortName members will both be set to the short name.  
- *             : *bpb                  pointer to the BiosParameterBlock struct instance.
+ *             : *bpb                  pointer to the BPB struct instance.
 ***********************************************************************************************************************
 */
 
 void
-pvt_SetCurrentDirectoryToChild (FatDirectory * directory, uint8_t *sector, uint16_t shortNamePosition, char * nameStr, BiosParameterBlock * bpb)
+pvt_SetCurrentDirectoryToChild (FatDirectory * directory, uint8_t *sector, uint16_t shortNamePosition, char * nameStr, BPB * bpb)
 {
   uint32_t dirFirstCluster;
   dirFirstCluster = sector[shortNamePosition + 21];
@@ -1175,7 +1175,7 @@ pvt_LoadLongName (int longNameFirstEntry, int longNameLastEntry, uint8_t * secto
  * 
  * Arguments   : *currentClusterIndex       a cluster's FAT index. The value at this index in the FAT is the index of the
  *                                     the next cluster of the file or directory.
- *             : *bpb                  pointer to the BiosParameterBlock struct instance.
+ *             : *bpb                  pointer to the BPB struct instance.
  * 
  * Returns     : The FAT index of the next cluster of a file or directory. This is the value stored at the indexed
  *               location in the FAT specified by the value of currentClusterIndex's index. If a value of 0xFFFFFFFF then 
@@ -1184,7 +1184,7 @@ pvt_LoadLongName (int longNameFirstEntry, int longNameLastEntry, uint8_t * secto
 */
 
 uint32_t 
-pvt_GetNextClusterIndex (uint32_t currentClusterIndex, BiosParameterBlock * bpb)
+pvt_GetNextClusterIndex (uint32_t currentClusterIndex, BPB * bpb)
 {
   uint8_t  bytesPerClusterIndex = 4; // for FAT32
   uint16_t numberOfIndexedClustersPerSectorOfFat = bpb->bytesPerSector / bytesPerClusterIndex; // = 128
@@ -1478,7 +1478,7 @@ pvt_PrintShortNameAndType (uint8_t *sector, uint16_t entry)
 */
 
 void 
-pvt_PrintFatFile (uint16_t entry, uint8_t *fileSector, BiosParameterBlock * bpb)
+pvt_PrintFatFile (uint16_t entry, uint8_t *fileSector, BPB * bpb)
   {
     uint32_t absoluteCurrentSectorNumber;
     uint32_t cluster;
@@ -1654,7 +1654,7 @@ pvt_SetLongNameFlags ( uint8_t  * longNameExistsFlag,
                        uint16_t   entry,
                        uint16_t * shortNamePositionInCurrentSector,
                        uint8_t  * currentSectorContents,
-                       BiosParameterBlock * bpb
+                       BPB * bpb
                      )
 {
   *longNameExistsFlag = 1;
@@ -1686,7 +1686,7 @@ pvt_SetLongNameFlags ( uint8_t  * longNameFlags,
                           uint16_t   entry,
                           uint16_t * shortNamePositionInCurrentSector,
                           uint8_t  * currentSectorContents,
-                          BiosParameterBlock * bpb
+                          BPB * bpb
                      )
 {
   *longNameFlags |= LONG_NAME_EXISTS_FLAG;
@@ -1726,12 +1726,12 @@ pvt_SetLongNameFlags ( uint8_t  * longNameFlags,
  *                                                     disk hosting the FAT volume.
  *             : clusterIndex                       - This is the current cluster's FAT index. This is required if it
  *                                                     is determined that the next sector is in the next cluster.   
- *             : *bpb                                - pointer to the BiosParameterBlock struct instance.
+ *             : *bpb                                - pointer to the BPB struct instance.
 ***********************************************************************************************************************
 */
 
 void
-pvt_GetNextSector( uint8_t * nextSectorContents, uint32_t currentSectorNumberInCluster, uint32_t absoluteCurrentSectorNumber, uint32_t clusterIndex,  BiosParameterBlock * bpb )
+pvt_GetNextSector( uint8_t * nextSectorContents, uint32_t currentSectorNumberInCluster, uint32_t absoluteCurrentSectorNumber, uint32_t clusterIndex,  BPB * bpb )
 {
   uint32_t absoluteNextSectorNumber; 
   
