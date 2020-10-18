@@ -95,7 +95,7 @@ typedef struct BPB
 
 
 // Struct to hold parameters of a FAT directory.
-typedef struct
+typedef struct FatDirectory
 {
     char longName[256];        // max 255 characters + '\0'
     char longParentPath[256];  // long name path to PARENT directory 
@@ -103,7 +103,7 @@ typedef struct
                                // for short names not currently supported.
     char shortParentPath[256]; // short name path to PARENT directory.
     uint32_t FATFirstCluster;  // Index of first cluster of current directory.
-} FatDirectory;
+} FatDir;
 
 
 
@@ -160,7 +160,7 @@ FAT_PrintBootSectorError (uint8_t err);
  *               found the members of the directory struct are updated to those corresponding to the matching 
  *               newDirectoryStr entry.
  *
- * Arguments   : *directory   pointer to a FatDirectory struct whose members must point to a valid
+ * Arguments   : *directory   pointer to a FatDir struct whose members must point to a valid
  *                                   FAT32 directory.
  *             : *newDirectoryStr    pointer to a C-string that is the name of the intended new directory. The function
  *                                   takes this and searches the current directory for a matching name. This string
@@ -179,7 +179,7 @@ FAT_PrintBootSectorError (uint8_t err);
 */
 
 uint16_t 
-FAT_SetDirectory (FatDirectory * directory, char * newDirectoryStr, BPB * bpb);
+FAT_SetDirectory (FatDir * directory, char * newDirectoryStr, BPB * bpb);
 
 
 
@@ -191,7 +191,7 @@ FAT_SetDirectory (FatDirectory * directory, char * newDirectoryStr, BPB * bpb);
  *               which associated data (hidden files, creation date, ...) are indicated by the ENTRY_FLAG. See the 
  *               specific ENTRY_FLAGs that can be passed in the FAT.H header file.
  * 
- * Argument    : *directory   pointer to a FatDirectory struct whose members must be associated with a 
+ * Argument    : *directory   pointer to a FatDir struct whose members must be associated with a 
  *                                   valid FAT32 directory.
  *             : entryFilter         byte of ENTRY_FLAGs, used to determine which entries will be printed. Any 
  *                                   combination of flags can be set. If neither LONG_NAME or SHORT_NAME are passed 
@@ -205,7 +205,7 @@ FAT_SetDirectory (FatDirectory * directory, char * newDirectoryStr, BPB * bpb);
 */
 
 uint16_t 
-FAT_PrintCurrentDirectory (FatDirectory * directory, uint8_t entryFilter, BPB * bpb);
+FAT_PrintCurrentDirectory (FatDir * directory, uint8_t entryFilter, BPB * bpb);
 
 
 
@@ -215,7 +215,7 @@ FAT_PrintCurrentDirectory (FatDirectory * directory, uint8_t entryFilter, BPB * 
  * 
  * Description : Prints the contents of a file from the current directory to a terminal/screen.
  * 
- * Arguments   : *directory   pointer to a FatDirectory struct whose members must be associated with a 
+ * Arguments   : *directory   pointer to a FatDir struct whose members must be associated with a 
  *                                   valid FAT32 directory.
  *             : *fileNameStr        ptr to C-string that is the name of the file to be printed to the screen. This
  *                                   must be a long name, unless there is no associated long name with an entry, in 
@@ -229,7 +229,7 @@ FAT_PrintCurrentDirectory (FatDirectory * directory, uint8_t entryFilter, BPB * 
 */
 
 uint16_t 
-FAT_PrintFile (FatDirectory * directory, char * file, BPB * bpb);
+FAT_PrintFile (FatDir * directory, char * file, BPB * bpb);
 
 
 
