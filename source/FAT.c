@@ -35,8 +35,8 @@ void pvt_LoadLongName (int longNameFirstEntry, int longNameLastEntry, uint8_t *s
 void pvt_GetNextSector (uint8_t * nextSectorContents, uint32_t currentSectorNumberInCluster, uint32_t absoluteCurrentSectorNumber, uint32_t clusterIndex,  BPB * bpb);
 uint32_t pvt_GetNextClusterIndex (uint32_t currentClusterIndex, BPB * bpb);
 uint8_t pvt_CheckLegalName (char * nameStr);
-void pvt_SetCurrentDirectoryToParent (FatDir * directory, BPB * bpb);
-void pvt_SetCurrentDirectoryToChild (FatDir * directory, uint8_t *sector, uint16_t shortNamePosition, char * nameStr, BPB * bpb);
+void pvt_SetCurrentDirectoryToParent (FatDir * Dir, BPB * bpb);
+void pvt_SetCurrentDirectoryToChild (FatDir * Dir, uint8_t *sector, uint16_t shortNamePosition, char * nameStr, BPB * bpb);
 void pvt_PrintEntryFields (uint8_t *byte, uint16_t entry, uint8_t entryFilter);
 void pvt_PrintShortNameAndType (uint8_t *byte, uint16_t entry);
 void pvt_PrintFatFile (uint16_t entry, uint8_t *fileSector, BPB * bpb);
@@ -189,48 +189,48 @@ FAT_PrintBootSectorError (uint8_t err)
 ***********************************************************************************************************************
  *                                                 SETS A DIRECTORY
  *                                        
- * Description : Call this function to set a new current directory. This operates by searching the current directory, 
- *               pointed to by the directory struct, for a name that matches newDirectoryStr. If a match is
- *               found the members of the directory struct are updated to those corresponding to the matching 
+ * Description : Call this function to set a new current Dir. This operates by searching the current Dir, 
+ *               pointed to by the Dir struct, for a name that matches newDirectoryStr. If a match is
+ *               found the members of the Dir struct are updated to those corresponding to the matching 
  *               newDirectoryStr entry.
  *
- * Arguments   : *directory   pointer to a FatDir struct whose members must point to a valid
- *                                   FAT32 directory.
- *             : *newDirectoryStr    pointer to a C-string that is the name of the intended new directory. The function
- *                                   takes this and searches the current directory for a matching name. This string
+ * Arguments   : *Dir   pointer to a FatDir struct whose members must point to a valid
+ *                                   FAT32 Dir.
+ *             : *newDirectoryStr    pointer to a C-string that is the name of the intended new Dir. The function
+ *                                   takes this and searches the current Dir for a matching name. This string
  *                                   must be a long name unless a long name does not exist for a given entry. Only then
  *                                   will a short name be searched.
  *             : *bpb                pointer to a BPB struct.
  * 
  * Return      : FAT Error Flag      The returned value can be read by passing it to FAT_PrintError(ErrorFlag). If 
- *                                   SUCCESS is returned then the directory struct members were successfully 
+ *                                   SUCCESS is returned then the Dir struct members were successfully 
  *                                   updated, but any other returned value indicates a failure struct members will not
  *                                   have been modified updated.
  *  
- * Limitations : This function will not work with absolute paths, it will only set a new directory that is a child or
- *               the parent of the current directory. 
+ * Limitations : This function will not work with absolute paths, it will only set a new Dir that is a child or
+ *               the parent of the current Dir. 
 ***********************************************************************************************************************
 */
 
 uint16_t 
-FAT_SetDirectory (FatDir * directory, char * newDirectoryStr, BPB * bpb)
+FAT_SetDirectory (FatDir * Dir, char * newDirectoryStr, BPB * bpb)
 {
   if (pvt_CheckLegalName (newDirectoryStr)) 
     return INVALID_DIR_NAME;
 
-  // Current Directory check
+  // newDirStr == 'Current Directory' ?
   if (!strcmp (newDirectoryStr,  ".")) 
     return SUCCESS;
   
-  // Parent Directory check
+  // newDirStr == 'Parent Directory' ?
   if (!strcmp (newDirectoryStr, ".."))
     {
-      pvt_SetCurrentDirectoryToParent (directory, bpb);
+      pvt_SetCurrentDirectoryToParent (Dir, bpb);
       return SUCCESS;
     }
 
   uint8_t  newDirStrLen = strlen (newDirectoryStr);
-  uint32_t clusterIndex = directory->FATFirstCluster;
+  uint32_t clusterIndex = Dir->FATFirstCluster;
   uint8_t  currentSectorContents[ bpb->bytesPerSector ]; 
   uint32_t absoluteCurrentSectorNumber;
   uint16_t shortNamePositionInCurrentSector = 0;
@@ -242,8 +242,8 @@ FAT_SetDirectory (FatDir * directory, char * newDirectoryStr, BPB * bpb)
   uint8_t  longNameFlags = 0;
   uint8_t  entryCorrectionFlag = 0;
 
-  // ***    Search directory entries of the current directory for match to newDirectoryStr and print if found    *** /
-  // loop through the current directory's clusters
+  // ***    Search Dir entries of the current Dir for match to newDirectoryStr and print if found    *** /
+  // loop through the current Dir's clusters
   do
     {
       // loop through sectors in the current cluster
@@ -293,7 +293,7 @@ FAT_SetDirectory (FatDir * directory, char * newDirectoryStr, BPB * bpb)
                           if ((attributeByte & LONG_NAME_ATTR_MASK) == LONG_NAME_ATTR_MASK) 
                             return CORRUPT_FAT_ENTRY;
 
-                          // only need to proceed if the short name attribute byte indicates the entry is a directory
+                          // only need to proceed if the short name attribute byte indicates the entry is a Dir
                           if (attributeByte & DIRECTORY_ENTRY_ATTR_FLAG)
                             {                                                           
                               // If long name crosses sector boundary
@@ -307,7 +307,7 @@ FAT_SetDirectory (FatDir * directory, char * newDirectoryStr, BPB * bpb)
                                   pvt_LoadLongName (SECTOR_LEN - ENTRY_LEN, (int)entry, currentSectorContents, longNameStr, &longNameStrIndex);
                                   if (!strcmp (newDirectoryStr, longNameStr)) 
                                     {                                                        
-                                      pvt_SetCurrentDirectoryToChild (directory, nextSectorContents, shortNamePositionInNextSector, newDirectoryStr, bpb);
+                                      pvt_SetCurrentDirectoryToChild (Dir, nextSectorContents, shortNamePositionInNextSector, newDirectoryStr, bpb);
                                       return SUCCESS;
                                     }
                                 }
@@ -323,7 +323,7 @@ FAT_SetDirectory (FatDir * directory, char * newDirectoryStr, BPB * bpb)
                                   pvt_LoadLongName(SECTOR_LEN - ENTRY_LEN, (int)entry, currentSectorContents, longNameStr, &longNameStrIndex);
                                   if (!strcmp (newDirectoryStr, longNameStr)) 
                                     { 
-                                      pvt_SetCurrentDirectoryToChild (directory, nextSectorContents, shortNamePositionInNextSector, newDirectoryStr, bpb);
+                                      pvt_SetCurrentDirectoryToChild (Dir, nextSectorContents, shortNamePositionInNextSector, newDirectoryStr, bpb);
                                       return SUCCESS;
                                     }
                                 }
@@ -340,14 +340,14 @@ FAT_SetDirectory (FatDir * directory, char * newDirectoryStr, BPB * bpb)
                             return CORRUPT_FAT_ENTRY;
         
                           attributeByte = currentSectorContents[ shortNamePositionInCurrentSector + 11 ];
-                          // If not a directory entry, move on to next entry.
+                          // If not a Dir entry, move on to next entry.
                           if ((attributeByte & DIRECTORY_ENTRY_ATTR_FLAG))
                             {
                               // load long name entry into longNameStr[]
                               pvt_LoadLongName (shortNamePositionInCurrentSector - ENTRY_LEN, (int)entry, currentSectorContents, longNameStr, &longNameStrIndex);
                               if  (!strcmp (newDirectoryStr, longNameStr)) 
                                 { 
-                                  pvt_SetCurrentDirectoryToChild (directory, currentSectorContents, shortNamePositionInCurrentSector, newDirectoryStr, bpb);
+                                  pvt_SetCurrentDirectoryToChild (Dir, currentSectorContents, shortNamePositionInCurrentSector, newDirectoryStr, bpb);
                                   return SUCCESS;
                                 }                                       
                             }
@@ -359,7 +359,7 @@ FAT_SetDirectory (FatDir * directory, char * newDirectoryStr, BPB * bpb)
                     {
                       attributeByte = currentSectorContents[entry + 11];
 
-                      // If not a directory entry OR newDirectoryStr is too long for a short name then skip this section.
+                      // If not a Dir entry OR newDirectoryStr is too long for a short name then skip this section.
                       if ((newDirStrLen < 9) && (attributeByte & DIRECTORY_ENTRY_ATTR_FLAG) )
                         {                   
                           char sn[ 9 ];
@@ -371,7 +371,7 @@ FAT_SetDirectory (FatDir * directory, char * newDirectoryStr, BPB * bpb)
                           sn[ newDirStrLen ] = '\0';
                           if (!strcmp (tempDir, sn))
                             { 
-                              pvt_SetCurrentDirectoryToChild (directory, currentSectorContents, entry, newDirectoryStr, bpb);
+                              pvt_SetCurrentDirectoryToChild (Dir, currentSectorContents, entry, newDirectoryStr, bpb);
                               return SUCCESS;
                             }
                         }
@@ -391,27 +391,27 @@ FAT_SetDirectory (FatDir * directory, char * newDirectoryStr, BPB * bpb)
 ***********************************************************************************************************************
  *                               PRINT THE ENTRIES OF THE CURRENT DIRECTORY TO A SCREEN
  * 
- * Description : Prints a list of entries (files and directories) contained in the current directory. Which entries and
+ * Description : Prints a list of entries (files and directories) contained in the current Dir. Which entries and
  *               which associated data (hidden files, creation date, ...) are indicated by the ENTRY_FLAG. See the 
  *               specific ENTRY_FLAGs that can be passed in the FAT.H header file.
  * 
- * Arguments   : *directory   pointer to a FatDir struct whose members must be associated with a 
- *                                   valid FAT32 directory.
+ * Arguments   : *Dir   pointer to a FatDir struct whose members must be associated with a 
+ *                                   valid FAT32 Dir.
  *             : entryFilter         byte of ENTRY_FLAGs, used to determine which entries will be printed. Any 
  *                                   combination of flags can be set. If neither LONG_NAME or SHORT_NAME are passed 
  *                                   then no entries will be printed.
  *             : *bpb                pointer to a BPB struct.
  * 
  * Return      : FAT Error Flag     Returns END_OF_DIRECTORY if the function completed successfully and was able to
- *                                  read in and print entries until it reached the end of the directory. Any other 
+ *                                  read in and print entries until it reached the end of the Dir. Any other 
  *                                  value returned indicates an error. Pass the value to FAT_PrintError(ErrorFlag). 
 ***********************************************************************************************************************
 */
 
 uint16_t 
-FAT_PrintCurrentDirectory (FatDir * directory, uint8_t entryFilter, BPB * bpb)
+FAT_PrintCurrentDirectory (FatDir * Dir, uint8_t entryFilter, BPB * bpb)
 {
-  uint32_t clusterIndex = directory->FATFirstCluster;
+  uint32_t clusterIndex = Dir->FATFirstCluster;
   uint8_t  currentSectorContents[ bpb->bytesPerSector ];
   uint32_t absoluteCurrentSectorNumber;
   uint16_t shortNamePositionInCurrentSector = 0;
@@ -437,7 +437,7 @@ FAT_PrintCurrentDirectory (FatDir * directory, uint8_t entryFilter, BPB * bpb)
   print_str("\n\n\r");
   
 
-  // loop through the current directory's clusters
+  // loop through the current Dir's clusters
   do 
     {
       // loop through sectors in the current cluster
@@ -595,7 +595,7 @@ FAT_PrintCurrentDirectory (FatDir * directory, uint8_t entryFilter, BPB * bpb)
         }
     }
   while ((clusterIndex = pvt_GetNextClusterIndex( clusterIndex, bpb )) != END_OF_CLUSTER);
-  // END: Print entries in the current directory
+  // END: Print entries in the current Dir
 
   return END_OF_DIRECTORY;
 }
@@ -606,10 +606,10 @@ FAT_PrintCurrentDirectory (FatDir * directory, uint8_t entryFilter, BPB * bpb)
 ***********************************************************************************************************************
  *                                               PRINT FILE TO SCREEN
  * 
- * Description : Prints the contents of a file from the current directory to a terminal/screen.
+ * Description : Prints the contents of a file from the current Dir to a terminal/screen.
  * 
- * Arguments   : *directory   pointer to a FatDir struct whose members must be associated with a 
- *                                   valid FAT32 directory.
+ * Arguments   : *Dir   pointer to a FatDir struct whose members must be associated with a 
+ *                                   valid FAT32 Dir.
  *             : *fileNameStr        ptr to C-string that is the name of the file to be printed to the screen. This
  *                                   must be a long name, unless there is no associated long name with an entry, in 
  *                                   which case it can be a short name.
@@ -622,14 +622,14 @@ FAT_PrintCurrentDirectory (FatDir * directory, uint8_t entryFilter, BPB * bpb)
 */
 
 uint16_t 
-FAT_PrintFile (FatDir * directory, char * fileNameStr, BPB * bpb)
+FAT_PrintFile (FatDir * Dir, char * fileNameStr, BPB * bpb)
 {
   if (pvt_CheckLegalName (fileNameStr)) 
     return INVALID_DIR_NAME;
   
 
   uint8_t fileNameStrLen = strlen(fileNameStr);
-  uint32_t clusterIndex = directory->FATFirstCluster;
+  uint32_t clusterIndex = Dir->FATFirstCluster;
   uint8_t  currentSectorContents[ bpb->bytesPerSector ];
   uint32_t absoluteCurrentSectorNumber;
   uint16_t shortNamePositionInCurrentSector = 0;
@@ -641,9 +641,9 @@ FAT_PrintFile (FatDir * directory, char * fileNameStr, BPB * bpb)
   uint8_t longNameFlags = 0;
   uint8_t entryCorrectionFlag = 0;
 
-  // ***     Search files in current directory for match to fileNameStr and print if found    *** /
+  // ***     Search files in current Dir for match to fileNameStr and print if found    *** /
   
-  // loop through the current directory's clusters
+  // loop through the current Dir's clusters
   int clusCnt = 0;    
   do
     {
@@ -696,7 +696,7 @@ FAT_PrintFile (FatDir * directory, char * fileNameStr, BPB * bpb)
                           if ((attributeByte & LONG_NAME_ATTR_MASK) == LONG_NAME_ATTR_MASK) 
                             return CORRUPT_FAT_ENTRY;
 
-                          // Only proceed if entry points to a file (i.e. directory flag is not set)
+                          // Only proceed if entry points to a file (i.e. Dir flag is not set)
                           if ( !(attributeByte & DIRECTORY_ENTRY_ATTR_FLAG))
                             {                                                           
                               if (longNameFlags & LONG_NAME_CROSSES_SECTOR_BOUNDARY_FLAG)
@@ -741,7 +741,7 @@ FAT_PrintFile (FatDir * directory, char * fileNameStr, BPB * bpb)
                             }
                         }
 
-                      // Long name exists and long and short name are entirely in the current directory.
+                      // Long name exists and long and short name are entirely in the current Dir.
                       else 
                         {   
                           attributeByte = currentSectorContents[shortNamePositionInCurrentSector+11];
@@ -974,24 +974,24 @@ pvt_CheckLegalName (char * nameStr)
  *                                  (PRIVATE) SET CURRENT DIRECTORY TO ITS PARENT
  * 
  * Description : This function is called by FAT_SetDirectory() if that function has been asked to set an 
- *               instance of a directory's struct members to it's parent directory.
+ *               instance of a Dir's struct members to it's parent Dir.
  * 
- * Argument    : *directory     pointer to an instance of a FatDir struct whose members will be
- *                                     updated to point to the parent of the directory currently pointed to by the
+ * Argument    : *Dir     pointer to an instance of a FatDir struct whose members will be
+ *                                     updated to point to the parent of the Dir currently pointed to by the
  *                                     struct's members.
  *             : *bpb                  pointer to the BPB struct instance.
 ***********************************************************************************************************************
 */
 
 void 
-pvt_SetCurrentDirectoryToParent (FatDir * directory, BPB * bpb)
+pvt_SetCurrentDirectoryToParent (FatDir * Dir, BPB * bpb)
 {
   uint32_t parentDirectoryFirstCluster;
   uint32_t absoluteCurrentSectorNumber;
   uint8_t  currentSectorContents[bpb->bytesPerSector];
 
   //absoluteCurrentSectorNumber = bpb->dataRegionFirstSector + ((cluster - 2) * bpb->sectorsPerCluster);
-  absoluteCurrentSectorNumber = bpb->dataRegionFirstSector + ((directory->FATFirstCluster - 2) * bpb->sectorsPerCluster);
+  absoluteCurrentSectorNumber = bpb->dataRegionFirstSector + ((Dir->FATFirstCluster - 2) * bpb->sectorsPerCluster);
 
   fat_ReadSingleSector (absoluteCurrentSectorNumber, currentSectorContents);
 
@@ -1003,38 +1003,38 @@ pvt_SetCurrentDirectoryToParent (FatDir * directory, BPB * bpb)
   parentDirectoryFirstCluster <<= 8;
   parentDirectoryFirstCluster |= currentSectorContents[58];
 
-  // if current directory is root directory, do nothing.
-  if (directory->FATFirstCluster == bpb->rootCluster); 
+  // if current Dir is root Dir, do nothing.
+  if (Dir->FATFirstCluster == bpb->rootCluster); 
 
-  // parent directory is root directory
+  // parent Dir is root Dir
   else if (parentDirectoryFirstCluster == 0)
     {
-      strcpy (directory->shortName, "/");
-      strcpy (directory->shortParentPath, "");
-      strcpy (directory->longName, "/");
-      strcpy (directory->longParentPath, "");
-      directory->FATFirstCluster = bpb->rootCluster;
+      strcpy (Dir->shortName, "/");
+      strcpy (Dir->shortParentPath, "");
+      strcpy (Dir->longName, "/");
+      strcpy (Dir->longParentPath, "");
+      Dir->FATFirstCluster = bpb->rootCluster;
     }
-  else // parent directory is not root directory
+  else // parent Dir is not root Dir
     {          
       char tmpShortNamePath[64];
       char tmpLongNamePath[64];
 
-      strlcpy (tmpShortNamePath, directory->shortParentPath, strlen (directory->shortParentPath));
-      strlcpy (tmpLongNamePath, directory->longParentPath,   strlen (directory->longParentPath ));
+      strlcpy (tmpShortNamePath, Dir->shortParentPath, strlen (Dir->shortParentPath));
+      strlcpy (tmpLongNamePath, Dir->longParentPath,   strlen (Dir->longParentPath ));
       
       char *shortNameLastDirectoryInPath = strrchr (tmpShortNamePath, '/');
       char *longNameLastDirectoryInPath  = strrchr (tmpLongNamePath , '/');
       
-      strcpy (directory->shortName, shortNameLastDirectoryInPath + 1);
-      strcpy (directory->longName , longNameLastDirectoryInPath  + 1);
+      strcpy (Dir->shortName, shortNameLastDirectoryInPath + 1);
+      strcpy (Dir->longName , longNameLastDirectoryInPath  + 1);
 
-      strlcpy (directory->shortParentPath, tmpShortNamePath, 
+      strlcpy (Dir->shortParentPath, tmpShortNamePath, 
                 (shortNameLastDirectoryInPath + 2) - tmpShortNamePath);
-      strlcpy (directory->longParentPath,  tmpLongNamePath, 
+      strlcpy (Dir->longParentPath,  tmpLongNamePath, 
                 (longNameLastDirectoryInPath  + 2) -  tmpLongNamePath);
 
-      directory->FATFirstCluster = parentDirectoryFirstCluster;
+      Dir->FATFirstCluster = parentDirectoryFirstCluster;
     }
 }
 
@@ -1045,12 +1045,12 @@ pvt_SetCurrentDirectoryToParent (FatDir * directory, BPB * bpb)
  *                           (PRIVATE) SET CURRENT DIRECTORY TO ONE OF ITS CHILD DIRECTORIES
  * 
  * Description : This function is called by FAT_SetDirectory() if that function has been asked to set an 
- *               instance of a directory's struct members to a child directory and a valid matching entry was 
+ *               instance of a Dir's struct members to a child Dir and a valid matching entry was 
  *               found. This function will only update the struct's members to that of the matching entry. It does
  *               not perform any of the search/compare required to find the match.
  * 
- * Argument    : *directory     pointer to an instance of a FatDir struct whose members will be
- *                                     updated to point to the child directory indicated by *nameStr.
+ * Argument    : *Dir     pointer to an instance of a FatDir struct whose members will be
+ *                                     updated to point to the child Dir indicated by *nameStr.
  *             : *sector               pointer to an array that holds the physical sector's contents that contains the 
  *                                     short name of the entry that matches the *nameStr.
  *             : shortNamePosition     integer that specifies the first position in *sector where the 32-byte short
@@ -1063,7 +1063,7 @@ pvt_SetCurrentDirectoryToParent (FatDir * directory, BPB * bpb)
 */
 
 void
-pvt_SetCurrentDirectoryToChild (FatDir * directory, uint8_t *sector, uint16_t shortNamePosition, char * nameStr, BPB * bpb)
+pvt_SetCurrentDirectoryToChild (FatDir * Dir, uint8_t *sector, uint16_t shortNamePosition, char * nameStr, BPB * bpb)
 {
   uint32_t dirFirstCluster;
   dirFirstCluster = sector[shortNamePosition + 21];
@@ -1074,7 +1074,7 @@ pvt_SetCurrentDirectoryToChild (FatDir * directory, uint8_t *sector, uint16_t sh
   dirFirstCluster <<= 8;
   dirFirstCluster |= sector[shortNamePosition + 26];
 
-  directory->FATFirstCluster = dirFirstCluster;
+  Dir->FATFirstCluster = dirFirstCluster;
   
   uint8_t snLen;
   if (strlen(nameStr) < 8) snLen = strlen(nameStr);
@@ -1085,17 +1085,17 @@ pvt_SetCurrentDirectoryToChild (FatDir * directory, uint8_t *sector, uint16_t sh
     sn[k] = sector[shortNamePosition + k];
   sn[snLen] = '\0';
 
-  strcat (directory->longParentPath,  directory->longName );
-  strcat (directory->shortParentPath, directory->shortName);
+  strcat (Dir->longParentPath,  Dir->longName );
+  strcat (Dir->shortParentPath, Dir->shortName);
 
-  // if current directory is not root then append '/'
-  if (directory->longName[0] != '/') 
-    strcat(directory->longParentPath, "/"); 
-  strcpy(directory->longName, nameStr);
+  // if current Dir is not root then append '/'
+  if (Dir->longName[0] != '/') 
+    strcat(Dir->longParentPath, "/"); 
+  strcpy(Dir->longName, nameStr);
   
-  if (directory->shortName[0] != '/') 
-    strcat(directory->shortParentPath, "/");
-  strcpy(directory->shortName, sn);
+  if (Dir->shortName[0] != '/') 
+    strcat(Dir->shortParentPath, "/");
+  strcpy(Dir->shortName, sn);
 }
 
 
@@ -1105,7 +1105,7 @@ pvt_SetCurrentDirectoryToChild (FatDir * directory, uint8_t *sector, uint16_t sh
  *                                  (PRIVATE) LOAD A LONG NAME ENTRY INTO A C-STRING
  * 
  * Description : This function is called by any of the FAT functions that need to read in a long name from a FAT
- *               directory into a C-string. This function is called twice if a long name crosses a sector boundary, and
+ *               Dir into a C-string. This function is called twice if a long name crosses a sector boundary, and
  *               the *longNameStrIndex will point to the position in the c-string to begin loading the string char's
  * 
  * Arguments   : longNameFirstEntry    integer that points to the position in *sector that is the lowest order entry
@@ -1168,18 +1168,18 @@ pvt_LoadLongName (int longNameFirstEntry, int longNameLastEntry, uint8_t * secto
 ***********************************************************************************************************************
  *                                        (PRIVATE) GET THE NEXT CLUSTER FAT INDEX
  *
- * Description : Used by the FAT functions to get the location of the next cluster in a directory or file. The value  
+ * Description : Used by the FAT functions to get the location of the next cluster in a Dir or file. The value  
  *               returned points to the cluster's index in the FAT. This value is offset by two when counting the 
  *               clusters in the FATs Data Region. Therefore, to get the cluster number in the data region the value
  *               returned by this function must be subtracted by 2.
  * 
  * Arguments   : *currentClusterIndex       a cluster's FAT index. The value at this index in the FAT is the index of the
- *                                     the next cluster of the file or directory.
+ *                                     the next cluster of the file or Dir.
  *             : *bpb                  pointer to the BPB struct instance.
  * 
- * Returns     : The FAT index of the next cluster of a file or directory. This is the value stored at the indexed
+ * Returns     : The FAT index of the next cluster of a file or Dir. This is the value stored at the indexed
  *               location in the FAT specified by the value of currentClusterIndex's index. If a value of 0xFFFFFFFF then 
- *               currentClusterIndex is the last cluster of the file/directory.
+ *               currentClusterIndex is the last cluster of the file/Dir.
 ***********************************************************************************************************************
 */
 
@@ -1393,7 +1393,7 @@ pvt_PrintEntryFields (uint8_t *sector, uint16_t entry, uint8_t entryFilter)
 ***********************************************************************************************************************
  *                                              (PRIVATE) PRINT SHORT NAME
  *
- * Description : Used by FAT_PrintCurrentDirectory to the short name of an fat file or directory.
+ * Description : Used by FAT_PrintCurrentDirectory to the short name of an fat file or Dir.
  * 
  * Arguments   : *sector          pointer to an array that holds the short name of the entry that is being printed
  *                                to the screen. Only the short name entry of a short name/long name combination holds
@@ -1524,7 +1524,7 @@ pvt_PrintFatFile (uint16_t entry, uint8_t *fileSector, BPB * bpb)
 ***********************************************************************************************************************
  *                         (PRIVATE) CORRECTS WHERE ENTRY IS POINTING AND RESEST LONG NAME FLAGS
  *
- * Description : Used by the FAT functions when searching through a directory. A correction may need to be made so that
+ * Description : Used by the FAT functions when searching through a Dir. A correction may need to be made so that
  *               entry is pointing to the correct location. This function uses the long name flag settings passed as
  *               arguments to determine if the adjustment needs to be made and makes the adjustment, if the correct
  *               entry is still in the current sector. If the correct entry is in the next sector, however, then the 
@@ -1714,11 +1714,11 @@ pvt_SetLongNameFlags ( uint8_t  * longNameFlags,
 ***********************************************************************************************************************
  *                             (PRIVATE) LOAD THE CONTENTS OF THE NEXT SECTOR INTO AN ARRAY
  *
- * Description : Used by the FAT functions to load the contents of the next file or directory sector into the 
+ * Description : Used by the FAT functions to load the contents of the next file or Dir sector into the 
  *               *nextSectorContents array if it is foudn that a long / short name combo crosses the sector boundary.
  * 
  * Arguments   : *nextSectorContents                 - Pointer to an array that will be loaded with the contents of the
- *                                                     next sector of a file or directory.
+ *                                                     next sector of a file or Dir.
  *             : currentSectorNumberInCluster        - Integer that specifies the current sector number relative to the
  *                                                     current cluster. This value is used to determine if the next
  *                                                     sector is in the current or the next cluster.
