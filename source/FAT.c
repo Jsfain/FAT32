@@ -190,13 +190,13 @@ FAT_PrintBootSectorError (uint8_t err)
  *                                                 SETS A DIRECTORY
  *                                        
  * Description : Call this function to set a new current Dir. This operates by searching the current Dir, 
- *               pointed to by the Dir struct, for a name that matches newDirectoryStr. If a match is
+ *               pointed to by the Dir struct, for a name that matches newDirStr. If a match is
  *               found the members of the Dir struct are updated to those corresponding to the matching 
- *               newDirectoryStr entry.
+ *               newDirStr entry.
  *
  * Arguments   : *Dir   pointer to a FatDir struct whose members must point to a valid
  *                                   FAT32 Dir.
- *             : *newDirectoryStr    pointer to a C-string that is the name of the intended new Dir. The function
+ *             : *newDirStr    pointer to a C-string that is the name of the intended new Dir. The function
  *                                   takes this and searches the current Dir for a matching name. This string
  *                                   must be a long name unless a long name does not exist for a given entry. Only then
  *                                   will a short name be searched.
@@ -213,23 +213,23 @@ FAT_PrintBootSectorError (uint8_t err)
 */
 
 uint16_t 
-FAT_SetDirectory (FatDir * Dir, char * newDirectoryStr, BPB * bpb)
+FAT_SetDirectory (FatDir * Dir, char * newDirStr, BPB * bpb)
 {
-  if (pvt_CheckLegalName (newDirectoryStr)) 
+  if (pvt_CheckLegalName (newDirStr)) 
     return INVALID_DIR_NAME;
 
   // newDirStr == 'Current Directory' ?
-  if (!strcmp (newDirectoryStr,  ".")) 
+  if (!strcmp (newDirStr,  ".")) 
     return SUCCESS;
   
   // newDirStr == 'Parent Directory' ?
-  if (!strcmp (newDirectoryStr, ".."))
+  if (!strcmp (newDirStr, ".."))
     {
       pvt_SetCurrentDirectoryToParent (Dir, bpb);
       return SUCCESS;
     }
 
-  uint8_t  newDirStrLen = strlen (newDirectoryStr);
+  uint8_t  newDirStrLen = strlen (newDirStr);
   uint32_t clusterIndex = Dir->FATFirstCluster;
   uint8_t  currentSectorContents[ bpb->bytesPerSector ]; 
   uint32_t absoluteCurrentSectorNumber;
@@ -242,7 +242,7 @@ FAT_SetDirectory (FatDir * Dir, char * newDirectoryStr, BPB * bpb)
   uint8_t  longNameFlags = 0;
   uint8_t  entryCorrectionFlag = 0;
 
-  // ***    Search Dir entries of the current Dir for match to newDirectoryStr and print if found    *** /
+  // ***    Search Dir entries of the current Dir for match to newDirStr and print if found    *** /
   // loop through the current Dir's clusters
   do
     {
@@ -305,9 +305,9 @@ FAT_SetDirectory (FatDir * Dir, char * newDirectoryStr, BPB * bpb)
                                   // load long name entry that crosses sector boundary into longNameStr[]
                                   pvt_LoadLongName (shortNamePositionInNextSector - ENTRY_LEN, 0, nextSectorContents, longNameStr, &longNameStrIndex);
                                   pvt_LoadLongName (SECTOR_LEN - ENTRY_LEN, (int)entry, currentSectorContents, longNameStr, &longNameStrIndex);
-                                  if (!strcmp (newDirectoryStr, longNameStr)) 
+                                  if (!strcmp (newDirStr, longNameStr)) 
                                     {                                                        
-                                      pvt_SetCurrentDirectoryToChild (Dir, nextSectorContents, shortNamePositionInNextSector, newDirectoryStr, bpb);
+                                      pvt_SetCurrentDirectoryToChild (Dir, nextSectorContents, shortNamePositionInNextSector, newDirStr, bpb);
                                       return SUCCESS;
                                     }
                                 }
@@ -321,9 +321,9 @@ FAT_SetDirectory (FatDir * Dir, char * newDirectoryStr, BPB * bpb)
 
                                   // load long name entry into longNameStr[]
                                   pvt_LoadLongName(SECTOR_LEN - ENTRY_LEN, (int)entry, currentSectorContents, longNameStr, &longNameStrIndex);
-                                  if (!strcmp (newDirectoryStr, longNameStr)) 
+                                  if (!strcmp (newDirStr, longNameStr)) 
                                     { 
-                                      pvt_SetCurrentDirectoryToChild (Dir, nextSectorContents, shortNamePositionInNextSector, newDirectoryStr, bpb);
+                                      pvt_SetCurrentDirectoryToChild (Dir, nextSectorContents, shortNamePositionInNextSector, newDirStr, bpb);
                                       return SUCCESS;
                                     }
                                 }
@@ -345,9 +345,9 @@ FAT_SetDirectory (FatDir * Dir, char * newDirectoryStr, BPB * bpb)
                             {
                               // load long name entry into longNameStr[]
                               pvt_LoadLongName (shortNamePositionInCurrentSector - ENTRY_LEN, (int)entry, currentSectorContents, longNameStr, &longNameStrIndex);
-                              if  (!strcmp (newDirectoryStr, longNameStr)) 
+                              if  (!strcmp (newDirStr, longNameStr)) 
                                 { 
-                                  pvt_SetCurrentDirectoryToChild (Dir, currentSectorContents, shortNamePositionInCurrentSector, newDirectoryStr, bpb);
+                                  pvt_SetCurrentDirectoryToChild (Dir, currentSectorContents, shortNamePositionInCurrentSector, newDirStr, bpb);
                                   return SUCCESS;
                                 }                                       
                             }
@@ -359,19 +359,19 @@ FAT_SetDirectory (FatDir * Dir, char * newDirectoryStr, BPB * bpb)
                     {
                       attributeByte = currentSectorContents[entry + 11];
 
-                      // If not a Dir entry OR newDirectoryStr is too long for a short name then skip this section.
+                      // If not a Dir entry OR newDirStr is too long for a short name then skip this section.
                       if ((newDirStrLen < 9) && (attributeByte & DIRECTORY_ENTRY_ATTR_FLAG) )
                         {                   
                           char sn[ 9 ];
                           char tempDir[ 9 ];
-                          strcpy(tempDir, newDirectoryStr);
+                          strcpy(tempDir, newDirStr);
 
                           for (uint8_t k = 0; k < newDirStrLen; k++) 
                             sn[ k ] = currentSectorContents[ k + entry ];
                           sn[ newDirStrLen ] = '\0';
                           if (!strcmp (tempDir, sn))
                             { 
-                              pvt_SetCurrentDirectoryToChild (Dir, currentSectorContents, entry, newDirectoryStr, bpb);
+                              pvt_SetCurrentDirectoryToChild (Dir, currentSectorContents, entry, newDirStr, bpb);
                               return SUCCESS;
                             }
                         }

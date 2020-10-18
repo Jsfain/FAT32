@@ -156,13 +156,13 @@ FAT_PrintBootSectorError (uint8_t err);
  *                                                 SETS A DIRECTORY
  *                                        
  * Description : Call this function to set a new current Dir. This operates by searching the current Dir, 
- *               pointed to by the Dir struct, for a name that matches newDirectoryStr. If a match is
+ *               pointed to by the Dir struct, for a name that matches newDirStr. If a match is
  *               found the members of the Dir struct are updated to those corresponding to the matching 
- *               newDirectoryStr entry.
+ *               newDirStr entry.
  *
  * Arguments   : *Dir   pointer to a FatDir struct whose members must point to a valid
  *                                   FAT32 Dir.
- *             : *newDirectoryStr    pointer to a C-string that is the name of the intended new Dir. The function
+ *             : *newDirStr    pointer to a C-string that is the name of the intended new Dir. The function
  *                                   takes this and searches the current Dir for a matching name. This string
  *                                   must be a long name unless a long name does not exist for a given entry. Only then
  *                                   will a short name be searched.
@@ -179,7 +179,7 @@ FAT_PrintBootSectorError (uint8_t err);
 */
 
 uint16_t 
-FAT_SetDirectory (FatDir * Dir, char * newDirectoryStr, BPB * bpb);
+FAT_SetDirectory (FatDir * Dir, char * newDirStr, BPB * bpb);
 
 
 
