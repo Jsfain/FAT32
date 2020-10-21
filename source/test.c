@@ -162,7 +162,7 @@ int main(void)
                 if(!strcmp(c,"cd"))
                 {   
                     err = FAT_SetDirectory(&cwd, a, &bpb);
-                    FAT_PrintError(err);
+                    if (err != SUCCESS) FAT_PrintError(err);
                 }
                 
                 else if (!strcmp(c,"ls"))
@@ -195,18 +195,17 @@ int main(void)
                         else if (strcmp(&a[loc[t]],"/FS") == 0 ) flag |= FILE_SIZE;
                         else if (strcmp(&a[loc[t]],"/T")  == 0 ) flag |= TYPE;
                         else { print_str("\n\rInvalid Argument"); break; }
-                        //print_str("\n\r flag    = \"0x");print_hex(flag);  print_str("\"");
                     }
-                    
                     if((flag&SHORT_NAME) != SHORT_NAME) { flag |= LONG_NAME; } //long name is default
                     err = FAT_PrintDirectory(&cwd, flag, &bpb);
-                    FAT_PrintError(err);
+                    if (err != END_OF_DIRECTORY) FAT_PrintError(err);
                 }
                 
                 else if (!strcmp(c,"open")) 
                 { 
                     err = FAT_PrintFile(&cwd,a,&bpb);
-                    FAT_PrintError(err);
+                    if (err != END_OF_FILE) FAT_PrintError(err);
+                    
                 }
                 else if (!strcmp(c,"cwd"))
                 {
