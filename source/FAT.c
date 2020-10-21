@@ -240,7 +240,7 @@ FAT_SetDirectory (FatDir * Dir, char * newDirStr, BPB * bpb)
   uint16_t snPosCurrSec = 0; 
   uint16_t snPosNextSec = 0;
   // ln -> long name
-  char     lnStr[LONG_NAME_SIZE_MAX];
+  char     lnStr[LONG_NAME_STRING_LEN_MAX];
   uint8_t  lnStrIndx = 0;
   uint8_t  lnFlags = 0;
 
@@ -277,7 +277,7 @@ FAT_SetDirectory (FatDir * Dir, char * newDirStr, BPB * bpb)
                     {
                       if ( !(currSecArr[entryPos] & LONG_NAME_LAST_ENTRY)) return CORRUPT_FAT_ENTRY;
                       
-                      for (uint8_t k = 0; k < LONG_NAME_SIZE_MAX; k++) lnStr[k] = '\0';
+                      for (uint8_t k = 0; k < LONG_NAME_STRING_LEN_MAX; k++) lnStr[k] = '\0';
 
                       lnStrIndx = 0;
                       pvt_SetLongNameFlags ( &lnFlags, entryPos, &snPosCurrSec, currSecArr, bpb);
@@ -409,7 +409,7 @@ FAT_PrintDirectory (FatDir * Dir, uint8_t entryFilter, BPB * bpb)
   uint16_t snPosCurrSec = 0; 
   uint16_t snPosNextSec = 0;
   // ln -> long name
-  char     lnStr[LONG_NAME_SIZE_MAX];
+  char     lnStr[LONG_NAME_STRING_LEN_MAX];
   uint8_t  lnStrIndx = 0;
   uint8_t  lnFlags = 0;
 
@@ -457,7 +457,7 @@ FAT_PrintDirectory (FatDir * Dir, uint8_t entryFilter, BPB * bpb)
                     {
                       if ( !(currSecArr[entryPos] & LONG_NAME_LAST_ENTRY)) return CORRUPT_FAT_ENTRY;
 
-                      for (uint8_t k = 0; k < LONG_NAME_SIZE_MAX; k++) lnStr[k] = '\0';
+                      for (uint8_t k = 0; k < LONG_NAME_STRING_LEN_MAX; k++) lnStr[k] = '\0';
  
                       lnStrIndx = 0;
 
@@ -647,7 +647,7 @@ FAT_PrintFile (FatDir * Dir, char * fileNameStr, BPB * bpb)
   uint16_t snPosCurrSec = 0;
   uint16_t snPosNextSec = 0;
   // ln -> long name
-  char     lnStr[LONG_NAME_SIZE_MAX];
+  char     lnStr[LONG_NAME_STRING_LEN_MAX];
   uint8_t  lnStrIndx = 0;
   uint8_t  lnFlags = 0;
    
@@ -685,7 +685,7 @@ FAT_PrintFile (FatDir * Dir, char * fileNameStr, BPB * bpb)
                     {
                       if ( !(currSecArr[entryPos] & LONG_NAME_LAST_ENTRY)) return CORRUPT_FAT_ENTRY;
                       
-                      for (uint8_t k = 0; k < LONG_NAME_SIZE_MAX; k++) lnStr[k] = '\0';
+                      for (uint8_t k = 0; k < LONG_NAME_STRING_LEN_MAX; k++) lnStr[k] = '\0';
 
                       pvt_SetLongNameFlags (&lnFlags, entryPos, &snPosCurrSec, currSecArr, bpb);
                       
@@ -925,8 +925,8 @@ pvt_CheckValidName (char * nameStr, FatDir * Dir)
 {
   // check that long name and path size are 
   // not too large for current settings.
-  if (strlen (nameStr) > LONG_NAME_SIZE_MAX) return 1;
-  if (( strlen (nameStr) + strlen (Dir->longParentPath)) > PATH_SIZE_MAX) return 1;
+  if (strlen (nameStr) > LONG_NAME_STRING_LEN_MAX) return 1;
+  if (( strlen (nameStr) + strlen (Dir->longParentPath)) > PATH_STRING_LEN_MAX) return 1;
   
   // nameStr is illegal if it is an empty string or begins with a space character 
   if ((strcmp (nameStr, "") == 0) || (nameStr[0] == ' ')) return 1;
@@ -1002,8 +1002,8 @@ pvt_SetDirectoryToParent (FatDir * Dir, BPB * bpb)
   // parent directory is not root directory
   else
     {          
-      char tmpShortNamePath[PATH_SIZE_MAX];
-      char tmpLongNamePath[PATH_SIZE_MAX];
+      char tmpShortNamePath[PATH_STRING_LEN_MAX];
+      char tmpLongNamePath[PATH_STRING_LEN_MAX];
 
       strlcpy (tmpShortNamePath, Dir->shortParentPath, strlen (Dir->shortParentPath));
       strlcpy (tmpLongNamePath, Dir->longParentPath,   strlen (Dir->longParentPath ));

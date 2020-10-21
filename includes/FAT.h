@@ -22,15 +22,28 @@
 #include <avr/io.h>
 
 
+/*
+***********************************************************************************************************************
+ *                                                       MACROS
+***********************************************************************************************************************
+*/
+
+
 #define SECTOR_LEN                                512
 #define ENTRY_LEN                                 32
-
-#define PATH_SIZE_MAX                             50
-#define LONG_NAME_SIZE_MAX                        50
-
 #define END_OF_CLUSTER                            0x0FFFFFFF
 
-// Boot Sector Error Flags
+
+// ******* Maximum FAT String Length Flags
+
+// Specify the max length of strings that can be stored in the members
+// of a FatDir instance. These are lower than required by FAT32 specs 
+// (255), to conserve memory. Adjust as needed.  
+#define PATH_STRING_LEN_MAX                       50
+#define LONG_NAME_STRING_LEN_MAX                  50
+
+
+// ******* Boot Sector Error Flags
 #define CORRUPT_BOOT_SECTOR                       0x01
 #define NOT_BOOT_SECTOR                           0x02
 #define INVALID_BYTES_PER_SECTOR                  0x04
@@ -38,7 +51,8 @@
 #define BOOT_SECTOR_NOT_FOUND                     0x10
 #define BOOT_SECTOR_VALID                         0x20
 
-// Fat Error Flags
+
+// ******* Fat Error Flags
 #define SUCCESS                                   0x00
 #define INVALID_FILE_NAME                         0x01
 #define INVALID_DIR_NAME                          0x02
@@ -48,65 +62,107 @@
 #define END_OF_DIRECTORY                          0x20
 #define CORRUPT_FAT_ENTRY                         0x40
 
-// FAT Entry Attribute Flags
-#define READ_ONLY_ATTR                            0x01
-#define HIDDEN_ATTR                               0x02
-#define SYSTEM_ATTR                               0x04
-#define VOLUME_ID_ATTR                            0x08
-#define DIRECTORY_ENTRY_ATTR                      0x10
-#define ARCHIVE_ATTR                              0x20
-#define LONG_NAME_ATTR_MASK                       0x0F
-// Other FAT specific flags / tokens
-#define LONG_NAME_LAST_ENTRY                      0x40
-#define LONG_NAME_ORDINAL_MASK                    0x3F
 
-// Long Name Flags
-#define LONG_NAME_EXISTS                     0x01
-#define LONG_NAME_CROSSES_SECTOR_BOUNDARY    0x02
-#define LONG_NAME_LAST_SECTOR_ENTRY          0x04
+// ******* Long Name Distribution Flags
 
-// Entry Filter Flags
+// These are set and used by a calling function to indicate
+// how a particular entry long/short name is distributed among
+// adjacent sectors.
+#define LONG_NAME_EXISTS                          0x01
+#define LONG_NAME_CROSSES_SECTOR_BOUNDARY         0x02
+#define LONG_NAME_LAST_SECTOR_ENTRY               0x04
+
+
+// ******** Entry Filter Flags
+
+// Pass any combination of these flags as the entryFilter argument
+// in FAT_PrintDirectory() to indicate which entries and their
+// fields to print to the screen.
 #define SHORT_NAME                                0x01
 #define LONG_NAME                                 0x02
 #define HIDDEN                                    0x04
 #define CREATION                                  0x08
 #define LAST_ACCESS                               0x10
 #define LAST_MODIFIED                             0x20
-#define TYPE                                      0x40
-#define FILE_SIZE                                 0x80
-#define ALL                                       (CREATION | LAST_ACCESS | LAST_MODIFIED)
+#define TYPE                                      0x40 // specifies if entry is a directory or file
+#define FILE_SIZE                                 0x80 // in kb. rounded.
+#define ALL                       (CREATION | LAST_ACCESS | LAST_MODIFIED)
 
-// Interface Error Flags : These errors are to be applied by the phyiscal interface.
+
+//********* FAT Entry Flags.
+
+// Flags 0x01 to 0x20 correspond to the attribute flags that can be set 
+// in the attribute byte (byte 11) of an entry. If the lowest four bytes
+// are set then this indicates the entry is part of a long name.
+#define READ_ONLY_ATTR                            0x01
+#define HIDDEN_ATTR                               0x02
+#define SYSTEM_ATTR                               0x04
+#define VOLUME_ID_ATTR                            0x08
+#define DIRECTORY_ENTRY_ATTR                      0x10
+#define ARCHIVE_ATTR                              0x20
+#define LONG_NAME_ATTR_MASK                       0x0F // OR'd lowest 4 attributes
+// Other FAT specific flags / tokens.
+#define LONG_NAME_LAST_ENTRY                      0x40  
+#define LONG_NAME_ORDINAL_MASK                    0x3F
+
+
+// ***** Physical Interface Error Flags
+
+// These error flags can be used by the interface in a specific implementation 
+// of this FAT module between this module and the pysical disk module/driver.
 #define READ_SECTOR_ERROR                         0x01
 #define READ_SECTOR_TIMEOUT                       0x02
 #define READ_SECTOR_SUCCESSFUL                    0x04
 
 
-// Struct to hold certain parameters of the Boot Sector / BIOS Parameter Block as well as some calculated values
-typedef struct BPB
+******
+/*
+***********************************************************************************************************************
+ *                                                     STRUCTS
+***********************************************************************************************************************
+*/
+
+// ****** Bios Paramater Block struct
+
+// An instance of this struct should hold specific values set in the FAT volume's
+// BIOS Parameter Block, as well as a few calculated values based on BPB values.
+// These values should be set only by passing an instance of the struct to 
+// FAT_SetBiosParameterBlock(BPB * bpb)
+typedef struct BiosParameterBlock
 {
-    uint16_t bytesPerSec;
-    uint8_t  secPerClus;
-    uint16_t rsvdSecCnt;
-    uint8_t  numOfFats;
-    uint32_t fatSize32;
-    uint32_t rootClus;
+  uint16_t bytesPerSec;
+  uint8_t  secPerClus;
+  uint16_t rsvdSecCnt;
+  uint8_t  numOfFats;
+  uint32_t fatSize32;
+  uint32_t rootClus;
 
-    uint32_t bootSecAddr;
-    uint32_t dataRegionFirstSector;
-} BPB;
+  uint32_t bootSecAddr;
+  uint32_t dataRegionFirstSector;
+} 
+BPB;
 
 
-// Struct to hold parameters of a FAT Dir.
+// ****** FAT Directory Struct
+
+// An instance of this struct should hold specific values according to a FAT directory.
+// The members of the struct will hold the long and short names of the directory as 
+// well as the long/short name path to the directory. These are useful for visual
+// confirmation of which directory the instance is pointing, but the member 
+// FATFirstCluster is the only value that determines which directory the instance is 
+// actually pointing at. This should be initialized by setting it to the root directory
+// using FAT_SetToRootDirectory(). After this, the values of this struct should only be 
+// manipulated by passing it to other FAT functions.
 typedef struct FatDirectory
 {
-    char longName[LONG_NAME_SIZE_MAX];        // max 255 characters + '\0'
-    char longParentPath[PATH_SIZE_MAX];  // long name path to PARENT Dir 
-    char shortName[9];         // max 8 char + '\0'. Directory extensions
-                               // for short names not currently supported.
-    char shortParentPath[PATH_SIZE_MAX]; // short name path to PARENT Dir.
-    uint32_t FATFirstCluster;  // Index of first cluster of current Dir.
-} FatDir;
+  char longName[LONG_NAME_STRING_LEN_MAX];        // max 255 characters + '\0'
+  char longParentPath[PATH_STRING_LEN_MAX];  // long name path to PARENT Dir 
+  char shortName[9];         // max 8 char + '\0'. Directory extensions
+                              // for short names not currently supported.
+  char shortParentPath[PATH_STRING_LEN_MAX]; // short name path to PARENT Dir.
+  uint32_t FATFirstCluster;  // Index of first cluster of current Dir.
+} 
+FatDir;
 
 
 
@@ -218,18 +274,17 @@ FAT_PrintDirectory (FatDir * Dir, uint8_t entryFilter, BPB * bpb);
 ***********************************************************************************************************************
  *                                               PRINT FILE TO SCREEN
  * 
- * Description : Prints the contents of a file from the current Dir to a terminal/screen.
+ * Description : Prints the contents of a FAT file from the current directory to a terminal/screen.
  * 
- * Arguments   : *Dir   pointer to a FatDir struct whose members must be associated with a 
- *                                   valid FAT32 Dir.
- *             : *fileNameStr        ptr to C-string that is the name of the file to be printed to the screen. This
- *                                   must be a long name, unless there is no associated long name with an entry, in 
- *                                   which case it can be a short name.
- *             : *bpb                pointer to a BPB struct.
+ * Arguments   : *Dir              - Pointer to a FatDir struct instance pointing to a valid FAT32 directory.
+ *             : *fileNameStr      - Ptr to C-string. This is the name of the file to be printed to the screen. This
+ *                                   can only be a long name unless there is no long name for a given entry, in which
+ *                                   case it must be a short name.
+ *             : *bpb              - Pointer to a valid instance of a BPB struct.
  * 
- * Return      : FAT Error Flag     Returns END_OF_FILE if the function completed successfully and was able to
- *                                  read in and print a file's contents to the screen. Any other value returned 
- *                                  indicates an error. Pass the returned value to FAT_PrintError(ErrorFlag).
+ * Return      : FAT Error Flag     Returns END_OF_FILE if the function completed successfully and was able to read in
+ *                                  and print a file's contents to the screen. Any other value returned indicates an
+ *                                  an error. Pass the returned value to FAT_PrintError(ErrorFlag).
 ***********************************************************************************************************************
 */
 
@@ -240,13 +295,14 @@ FAT_PrintFile (FatDir * Dir, char * file, BPB * bpb);
 
 /*
 ***********************************************************************************************************************
- *                                                PRINT FAT ERRORS
- *
- * DESCRIPTION : Prints the error code returned by a FAT functions.
+ *                                        PRINT ERROR RETURNED BY A FAT FUNCTION
  * 
- * ARGUMENT    : err         uin8_t value which is the error to be printed by the function.
+ * Description : Call this function to print an error flag returned by one of the FAT functions to the screen. 
+ * 
+ * Argument    : err    This should be an error flag returned by one of the FAT file/directory functions.
 ***********************************************************************************************************************
 */
+
 void 
 FAT_PrintError(uint8_t err);
 

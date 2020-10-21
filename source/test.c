@@ -205,7 +205,6 @@ int main(void)
                 { 
                     err = FAT_PrintFile(&cwd,a,&bpb);
                     if (err != END_OF_FILE) FAT_PrintError(err);
-                    
                 }
                 else if (!strcmp(c,"cwd"))
                 {
