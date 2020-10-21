@@ -25,7 +25,9 @@
 #define SECTOR_LEN                                512
 #define ENTRY_LEN                                 32
 
-#define LONG_NAME_LEN_MAX                         64
+#define PATH_SIZE_MAX                             50
+#define LONG_NAME_SIZE_MAX                        50
+
 #define END_OF_CLUSTER                            0x0FFFFFFF
 
 // Boot Sector Error Flags
@@ -59,9 +61,9 @@
 #define LONG_NAME_ORDINAL_MASK                    0x3F
 
 // Long Name Flags
-#define LONG_NAME_EXISTS_FLAG                     0x01
-#define LONG_NAME_CROSSES_SECTOR_BOUNDARY_FLAG    0x02
-#define LONG_NAME_LAST_SECTOR_ENTRY_FLAG          0x04
+#define LONG_NAME_EXISTS                     0x01
+#define LONG_NAME_CROSSES_SECTOR_BOUNDARY    0x02
+#define LONG_NAME_LAST_SECTOR_ENTRY          0x04
 
 // Entry Filter Flags
 #define SHORT_NAME                                0x01
@@ -70,6 +72,8 @@
 #define CREATION                                  0x08
 #define LAST_ACCESS                               0x10
 #define LAST_MODIFIED                             0x20
+#define TYPE                                      0x40
+#define FILE_SIZE                                 0x80
 #define ALL                                       (CREATION | LAST_ACCESS | LAST_MODIFIED)
 
 // Interface Error Flags : These errors are to be applied by the phyiscal interface.
@@ -96,11 +100,11 @@ typedef struct BPB
 // Struct to hold parameters of a FAT Dir.
 typedef struct FatDirectory
 {
-    char longName[256];        // max 255 characters + '\0'
-    char longParentPath[256];  // long name path to PARENT Dir 
+    char longName[LONG_NAME_SIZE_MAX];        // max 255 characters + '\0'
+    char longParentPath[PATH_SIZE_MAX];  // long name path to PARENT Dir 
     char shortName[9];         // max 8 char + '\0'. Directory extensions
                                // for short names not currently supported.
-    char shortParentPath[256]; // short name path to PARENT Dir.
+    char shortParentPath[PATH_SIZE_MAX]; // short name path to PARENT Dir.
     uint32_t FATFirstCluster;  // Index of first cluster of current Dir.
 } FatDir;
 
@@ -206,7 +210,7 @@ FAT_SetDirectory (FatDir * Dir, char * newDirStr, BPB * bpb);
 */
 
 uint8_t 
-FAT_PrintCurrentDirectory (FatDir * Dir, uint8_t entryFilter, BPB * bpb);
+FAT_PrintDirectory (FatDir * Dir, uint8_t entryFilter, BPB * bpb);
 
 
 

@@ -84,7 +84,7 @@ int main(void)
         //initialize current working directory to the root directory
         FatDir cwd = {"/","","/","", bpb.rootClus};
         //uint16_t err = 0;
-        //FAT_PrintCurrentDirectory(&cwd, LONG_NAME|HIDDEN);
+        //FAT_PrintDirectory(&cwd, LONG_NAME|HIDDEN);
         //FAT_PrintError(err);
 
         //print_str("\n\rGetFatRootClus() = "); print_dec(GetFatRootClus());
@@ -192,12 +192,14 @@ int main(void)
                         else if (strcmp(&a[loc[t]],"/C")  == 0 ) flag |= CREATION;
                         else if (strcmp(&a[loc[t]],"/LA") == 0 ) flag |= LAST_ACCESS;
                         else if (strcmp(&a[loc[t]],"/LM") == 0 ) flag |= LAST_MODIFIED;
+                        else if (strcmp(&a[loc[t]],"/FS") == 0 ) flag |= FILE_SIZE;
+                        else if (strcmp(&a[loc[t]],"/T")  == 0 ) flag |= TYPE;
                         else { print_str("\n\rInvalid Argument"); break; }
                         //print_str("\n\r flag    = \"0x");print_hex(flag);  print_str("\"");
                     }
                     
                     if((flag&SHORT_NAME) != SHORT_NAME) { flag |= LONG_NAME; } //long name is default
-                    err = FAT_PrintCurrentDirectory(&cwd, flag, &bpb);
+                    err = FAT_PrintDirectory(&cwd, flag, &bpb);
                     FAT_PrintError(err);
                 }
                 
