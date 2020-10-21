@@ -184,6 +184,41 @@ FAT_PrintBootSectorError (uint8_t err)
 
 /*
 ***********************************************************************************************************************
+ *                                SET MEMBERS OF FAT DIRECTORY INSTANCE TO ROOT DIRECTORY
+ * 
+ * This function should be called before maniupulating/accessing the FatDir instance using the other FAT functions.
+ * Call this function to set the members of the FatDir struct's instance to the root directory
+ *                                         
+ * Description : This function will set the members of a BiosParameterBlock (BPB) struct instance according to the
+ *               values specified within the FAT volume's Bios Parameter Block / Boot Sector. 
+ * 
+ * Arguments   : *Dir          - Pointer to a FatDir struct whose members will be set to point to the root directory.
+ *             : *bpb          - Pointer to a BPB struct instance.
+***********************************************************************************************************************
+*/
+
+void
+FAT_SetToRootDirectory(FatDir * Dir, BPB * bpb)
+{
+  for (uint8_t i = 0; i < LONG_NAME_STRING_LEN_MAX; i++)
+    Dir->longName[i] = '\0';
+  for (uint8_t i = 0; i < PATH_STRING_LEN_MAX; i++)
+    Dir->longParentPath[i] = '\0';
+  for (uint8_t i = 0; i < 9; i++)
+    Dir->shortName[i] = '\0';
+  for (uint8_t i = 0; i < PATH_STRING_LEN_MAX; i++)
+    Dir->shortParentPath[i] = '\0';
+  
+  Dir->longName[0] = '/';
+  Dir->shortName[0] = '/';
+  Dir->FATFirstCluster = bpb->rootClus;
+}
+
+
+
+
+/*
+***********************************************************************************************************************
  *                                                   SET FAT DIRECTORY
  *                                        
  * Description : Call this function to set a FatDirectory (FatDir) struct instance to a new directory. The new 

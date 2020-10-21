@@ -115,7 +115,7 @@
 #define READ_SECTOR_SUCCESSFUL                    0x04
 
 
-******
+
 /*
 ***********************************************************************************************************************
  *                                                     STRUCTS
@@ -206,6 +206,26 @@ FAT_SetBiosParameterBlock(BPB * bpb);
 
 void 
 FAT_PrintBootSectorError (uint8_t err);
+
+
+
+/*
+***********************************************************************************************************************
+ *                                SET MEMBERS OF FAT DIRECTORY INSTANCE TO ROOT DIRECTORY
+ * 
+ * This function should be called before maniupulating/accessing the FatDir instance using the other FAT functions.
+ * Call this function to set the members of the FatDir struct's instance to the root directory
+ *                                         
+ * Description : This function will set the members of a BiosParameterBlock (BPB) struct instance according to the
+ *               values specified within the FAT volume's Bios Parameter Block / Boot Sector. 
+ * 
+ * Arguments   : *Dir          - Pointer to a FatDir struct whose members will be set to point to the root directory.
+ *             : *bpb          - Pointer to a BPB struct instance.
+***********************************************************************************************************************
+*/
+
+void
+FAT_SetToRootDirectory(FatDir * Dir, BPB * bpb);
 
 
 
