@@ -5,6 +5,25 @@
 *                                           Copyright (c) 2020 Joshua Fain
 *                                                 All Rights Reserved
 *
+* DESCRIPTION: Module used for interfacing with a FAT32 formatted volume. Declares the functions defined in FAT.C as
+*              well as defines the structs and flags to be used to interact with those functions.
+*
+*
+* "PUBLIC" FUNCTION LIST:
+*   uint8_t  FAT_SetBiosParameterBlock(BPB * bpb);
+*   void     FAT_PrintBootSectorError (uint8_t err);
+*   void     FAT_SetDirectoryToRoot(FatDir * Dir, BPB * bpb);
+*   uint8_t  FAT_SetDirectory (FatDir * Dir, char * newDirStr, BPB * bpb);
+*   uint8_t  FAT_PrintDirectory (FatDir * Dir, uint8_t entryFilter, BPB * bpb);
+*   uint8_t  FAT_PrintFile (FatDir * Dir, char * file, BPB * bpb);
+*   void     FAT_PrintError(uint8_t err);
+*
+*
+* STRUCTS LIST:
+*   typedef struct BiosParameterBlock BPB
+*   typedef struct FatDirectory FatDir
+*
+*
 * File : FAT.C
 * By   : Joshua Fain
 ***********************************************************************************************************************
@@ -29,22 +48,20 @@
 
 // Private function descriptions are only included with their definitions at the bottom of this file.
 
-uint8_t pvt_CorrectEntryCheck (uint8_t lnFlags, uint16_t* entryPos,
-                               uint16_t* snPosCurrSec, uint16_t* snPosNextSec); 
-void pvt_SetLongNameFlags (uint8_t* lnFlags, uint16_t entryPos, uint16_t* snPosCurrSec,
-                           uint8_t* currSecArr, BPB * bpb);
-void pvt_LoadLongName (int longNameFirstEntry, int longNameLastEntry, 
-                       uint8_t * sectorArr, char* lnStr, uint8_t* lnStrIndx);
-void pvt_GetNextSector (uint8_t* nextSecArr, uint32_t currSecNumInClus, 
+uint8_t pvt_CheckValidName (char * nameStr, FatDir * Dir);
+void pvt_SetDirectoryToParent (FatDir * Dir, BPB * bpb);
+void pvt_SetDirectoryToChild (FatDir * Dir, uint8_t * sectorArr, uint16_t snPos, char * childDirStr, BPB * bpb);
+void pvt_LoadLongName (int lnFirstEntry, int lnLastEntry, uint8_t * sectorArr, char * lnStr, uint8_t * lnStrIndx);
+uint32_t pvt_GetNextClusterIndex (uint32_t currentClusterIndex, BPB * bpb);
+void pvt_PrintEntryFields (uint8_t * byte, uint16_t entryPos, uint8_t entryFilter);
+void pvt_PrintShortName (uint8_t * byte, uint16_t entryPos, uint8_t entryFilter);
+void pvt_PrintFatFile (uint16_t entryPos, uint8_t * fileSector, BPB * bpb);
+uint8_t pvt_CorrectEntryCheck (uint8_t lnFlags, uint16_t * entryPos, uint16_t * snPosCurrSec, uint16_t * snPosNextSec);           
+void pvt_SetLongNameFlags (uint8_t * lnFlags, uint16_t entryPos, 
+                           uint16_t * snPosCurrSec, uint8_t * currSecArr, BPB * bpb);
+void pvt_GetNextSector (uint8_t * nextSecArr, uint32_t currSecNumInClus, 
                         uint32_t currSecNumPhys, uint32_t clusIndx, BPB* bpb);
 
-void pvt_SetDirectoryToParent (FatDir* Dir, BPB* bpb);
-void pvt_SetDirectoryToChild (FatDir* Dir, uint8_t * sectorArr, uint16_t snPos, char* childDirStr, BPB* bpb);
-uint32_t pvt_GetNextClusterIndex (uint32_t currentClusterIndex, BPB* bpb);
-uint8_t pvt_CheckValidName (char * nameStr, FatDir * Dir);
-void pvt_PrintEntryFields (uint8_t* byte, uint16_t entryPos, uint8_t entryFilter);
-void pvt_PrintShortName (uint8_t* byte, uint16_t entryPos, uint8_t entryFilter);
-void pvt_PrintFatFile (uint16_t entryPos, uint8_t* fileSector, BPB* bpb);
 
 
 
@@ -198,7 +215,7 @@ FAT_PrintBootSectorError (uint8_t err)
 */
 
 void
-FAT_SetToRootDirectory(FatDir * Dir, BPB * bpb)
+FAT_SetDirectoryToRoot(FatDir * Dir, BPB * bpb)
 {
   for (uint8_t i = 0; i < LONG_NAME_STRING_LEN_MAX; i++)
     Dir->longName[i] = '\0';
@@ -1128,9 +1145,9 @@ pvt_SetDirectoryToChild (FatDir * Dir, uint8_t * sectorArr, uint16_t snPos, char
  *               C-string. The function is called twice if a long name crosses a sector boundary, and *lnStrIndx will
  *               point to the position in the string to begin loading the next characters
  * 
- * Arguments   : longNameFirstEntry  - Integer that points to the position in *sectorArr that is the lowest order entry
+ * Arguments   : lnFirstEntry  - Integer that points to the position in *sectorArr that is the lowest order entry
  *                                     of the long name in the sector array.
- *             : longNameLastEntry   - Integer that points to the position in *sectorArr that is the highest order
+ *             : lnLastEntry   - Integer that points to the position in *sectorArr that is the highest order
  *                                     entry of the long name in the sector array.
  *             : *sectorArr          - Pointer to an array that holds the physical sector's contents containing the 
  *                                     the entries of the long name that will be loaded into the char arry *lnStr.
@@ -1145,9 +1162,9 @@ pvt_SetDirectoryToChild (FatDir * Dir, uint8_t * sectorArr, uint16_t snPos, char
 */
 
 void
-pvt_LoadLongName (int longNameFirstEntry, int longNameLastEntry, uint8_t * sectorArr, char * lnStr, uint8_t * lnStrIndx)
+pvt_LoadLongName (int lnFirstEntry, int lnLastEntry, uint8_t * sectorArr, char * lnStr, uint8_t * lnStrIndx)
 {
-  for (int i = longNameFirstEntry; i >= longNameLastEntry; i = i - ENTRY_LEN)
+  for (int i = lnFirstEntry; i >= lnLastEntry; i = i - ENTRY_LEN)
     {                                              
       for (uint16_t n = i + 1; n < i + 11; n++)
         {                                  
@@ -1641,7 +1658,8 @@ pvt_SetLongNameFlags ( uint8_t * lnFlags, uint16_t entryPos, uint16_t * snPosCur
 */
 
 void
-pvt_GetNextSector (uint8_t * nextSecArr, uint32_t currSecNumInClus, uint32_t currSecNumPhys, uint32_t clusIndx, BPB * bpb)
+pvt_GetNextSector (uint8_t * nextSecArr, uint32_t currSecNumInClus, 
+                   uint32_t currSecNumPhys, uint32_t clusIndx, BPB * bpb)
 {
   uint32_t nextSecNumPhys; 
   

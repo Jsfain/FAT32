@@ -83,7 +83,7 @@ int main(void)
         //print_str("\n\r boot sector is at block number "); print_dec(bootSectorLocation);
         //initialize current working directory to the root directory
         FatDir cwd; // = {"/","","/","", bpb.rootClus};
-        FAT_SetToRootDirectory(&cwd, &bpb);
+        FAT_SetDirectoryToRoot(&cwd, &bpb);
         //uint16_t err = 0;
         //FAT_PrintDirectory(&cwd, LONG_NAME|HIDDEN);
         //FAT_PrintError(err);

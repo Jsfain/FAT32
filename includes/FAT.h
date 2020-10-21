@@ -9,6 +9,21 @@
 *              well as defines the structs and flags to be used to interact with those functions.
 *
 *
+* "PUBLIC" FUNCTION LIST:
+*   uint8_t  FAT_SetBiosParameterBlock(BPB * bpb);
+*   void     FAT_PrintBootSectorError (uint8_t err);
+*   void     FAT_SetDirectoryToRoot(FatDir * Dir, BPB * bpb);
+*   uint8_t  FAT_SetDirectory (FatDir * Dir, char * newDirStr, BPB * bpb);
+*   uint8_t  FAT_PrintDirectory (FatDir * Dir, uint8_t entryFilter, BPB * bpb);
+*   uint8_t  FAT_PrintFile (FatDir * Dir, char * file, BPB * bpb);
+*   void     FAT_PrintError(uint8_t err);
+*
+*
+* STRUCTS LIST:
+*   typedef struct BiosParameterBlock BPB
+*   typedef struct FatDirectory FatDir
+*
+*
 * File : FAT.H
 * By   : Joshua Fain
 ***********************************************************************************************************************
@@ -225,7 +240,7 @@ FAT_PrintBootSectorError (uint8_t err);
 */
 
 void
-FAT_SetToRootDirectory(FatDir * Dir, BPB * bpb);
+FAT_SetDirectoryToRoot(FatDir * Dir, BPB * bpb);
 
 
 
