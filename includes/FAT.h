@@ -54,8 +54,8 @@
 // Specify the max length of strings that can be stored in the members
 // of a FatDir instance. These are lower than required by FAT32 specs 
 // (255), to conserve memory. Adjust as needed.  
-#define PATH_STRING_LEN_MAX                       50
-#define LONG_NAME_STRING_LEN_MAX                  50
+#define PATH_STRING_LEN_MAX                       100
+#define LONG_NAME_STRING_LEN_MAX                  100
 
 
 // ******* Boot Sector Error Flags

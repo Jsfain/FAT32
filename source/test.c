@@ -1,11 +1,55 @@
-/******************************************************************************
- * Author: Joshua Fain
- * Date:   7/5/2020
- * 
- * Contians main()
- * File used to test out the sd card functions. Changes regularly
- * depending on what is being tested.
- * ***************************************************************************/
+/*
+***********************************************************************************************************************
+*                                                   TEST for AVR-FAT
+*
+*                                           Copyright (c) 2020 Joshua Fain
+*                                                 All Rights Reserved
+*
+* This file contains main() and is used to test the functionality of the the AVR-FAT module. It is not considered part
+* of the module.
+*
+* DESCRIPTION: This file currently implements a command line like interface to navigate a FAT volume using the 
+*              the functions available with the AVR-FAT module. The AVR-FAT module was tested using the AVR-SDCard 
+*              module as the physical disk driver. This is included here, but is not part of the AVR-FAT module.
+*
+*
+* COMMAND AVAILABLE:
+*  (1) cd <DIR>                       :    Change directory to the directory specified by <DIR>.
+*  (2) ls <FILTER_1> ... <FILTER_n>   :    List directory contents based on <FILTER>'s.
+*  (3) open <FILE>                    :    Print contents of <FILE> to a screen.
+*  (4) pwd                            :    Print the current working directory to screen. This actually prints the
+*                                          values of the FatDir instances members at the time it is called.
+*
+* NOTES: (1) This only has READ capabilities. No file or directories can be created with the module, and nothing in
+             the FAT volume can be modified.
+*        (2) The 'cd' command can only change the directory to a child or the parent of the current directory.
+*        (3) 'open' will only work for files that are in the current directory. 
+*        (4) Pass ".." (without quotes) as the argument to cd to change to the parent directory.
+*        (5) Quotation marks should NOT be used in specifying a directory or file, even if spaces are in the name. 
+*        (6) Directory and file arguments are all case sensitive.
+*        (7) If no argument is given to 'ls' then the long name of non-hidden entries is printed to the screen.
+*        (8) The following options are available as "filters" for the 'ls' command. Pass any combination of these:
+*             /LN : Print long name of each entry if it exists, else its short name is printed.
+*             /SN : Print short name of the entry.
+*             /H  : Print hidden entries.
+*             /T  : Print the entry type (file or directory). 
+*             /FS : Print the file size of the entry. Currently rounded down to the nearest KB.
+*             /C  : Print entries creation date and time.
+*             /LM : Print last modified date and time.
+*             /LA : Print last access date.
+*             /A  :  = /C /LM /LA
+*         
+*        (9) To exit the command line portion of this testing module, enter 'q'.  After exiting, access to the raw 
+*            data of the physical disk is provided using the functionality of the AVR-SDCard module. Prompts are 
+*            provided there as instructions, but again, this functionality is not considered part of the AVR-FAT 
+*            but only specific to how it is implemented here. 
+*   
+*
+* File : AVR_FAT_TEST.C
+* By   : Joshua Fain
+***********************************************************************************************************************
+*/
+
 
 #include <string.h>
 #include <avr/io.h>
@@ -19,9 +63,10 @@
 #include "../includes/fattosd.h"
 
 
+// local function used for raw data access, not part of the avr-fat module. 
 uint32_t enterBlockNumber();
 
-//  *******   MAIN   ********  
+
 int main(void)
 {
   USART_Init();
@@ -92,37 +137,36 @@ int main(void)
    
       uint8_t cmdLineLenMax = 100;
       char    inputStr[cmdLineLenMax];
-      char    cmd[cmdLineLenMax];
-      char    arg[cmdLineLenMax];
-      uint8_t lastArgFlag = 0;
-      char    *tempArg;
+      char    inputChar;
+      char    cmdStr[cmdLineLenMax];
+      char    argStr[cmdLineLenMax];
       uint8_t argCnt;
-      char    input;
+      uint8_t lastArgFlag = 0;
       char    *spacePtr;
       uint8_t numOfChars = 0;
-      uint8_t flag = 0;
+      uint8_t filter = 0; // used with FAT_PrintDirectory()
       uint8_t quit = 0;
 
       do
         {
           // reset strings and variables
           for (int k = 0; k < cmdLineLenMax; k++) inputStr[k] = '\0';
-          for (int k = 0; k < cmdLineLenMax; k++) cmd[k] = '\0';
-          for (int k = 0; k < cmdLineLenMax; k++) arg[k] = '\0';
-          flag = 0;
+          for (int k = 0; k < cmdLineLenMax; k++) cmdStr[k]   = '\0';
+          for (int k = 0; k < cmdLineLenMax; k++) argStr[k]   = '\0';
+          filter = 0;
           err = 0;
           numOfChars = 0;
           
-          // print cmd prompt to screen
+          // print cmdStr prompt to screen
           print_str ("\n\r"); print_str (cwd.longParentPath);
           print_str (cwd.longName); print_str (" > ");
           
           // Enter commands / arguments
-          input = USART_Receive();
-          while (input != '\r')
+          inputChar = USART_Receive();
+          while (inputChar != '\r')
             {
               // handle backspaces
-              if (input == 127)  
+              if (inputChar == 127)  
                 {
                   print_str ("\b \b");
                   if (numOfChars > 0) numOfChars--;
@@ -131,13 +175,13 @@ int main(void)
               // print last char entered
               else 
                 { 
-                  USART_Transmit (input);
-                  inputStr[numOfChars] = input;
+                  USART_Transmit (inputChar);
+                  inputStr[numOfChars] = inputChar;
                   numOfChars++;
                 }
               
               // get next char
-              input = USART_Receive();
+              inputChar = USART_Receive();
               if (numOfChars >= cmdLineLenMax) break;
             }
 
@@ -146,62 +190,63 @@ int main(void)
           if (*spacePtr != '\0')
             {
               *spacePtr = '\0';
-              strcpy (arg, spacePtr + 1);
+              strcpy (argStr, spacePtr + 1);
             }
-          strcpy (cmd, inputStr);
+          strcpy (cmdStr, inputStr);
 
           // Execute command
           if (numOfChars < cmdLineLenMax) 
             {
               // Command: change directory
-              if ( !strcmp (cmd, "cd"))
+              if ( !strcmp (cmdStr, "cd"))
                 {   
-                  err = FAT_SetDirectory (&cwd, arg, &bpb);
+                  err = FAT_SetDirectory (&cwd, argStr, &bpb);
                   if (err != SUCCESS) FAT_PrintError (err);
                 }
                 
               // Command: list directory contents
-              else if ( !strcmp(cmd, "ls"))
+              else if ( !strcmp(cmdStr, "ls"))
                 {
                   lastArgFlag = 0;
                   argCnt = 0;
                   do
                     {
-                      // find first occurance of ' ' in arg.
-                      tempArg = strchr (arg, ' ');
-                      if (tempArg == NULL) lastArgFlag = 1;
-                      *tempArg = '\0';
+                      // find first occurance of ' ' in argStr.
+                      spacePtr = strchr (argStr, ' ');
+                      if (spacePtr == NULL) lastArgFlag = 1;
+                      *spacePtr = '\0';
                       
-                           if (strcmp ( arg, "/LN") == 0) flag |= LONG_NAME;
-                      else if (strcmp ( arg, "/SN") == 0) flag |= SHORT_NAME;
-                      else if (strcmp ( arg, "/A" ) == 0) flag |= ALL;
-                      else if (strcmp ( arg, "/H" ) == 0) flag |= HIDDEN;
-                      else if (strcmp ( arg, "/C" ) == 0) flag |= CREATION;
-                      else if (strcmp ( arg, "/LA") == 0) flag |= LAST_ACCESS;
-                      else if (strcmp ( arg, "/LM") == 0) flag |= LAST_MODIFIED;
-                      else if (strcmp ( arg, "/FS") == 0) flag |= FILE_SIZE;
-                      else if (strcmp ( arg, "/T" ) == 0) flag |= TYPE;
+                           if (strcmp ( argStr, "/LN") == 0) filter |= LONG_NAME;
+                      else if (strcmp ( argStr, "/SN") == 0) filter |= SHORT_NAME;
+                      else if (strcmp ( argStr, "/A" ) == 0) filter |= ALL;
+                      else if (strcmp ( argStr, "/H" ) == 0) filter |= HIDDEN;
+                      else if (strcmp ( argStr, "/C" ) == 0) filter |= CREATION;
+                      else if (strcmp ( argStr, "/LA") == 0) filter |= LAST_ACCESS;
+                      else if (strcmp ( argStr, "/LM") == 0) filter |= LAST_MODIFIED;
+                      else if (strcmp ( argStr, "/FS") == 0) filter |= FILE_SIZE;
+                      else if (strcmp ( argStr, "/T" ) == 0) filter |= TYPE;
                      
                       if (lastArgFlag) break;
-                      strcpy (arg, tempArg + 1);
+                      strcpy (argStr, spacePtr + 1);
                     }
                   while (argCnt++ < 10);
   
                   // Send LONG_NAME as default argument.
-                  if ((flag & SHORT_NAME) != SHORT_NAME) flag |= LONG_NAME; 
-                  err = FAT_PrintDirectory (&cwd, flag, &bpb);
+                  if ((filter & SHORT_NAME) != SHORT_NAME) filter |= LONG_NAME; 
+                  
+                  err = FAT_PrintDirectory (&cwd, filter, &bpb);
                   if (err != END_OF_DIRECTORY) FAT_PrintError (err);
                 }
               
               // Command: open file and print it to screen
-              else if (!strcmp(cmd, "open")) 
+              else if (!strcmp(cmdStr, "open")) 
                 { 
-                  err = FAT_PrintFile (&cwd, arg, &bpb);
+                  err = FAT_PrintFile (&cwd, argStr, &bpb);
                   if (err != END_OF_FILE) FAT_PrintError (err);
                 }
 
               // Command: print FatDir members
-              else if (!strcmp(cmd, "cwd"))
+              else if (!strcmp(cmdStr, "pwd"))
                 {
                   print_str ("\n\rshortName = "); print_str (cwd.shortName);
                   print_str ("\n\rshortParentPath = "); print_str (cwd.shortParentPath);
@@ -210,8 +255,8 @@ int main(void)
                   print_str ("\n\rFATFirstCluster = "); print_dec (cwd.FATFirstCluster);
                 }
               
-              // quit the cmd line interface.
-              else if (cmd[0] == 'q') { print_str ("\n\rquit\n\r"); quit = 1; }
+              // quit the cmdStr line interface.
+              else if (cmdStr[0] == 'q') { print_str ("\n\rquit\n\r"); quit = 1; }
               
               else  print_str ("\n\rInvalid command\n\r");
             }
@@ -226,60 +271,62 @@ int main(void)
 
 
 
+      // **********************************************************
+      // SD Card raw data access
 
-      uint32_t startBlockNumber;
-      uint32_t numberOfBlocks;
-      uint8_t answer;
+      uint32_t startBlockNum;
+      uint32_t numOfBlocks;
+      uint8_t  answer;
       do
         {
-            do
-              {
-                print_str("\n\n\n\rEnter Start Block\n\r");
-                startBlockNumber = enterBlockNumber();
-                print_str("\n\rHow many blocks do you want to print?\n\r");
-                numberOfBlocks = enterBlockNumber();
-                print_str("\n\rYou have selected to print "); print_dec(numberOfBlocks);
-                print_str(" blocks beginning at block number "); print_dec(startBlockNumber);
-                print_str("\n\rIs this correct? (y/n)");
-                answer = USART_Receive();
-                USART_Transmit(answer);
-                print_str("\n\r");
-              }
-            while(answer != 'y');
+          do
+            {
+              print_str ("\n\n\n\rEnter Start Block\n\r");
+              startBlockNum = enterBlockNumber();
+              print_str ("\n\rHow many blocks do you want to print?\n\r");
+              numOfBlocks = enterBlockNumber();
+              print_str ("\n\rYou have selected to print "); 
+              print_dec(numOfBlocks);
+              print_str (" blocks beginning at block number "); 
+              print_dec(startBlockNum);
+              print_str ("\n\rIs this correct? (y/n)");
+              answer = USART_Receive();
+              USART_Transmit (answer);
+              print_str ("\n\r");
+            }
+          while (answer != 'y');
 
-            // READ amd PRINT post write
-            if (ctv.type == SDHC) // SDHC is block addressable
-                err = SD_PrintMultipleBlocks(startBlockNumber,numberOfBlocks);
-            else // SDSC byte addressable
-                err = SD_PrintMultipleBlocks(
-                                startBlockNumber * BLOCK_LEN, 
-                                numberOfBlocks);
-            
-            if(err != READ_SUCCESS)
-              { 
-                print_str("\n\r >> SD_PrintMultipleBlocks() returned ");
-                if(err & R1_ERROR)
-                  {
-                    print_str("R1 error: ");
-                    SD_PrintR1(err);
-                  }
-                else 
-                  { 
-                    print_str(" error "); 
-                    SD_PrintReadError(err);
-                  }
-              }
+          // Print blocks
 
-            print_str("\n\rPress 'q' to quit: ");
-            answer = USART_Receive();
-            USART_Transmit(answer);
+          // SDHC is block addressable
+          if (ctv.type == SDHC) err = SD_PrintMultipleBlocks(startBlockNum, numOfBlocks);
+          // SDSC is byte addressable
+          else err = SD_PrintMultipleBlocks (startBlockNum * BLOCK_LEN, numOfBlocks);
+          
+          if (err != READ_SUCCESS)
+            { 
+              print_str ("\n\r >> SD_PrintMultipleBlocks() returned ");
+              if (err & R1_ERROR)
+                {
+                  print_str ("R1 error: ");
+                  SD_PrintR1 (err);
+                }
+              else 
+                { 
+                  print_str (" error "); 
+                  SD_PrintReadError (err);
+                }
+            }
+          print_str ("\n\rPress 'q' to quit: ");
+          answer = USART_Receive();
+          USART_Transmit (answer);
         }
-      while(answer != 'q');
+      while (answer != 'q');
     }
   
-  // Something to do after SD card testing has completed.
+  // Something else to do. Print entered chars to screen.
   while(1)
-      USART_Transmit(USART_Receive());
+      USART_Transmit (USART_Receive());
   
   return 0;
 }
@@ -287,7 +334,7 @@ int main(void)
 
 
 
-// local function for taking user input to specify a block
+// local function for taking user inputChar to specify a block
 // number. If nothing is entered then the block number is 0.
 uint32_t enterBlockNumber()
 {

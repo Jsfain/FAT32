@@ -726,7 +726,7 @@ FAT_PrintFile (FatDir * Dir, char * fileNameStr, BPB * bpb)
 
               // If first value of entry is 0 then all subsequent entries are empty.
               if (currSecArr[ entryPos ] == 0) 
-                return END_OF_DIRECTORY;
+                return FILE_NOT_FOUND;
 
               // Only continue checking this entry if it has not been marked for deletion.
               if (currSecArr[entryPos] != 0xE5)
