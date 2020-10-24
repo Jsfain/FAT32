@@ -116,10 +116,10 @@ FAT_SetBiosParameterBlock (BPB * bpb)
 {
   uint8_t BootSector[SECTOR_LEN];
 
-  bpb->bootSecAddr = fat_FindBootSector();
+  bpb->bootSecAddr = FATtoDisk_FindBootSector();
   
   if (bpb->bootSecAddr != 0xFFFFFFFF)
-    fat_ReadSingleSector (bpb->bootSecAddr, BootSector);
+    FATtoDisk_ReadSingleSector (bpb->bootSecAddr, BootSector);
   else
     return BOOT_SECTOR_NOT_FOUND;
 
@@ -318,7 +318,7 @@ FAT_SetDirectory (FatDir * Dir, char * newDirStr, BPB * bpb)
         {         
           // load sector data into currSecArr
           currSecNumPhys = currSecNumInClus + bpb->dataRegionFirstSector + ((clusIndx - 2) * bpb->secPerClus);
-          fat_ReadSingleSector (currSecNumPhys, currSecArr);
+          FATtoDisk_ReadSingleSector (currSecNumPhys, currSecArr);
 
           for (uint16_t entryPos = 0; entryPos < SECTOR_LEN; entryPos += ENTRY_LEN)
             {
@@ -499,7 +499,7 @@ FAT_PrintDirectory (FatDir * Dir, uint8_t entryFilter, BPB * bpb)
         {
           // load sector bytes into currSecArr[]
           currSecNumPhys = currSecNumInClus + bpb->dataRegionFirstSector + ((clusIndx - 2) * bpb->secPerClus);
-          fat_ReadSingleSector (currSecNumPhys, currSecArr);
+          FATtoDisk_ReadSingleSector (currSecNumPhys, currSecArr);
 
           for (uint16_t entryPos = 0; entryPos < bpb->bytesPerSec; entryPos = entryPos + ENTRY_LEN)
             {
@@ -725,7 +725,7 @@ FAT_PrintFile (FatDir * Dir, char * fileNameStr, BPB * bpb)
         {     
           // load sector bytes into currSecArr[]
           currSecNumPhys = currSecNumInClus + bpb->dataRegionFirstSector + ((clusIndx - 2) * bpb->secPerClus);
-          fat_ReadSingleSector (currSecNumPhys, currSecArr );
+          FATtoDisk_ReadSingleSector (currSecNumPhys, currSecArr );
           
           // loop through entries in the current sector.
           for (uint16_t entryPos = 0; entryPos < bpb->bytesPerSec; entryPos = entryPos + ENTRY_LEN)
@@ -1044,7 +1044,7 @@ pvt_SetDirectoryToParent (FatDir * Dir, BPB * bpb)
 
   currSecNumPhys = bpb->dataRegionFirstSector + ((Dir->FATFirstCluster - 2) * bpb->secPerClus);
 
-  fat_ReadSingleSector (currSecNumPhys, currSecArr);
+  FATtoDisk_ReadSingleSector (currSecNumPhys, currSecArr);
 
   parentDirFirstClus = currSecArr[53];
   parentDirFirstClus <<= 8;
@@ -1249,7 +1249,7 @@ pvt_GetNextClusterIndex (uint32_t currClusIndx, BPB * bpb)
 
   uint8_t sectorArr[bpb->bytesPerSec];
 
-  fat_ReadSingleSector (fatSectorToRead, sectorArr);
+  FATtoDisk_ReadSingleSector (fatSectorToRead, sectorArr);
 
   cluster = sectorArr[clusIndxStartByte+3];
   cluster <<= 8;
@@ -1542,7 +1542,7 @@ pvt_PrintFatFile (uint16_t entryPos, uint8_t *fileSector, BPB * bpb)
           {
             currSecNumPhys = currSecNumInClus + bpb->dataRegionFirstSector + ( (cluster - 2) * bpb->secPerClus );
 
-            fat_ReadSingleSector (currSecNumPhys, fileSector);
+            FATtoDisk_ReadSingleSector (currSecNumPhys, fileSector);
             for (uint16_t k = 0; k < bpb->bytesPerSec; k++)  
               {
                 // just for formatting how this shows up on the screen.
@@ -1684,5 +1684,5 @@ pvt_GetNextSector (uint8_t * nextSecArr, uint32_t currSecNumInClus,
   else 
     nextSecNumPhys = 1 + currSecNumPhys;
 
-  fat_ReadSingleSector (nextSecNumPhys, nextSecArr);
+  FATtoDisk_ReadSingleSector (nextSecNumPhys, nextSecArr);
 }

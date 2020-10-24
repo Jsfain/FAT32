@@ -1,14 +1,24 @@
 /*
 ***********************************************************************************************************************
+*                                           INTERFACE FOR AVR-FAT to AVR-SDCARD
+* 
 * File   : FATtoSD.C
 * Author : Joshua Fain
 * Target : ATMega1280
 *
 *
-* DESCRIPTION: 
+* DESCRIPTION:
+* This file in included as an interface between the AVR-FAT module and the AVR-SDCard module. A module/driver for
+* accessing raw data on a FAT32-formatted volume is required. The AVR-FAT module is intended to be independent of the
+* physical volume, and implementing a different raw data access driver would is possible as long as "non-private"
+* functions are implemented that have the same functionality as those here. 
 * 
-*                                                
-*                                                       MIT LICENSE
+* FUNCTIONS:
+* (1) uint32_t FATtoDisk_FindBootSector();                                               
+* (2) uint8_t  FATtoDisk_ReadSingleSector (uint32_t address, uint8_t *sectorByteArry)
+*
+*
+*                                                      MIT LICENSE
 *
 * Copyright (c) 2020 Joshua Fain
 *
@@ -38,7 +48,7 @@
 // declare
 uint8_t pvt_getCardType();
 
-uint32_t fat_FindBootSector()
+uint32_t FATtoDisk_FindBootSector()
 {
     uint8_t block[512];
     uint16_t timeout = 0;
@@ -116,7 +126,7 @@ uint32_t fat_FindBootSector()
 
 
 
-uint8_t fat_ReadSingleSector( uint32_t address, uint8_t *sectorByteArray)
+uint8_t FATtoDisk_ReadSingleSector( uint32_t address, uint8_t *sectorByteArray)
 {
     uint8_t cardType;
     uint16_t err;

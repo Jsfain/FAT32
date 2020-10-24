@@ -6,7 +6,14 @@
 *
 *
 * DESCRIPTION: 
+* This file in included as an interface between the AVR-FAT module and the AVR-SDCard module. A module/driver for
+* accessing raw data on a FAT32-formatted volume is required. The AVR-FAT module is intended to be independent of the
+* physical volume, and implementing a different raw data access driver would is possible as long as "non-private"
+* functions are implemented that have the same functionality as those here. 
 * 
+* FUNCTIONS:
+* (1) uint32_t FATtoDisk_FindBootSector();                                               
+* (2) uint8_t  FATtoDisk_ReadSingleSector (uint32_t address, uint8_t *sectorByteArry)
 *                                                
 *                                                       MIT LICENSE
 *
@@ -30,8 +37,8 @@
 
 #include <avr/io.h>
 
-uint8_t fat_ReadSingleSector( uint32_t address, uint8_t * arr );
+uint8_t FATtoDisk_ReadSingleSector( uint32_t address, uint8_t * arr );
 
-uint32_t fat_FindBootSector();
+uint32_t FATtoDisk_FindBootSector();
 
 #endif //FATTOSD_H
