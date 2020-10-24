@@ -314,7 +314,7 @@ void SD_PrintInitError(uint32_t err)
         print_str(" FAILED_READ_OCR,");
     if(err&POWER_UP_NOT_COMPLETE)
         print_str(" POWER_UP_NOT_COMPLETE,");
-    if(err == INIT_SUCCESS) // 0
+    if( (err&INIT_SUCCESS) == INIT_SUCCESS) 
         print_str(" INIT_SUCCESS\n\r");
 }
 // END sd_printInitErrors()

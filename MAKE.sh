@@ -17,17 +17,17 @@ Link=(avr-gcc -Wall -g -mmcu=atmega1280 -o)
 IHex=(avr-objcopy -j .text -j .data -O ihex)
 
 
-echo -e ">> COMPILE: "${Compile[@]}" "$buildDir"/test.o " $sourceDir"/test.c"
-"${Compile[@]}" $buildDir/test.o $sourceDir/test.c
+echo -e ">> COMPILE: "${Compile[@]}" "$buildDir"/avr_fat_test.o " $sourceDir"/avr_fat_test.c"
+"${Compile[@]}" $buildDir/avr_fat_test.o $sourceDir/avr_fat_test.c
 status=$?
 sleep $t
 if [ $status -gt 0 ]
 then
-    echo -e "error compiling TEST.C"
+    echo -e "error compiling AVR_FAT_TEST.C"
     echo -e "program exiting with code $status"
     exit $status
 else
-    echo -e "Compiling TEST.C successful"
+    echo -e "Compiling AVR_FAT_TEST.C successful"
 fi
 
 
@@ -129,8 +129,8 @@ else
 fi
 
 
-echo -e "\n\r>> LINK: "${Link[@]}" "$buildDir"/test.elf "$buildDir"/test.o  "$buildDir"/spi.o "$buildDir"/sd_spi_base.o "$buildDir"/sd_spi_data_access.o "$buildDir"/usart.o "$buildDir"/prints.o "$buildDir"/fat.o "$buildDir"/fattosd.o"
-"${Link[@]}" $buildDir/test.elf $buildDir/test.o $buildDir/spi.o $buildDir/sd_spi_base.o $buildDir/sd_spi_data_access.o $buildDir/usart.o $buildDir/prints.o $buildDir/fat.o $buildDir/fattosd.o
+echo -e "\n\r>> LINK: "${Link[@]}" "$buildDir"/avr_fat_test.elf "$buildDir"/avr_fat_test.o  "$buildDir"/spi.o "$buildDir"/sd_spi_base.o "$buildDir"/sd_spi_data_access.o "$buildDir"/usart.o "$buildDir"/prints.o "$buildDir"/fat.o "$buildDir"/fattosd.o"
+"${Link[@]}" $buildDir/avr_fat_test.elf $buildDir/avr_fat_test.o $buildDir/spi.o $buildDir/sd_spi_base.o $buildDir/sd_spi_data_access.o $buildDir/usart.o $buildDir/prints.o $buildDir/fat.o $buildDir/fattosd.o
 status=$?
 sleep $t
 if [ $status -gt 0 ]
@@ -139,13 +139,13 @@ then
     echo -e "program exiting with code $status"
     exit $status
 else
-    echo -e "Linking successful. Output in TEST.ELF"
+    echo -e "Linking successful. Output in AVR_FAT_TEST.ELF"
 fi
 
 
 
-echo -e "\n\r>> GENERATE INTEL HEX File: "${IHex[@]}" "$buildDir"/test.elf "$buildDir"/test.hex"
-"${IHex[@]}" $buildDir/test.elf $buildDir/test.hex
+echo -e "\n\r>> GENERATE INTEL HEX File: "${IHex[@]}" "$buildDir"/avr_fat_test.elf "$buildDir"/avr_fat_test.hex"
+"${IHex[@]}" $buildDir/avr_fat_test.elf $buildDir/avr_fat_test.hex
 status=$?
 sleep $t
 if [ $status -gt 0 ]
@@ -154,7 +154,7 @@ then
     echo -e "program exiting with code $status"
     exit $status
 else
-    echo -e "HEX file successfully generated. Output in TEST.HEX"
+    echo -e "HEX file successfully generated. Output in AVR_FAT_TEST.HEX"
 fi
 
 

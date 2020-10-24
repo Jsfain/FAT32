@@ -31,7 +31,7 @@
 
 /******************************************************************************
  * Function:    print_dec(uint32_t n) 
- * Description: prints decimal value of the arguement to screen.
+ * Description: prints unsigned (positive) base-10 (decima)l value of the arguement to screen.
  * Argument(s): unsigned integer to print to screen. up to 32-bit.
  * Returns:     VOID
 ******************************************************************************/

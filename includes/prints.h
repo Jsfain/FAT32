@@ -31,7 +31,7 @@
  * Functions: Declaration of print functions. See PRINTS.C for details.
 ******************************************************************************/
 
-//prints decimal integer up to 32 bits
+//prints unsigned (positive) base-10 (decimal) integer up to 32 bits
 void print_dec(uint32_t);
 
 //prints binary integer up to 32 bits
