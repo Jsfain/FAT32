@@ -4,8 +4,52 @@
 *
 *                      Contains main(). Used to test the functionality of the the AVR-FAT module.
 * 
-* LICENSE: 
-* MIT License
+* File   : AVR_FAT_TEST.C
+* Author : Joshua Fain
+* Target : ATMega1280
+*
+*
+* DESCRIPTION: 
+* This file currently implements a simple command-line like interface to navigate a FAT volume using the functions 
+* available in the AVR-FAT module (i.e. FAT.C / FAT.H). This particular 'test' implementation uses the AVR-SDCard 
+* module as a physical disk driver to access the raw data contents of a FAT32-formatted SD card. This driver is 
+* included in the repo, but the AVR-SDCard module should not be considered part of this AVR-FAT module.
+*
+*
+* COMMANDS:
+*  (1) cd <DIR>                       :    Change directory to the directory specified by <DIR>.
+*  (2) ls <FILTER_1> ... <FILTER_n>   :    List directory contents based on <FILTER>'s.
+*  (3) open <FILE>                    :    Print contents of <FILE> to a screen.
+*  (4) pwd                            :    Print the current working directory to screen. This actually prints the
+*                                          values of the FatDir instances members at the time it is called.
+*
+* NOTES: 
+* (1) This only has READ capabilities. No file or directories can be created with the module, and nothing in the FAT
+*     volume can be modified.
+* (2) The 'cd' command can only change the directory to a child or the parent of the current directory.
+* (3) 'open' will only work for files that are in the current directory. 
+* (4) Pass ".." (without quotes) as the argument to cd to change to the parent directory.
+* (5) Quotation marks should NOT be used in specifying a directory or file, even if spaces are in the name. 
+* (6) Directory and file arguments are all case sensitive.
+* (7) If no argument is given to 'ls' then the long name of non-hidden entries is printed to the screen.
+* (8) The following options are available as "filters" for the 'ls' command. Pass any combination of these:
+*      /LN : Print long name of each entry if it exists, else its short name is printed.
+*      /SN : Print short name of the entry.
+*      /H  : Print hidden entries.
+*      /T  : Print the entry type (file or directory). 
+*      /FS : Print the file size of the entry. Currently rounded down to the nearest KB.
+*      /C  : Print entries creation date and time.
+*      /LM : Print last modified date and time.
+*      /LA : Print last access date.
+*      /A  :  = /C /LM /LA
+*
+* (9) To exit the command line portion of this testing module, enter 'q'.  After exiting, access to the raw data of the
+*     physical disk is provided using the functionality of the AVR-SDCard module. Prompts are provided there as 
+*     instructions, but again, this functionality is not considered part of the AVR-FAT but only specific to how it is
+*     implemented here. 
+*   
+*
+*                                                       MIT LICENSE
 *
 * Copyright (c) 2020 Joshua Fain
 *
@@ -19,52 +63,9 @@
 * WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
 * COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR 
 * OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-*
-*
-*
-* DESCRIPTION: 
-* This file currently implements a simple command-line like interface to navigate a FAT volume using the functions 
-* available in the AVR-FAT module (i.e. FAT.C / FAT.H). This particular 'test' implementation uses the AVR-SDCard 
-* module as a physical disk driver to access the raw data contents of a FAT32-formatted SD card. This driver is 
-* included in the repo, but the AVR-SDCard module should not be considered part of this AVR-FAT module.
-*
-*
-* COMMANDS AVAILABLE:
-*  (1) cd <DIR>                       :    Change directory to the directory specified by <DIR>.
-*  (2) ls <FILTER_1> ... <FILTER_n>   :    List directory contents based on <FILTER>'s.
-*  (3) open <FILE>                    :    Print contents of <FILE> to a screen.
-*  (4) pwd                            :    Print the current working directory to screen. This actually prints the
-*                                          values of the FatDir instances members at the time it is called.
-*
-* NOTES: (1) This only has READ capabilities. No file or directories can be created with the module, and nothing in
-             the FAT volume can be modified.
-*        (2) The 'cd' command can only change the directory to a child or the parent of the current directory.
-*        (3) 'open' will only work for files that are in the current directory. 
-*        (4) Pass ".." (without quotes) as the argument to cd to change to the parent directory.
-*        (5) Quotation marks should NOT be used in specifying a directory or file, even if spaces are in the name. 
-*        (6) Directory and file arguments are all case sensitive.
-*        (7) If no argument is given to 'ls' then the long name of non-hidden entries is printed to the screen.
-*        (8) The following options are available as "filters" for the 'ls' command. Pass any combination of these:
-*             /LN : Print long name of each entry if it exists, else its short name is printed.
-*             /SN : Print short name of the entry.
-*             /H  : Print hidden entries.
-*             /T  : Print the entry type (file or directory). 
-*             /FS : Print the file size of the entry. Currently rounded down to the nearest KB.
-*             /C  : Print entries creation date and time.
-*             /LM : Print last modified date and time.
-*             /LA : Print last access date.
-*             /A  :  = /C /LM /LA
-*         
-*        (9) To exit the command line portion of this testing module, enter 'q'.  After exiting, access to the raw 
-*            data of the physical disk is provided using the functionality of the AVR-SDCard module. Prompts are 
-*            provided there as instructions, but again, this functionality is not considered part of the AVR-FAT 
-*            but only specific to how it is implemented here. 
-*   
-*
-* File : AVR_FAT_TEST.C
-* By   : Joshua Fain
 ***********************************************************************************************************************
 */
+
 
 #include <string.h>
 #include <avr/io.h>
