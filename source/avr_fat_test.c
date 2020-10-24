@@ -1,19 +1,35 @@
 /*
 ***********************************************************************************************************************
-*                                                   TEST for AVR-FAT
+*                                                  TEST for AVR-FAT MODULE
 *
-*                                           Copyright (c) 2020 Joshua Fain
-*                                                 All Rights Reserved
+*                      Contains main(). Used to test the functionality of the the AVR-FAT module.
+* 
+* LICENSE: 
+* MIT License
 *
-* This file contains main() and is used to test the functionality of the the AVR-FAT module. It is not considered part
-* of the module.
+* Copyright (c) 2020 Joshua Fain
 *
-* DESCRIPTION: This file currently implements a command line like interface to navigate a FAT volume using the 
-*              the functions available with the AVR-FAT module. The AVR-FAT module was tested using the AVR-SDCard 
-*              module as the physical disk driver. This is included here, but is not part of the AVR-FAT module.
+* Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated 
+* documentation files (the "Software"), to deal in the Software without restriction, including without limitation the 
+* rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to 
+* permit ersons to whom the Software is furnished to do so, subject to the following conditions: The above copyright 
+* notice and this permission notice shall be included in all copies or substantial portions of the Software.
+* 
+* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE 
+* WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
+* COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR 
+* OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 *
 *
-* COMMAND AVAILABLE:
+*
+* DESCRIPTION: 
+* This file currently implements a simple command-line like interface to navigate a FAT volume using the functions 
+* available in the AVR-FAT module (i.e. FAT.C / FAT.H). This particular 'test' implementation uses the AVR-SDCard 
+* module as a physical disk driver to access the raw data contents of a FAT32-formatted SD card. This driver is 
+* included in the repo, but the AVR-SDCard module should not be considered part of this AVR-FAT module.
+*
+*
+* COMMANDS AVAILABLE:
 *  (1) cd <DIR>                       :    Change directory to the directory specified by <DIR>.
 *  (2) ls <FILTER_1> ... <FILTER_n>   :    List directory contents based on <FILTER>'s.
 *  (3) open <FILE>                    :    Print contents of <FILE> to a screen.
@@ -50,10 +66,8 @@
 ***********************************************************************************************************************
 */
 
-
 #include <string.h>
 #include <avr/io.h>
-#include <avr/pgmspace.h>
 #include "../includes/usart.h"
 #include "../includes/spi.h"
 #include "../includes/prints.h"
@@ -63,7 +77,7 @@
 #include "../includes/fattosd.h"
 
 
-// local function used for raw data access, not part of the avr-fat module. 
+// local function used for raw data access. Not part of the avr-fat module. 
 uint32_t enterBlockNumber();
 
 

@@ -1,28 +1,47 @@
 /*
 ***********************************************************************************************************************
-*                                                       AVR-FAT
+*                                                       AVR-FAT MODULE
 *
-* DESCRIPTION: Module used for interfacing with a FAT32 formatted volume. Declares the functions defined in FAT.C as
-*              well as defines the structs and flags to be used to interact with those functions.
-*
-*
-* "PUBLIC" FUNCTION LIST:
-*   uint8_t  FAT_SetBiosParameterBlock(BPB * bpb);
-*   void     FAT_PrintBootSectorError (uint8_t err);
-*   void     FAT_SetDirectoryToRoot(FatDir * Dir, BPB * bpb);
-*   uint8_t  FAT_SetDirectory (FatDir * Dir, char * newDirStr, BPB * bpb);
-*   uint8_t  FAT_PrintDirectory (FatDir * Dir, uint8_t entryFilter, BPB * bpb);
-*   uint8_t  FAT_PrintFile (FatDir * Dir, char * file, BPB * bpb);
-*   void     FAT_PrintError(uint8_t err);
+* File   : FAT.C
+* Author : Joshua Fain
+* Target : ATMega1280
 *
 *
-* STRUCTS LIST:
-*   typedef struct BiosParameterBlock BPB
-*   typedef struct FatDirectory FatDir
+* DESCRIPTION: 
+* Defines functions declared in FAT.H for accessing contents of a FAT32 formatted volume using an AVR microconstroller. 
+* The fuctions defined here only provide READ access to the volume's contents (i.e. print file, print directory), no 
+* WRITE access is currently possible.
 *
 *
-* File : FAT.C
-* By   : Joshua Fain
+* FUNCTION "PUBLIC":
+*  (1) uint8_t  FAT_SetBiosParameterBlock(BPB * bpb);
+*  (2) void     FAT_PrintBootSectorError (uint8_t err);
+*  (3) void     FAT_SetDirectoryToRoot(FatDir * Dir, BPB * bpb);
+*  (4) uint8_t  FAT_SetDirectory (FatDir * Dir, char * newDirStr, BPB * bpb);
+*  (5) uint8_t  FAT_PrintDirectory (FatDir * Dir, uint8_t entryFilter, BPB * bpb);
+*  (6) uint8_t  FAT_PrintFile (FatDir * Dir, char * file, BPB * bpb);
+*  (7) void     FAT_PrintError(uint8_t err);
+*
+*
+* STRUCTS USED (defined in FAT.H):
+*  (1) typedef struct BiosParameterBlock BPB
+*  (2) typedef struct FatDirectory FatDir
+*
+*                                                 
+*                                                       MIT LICENSE
+*
+* Copyright (c) 2020 Joshua Fain
+*
+* Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated 
+* documentation files (the "Software"), to deal in the Software without restriction, including without limitation the 
+* rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to 
+* permit ersons to whom the Software is furnished to do so, subject to the following conditions: The above copyright 
+* notice and this permission notice shall be included in all copies or substantial portions of the Software.
+* 
+* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE 
+* WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
+* COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR 
+* OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ***********************************************************************************************************************
 */
 
