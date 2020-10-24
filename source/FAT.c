@@ -1,9 +1,6 @@
 /*
 ***********************************************************************************************************************
 *                                                       AVR-FAT
-*                                        
-*                                           Copyright (c) 2020 Joshua Fain
-*                                                 All Rights Reserved
 *
 * DESCRIPTION: Module used for interfacing with a FAT32 formatted volume. Declares the functions defined in FAT.C as
 *              well as defines the structs and flags to be used to interact with those functions.
