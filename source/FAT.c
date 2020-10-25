@@ -212,6 +212,9 @@ FAT_PrintBootSectorError (uint8_t err)
     case BOOT_SECTOR_NOT_FOUND:
       print_str("BOOT_SECTOR_NOT_FOUND");
       break;
+    case FAILED_READ_BOOT_SECTOR:
+      print_str("FAILED_READ_BOOT_SECTOR");
+      break;
     default:
       print_str("UNKNOWN_ERROR");
       break;
@@ -960,6 +963,9 @@ FAT_PrintError (uint8_t err)
       break;
     case END_OF_FILE:
       print_str("\n\rEND_OF_FILE");
+      break;
+    case FAILED_READ_SECTOR:
+      print_str("\n\rFAILED_READ_SECTOR");
       break;
     default:
       print_str("\n\rUNKNOWN_ERROR");
