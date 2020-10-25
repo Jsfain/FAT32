@@ -292,6 +292,7 @@ int main(void)
       uint32_t startBlockNum;
       uint32_t numOfBlocks;
       uint8_t  answer;
+      uint16_t sdErr = 0;
       do
         {
           do
@@ -314,22 +315,22 @@ int main(void)
           // Print blocks
 
           // SDHC is block addressable
-          if (ctv.type == SDHC) err = SD_PrintMultipleBlocks(startBlockNum, numOfBlocks);
+          if (ctv.type == SDHC) sdErr = SD_PrintMultipleBlocks(startBlockNum, numOfBlocks);
           // SDSC is byte addressable
-          else err = SD_PrintMultipleBlocks (startBlockNum * BLOCK_LEN, numOfBlocks);
+          else sdErr = SD_PrintMultipleBlocks (startBlockNum * BLOCK_LEN, numOfBlocks);
           
-          if (err != READ_SUCCESS)
+          if (sdErr != READ_SUCCESS)
             { 
               print_str ("\n\r >> SD_PrintMultipleBlocks() returned ");
-              if (err & R1_ERROR)
+              if (sdErr & R1_ERROR)
                 {
                   print_str ("R1 error: ");
-                  SD_PrintR1 (err);
+                  SD_PrintR1 (sdErr);
                 }
               else 
                 { 
                   print_str (" error "); 
-                  SD_PrintReadError (err);
+                  SD_PrintReadError (sdErr);
                 }
             }
           print_str ("\n\rPress 'q' to quit: ");

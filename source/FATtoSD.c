@@ -155,14 +155,13 @@ uint8_t FATtoDisk_ReadSingleSector ( uint32_t address, uint8_t *sectorByteArray)
     // determine if card is SDSC or SDHC/SDXC
     cardType = pvt_getCardType();
 
-    // SDHC is block addressable
-    // SDSC byte addressable
-    if (cardType == SDHC) 
+    // SDHC is block addressable SDSC byte addressable
+    if (cardType == SDHC)
       err = SD_ReadSingleBlock(blockNumber, db);
-    else 
+    else // SDSC
       err = SD_ReadSingleBlock(blockNumber * BLOCK_LEN, db);
 
-    if (err != READ_SUCCESS) 
+    if (err != READ_SUCCESS)
       return 1; // failed
     
     for (int k = 0; k < 512; k++)

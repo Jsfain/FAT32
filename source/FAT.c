@@ -300,8 +300,11 @@ FAT_SetDirectory (FatDir * Dir, char * newDirStr, BPB * bpb)
   
   // newDirStr == 'Parent Directory' ?
   if (!strcmp (newDirStr, ".."))
-      // returns either FAILED_READ_SECTOR or SUCCESS
-      return pvt_SetDirectoryToParent (Dir, bpb);
+  {
+    print_str("\n\rSetDir 1");
+    // returns either FAILED_READ_SECTOR or SUCCESS
+    return pvt_SetDirectoryToParent (Dir, bpb);
+  }
 
   uint8_t  newDirStrLen = strlen (newDirStr);
   uint32_t clusIndx = Dir->FATFirstCluster;
@@ -326,7 +329,11 @@ FAT_SetDirectory (FatDir * Dir, char * newDirStr, BPB * bpb)
           // load sector data into currSecArr
           currSecNumPhys = currSecNumInClus + bpb->dataRegionFirstSector + ((clusIndx - 2) * bpb->secPerClus);
           err = FATtoDisk_ReadSingleSector (currSecNumPhys, currSecArr);
-          if (err == 1) return FAILED_READ_SECTOR;
+          if (err == 1) 
+          { 
+            print_str("\n\r first");
+            return FAILED_READ_SECTOR;
+          }
 
           for (uint16_t entryPos = 0; entryPos < SECTOR_LEN; entryPos += ENTRY_LEN)
             {
@@ -361,7 +368,11 @@ FAT_SetDirectory (FatDir * Dir, char * newDirStr, BPB * bpb)
                       if (lnFlags & (LONG_NAME_CROSSES_SECTOR_BOUNDARY | LONG_NAME_LAST_SECTOR_ENTRY))
                         {
                           err = pvt_GetNextSector (nextSecArr, currSecNumInClus, currSecNumPhys, clusIndx, bpb);
-                          if (err == FAILED_READ_SECTOR) return FAILED_READ_SECTOR;
+                          if (err == FAILED_READ_SECTOR) 
+                            { 
+                              print_str("\n\r second");
+                              return FAILED_READ_SECTOR;
+                            }
                           snPosNextSec = snPosCurrSec - bpb->bytesPerSec;
                           attrByte = nextSecArr[snPosNextSec + 11];
 
@@ -739,7 +750,11 @@ FAT_PrintFile (FatDir * Dir, char * fileNameStr, BPB * bpb)
           // load sector bytes into currSecArr[]
           currSecNumPhys = currSecNumInClus + bpb->dataRegionFirstSector + ((clusIndx - 2) * bpb->secPerClus);
           err = FATtoDisk_ReadSingleSector (currSecNumPhys, currSecArr );
-          if (err == 1) return FAILED_READ_SECTOR;
+          if (err == 1) 
+          {
+            print_str("\n\rPRINT FILE 1");
+            return FAILED_READ_SECTOR;
+          }
 
           // loop through entries in the current sector.
           for (uint16_t entryPos = 0; entryPos < bpb->bytesPerSec; entryPos = entryPos + ENTRY_LEN)
@@ -755,8 +770,8 @@ FAT_PrintFile (FatDir * Dir, char * fileNameStr, BPB * bpb)
               lnFlags = 0;
 
               // If first value of entry is 0 then all subsequent entries are empty.
-              if (currSecArr[ entryPos ] == 0) 
-                return FILE_NOT_FOUND;
+              if (currSecArr[entryPos] == 0) 
+                { print_str("\n\rthis one");return FILE_NOT_FOUND;}
 
               // Only continue checking this entry if it has not been marked for deletion.
               if (currSecArr[entryPos] != 0xE5)
@@ -765,22 +780,28 @@ FAT_PrintFile (FatDir * Dir, char * fileNameStr, BPB * bpb)
                   
                   if ((attrByte & LONG_NAME_ATTR_MASK) == LONG_NAME_ATTR_MASK)
                     {
-                      if ( !(currSecArr[entryPos] & LONG_NAME_LAST_ENTRY)) return CORRUPT_FAT_ENTRY;
+                      if ( !(currSecArr[entryPos] & LONG_NAME_LAST_ENTRY)) 
+                        return CORRUPT_FAT_ENTRY;
                       
-                      for (uint8_t k = 0; k < LONG_NAME_STRING_LEN_MAX; k++) lnStr[k] = '\0';
+                      for (uint8_t k = 0; k < LONG_NAME_STRING_LEN_MAX; k++) 
+                        lnStr[k] = '\0';
 
                       pvt_SetLongNameFlags (&lnFlags, entryPos, &snPosCurrSec, currSecArr, bpb);
                       
                       lnStrIndx = 0;
+
+                      // if long name exists and short name entry is in the next sector 
                       if (lnFlags & (LONG_NAME_CROSSES_SECTOR_BOUNDARY | LONG_NAME_LAST_SECTOR_ENTRY))
                         {
-                          err = pvt_GetNextSector (nextSecArr, currSecNumInClus, currSecNumPhys, clusIndx, bpb );
-                          if (err == FAILED_READ_SECTOR) return FAILED_READ_SECTOR;
+                          err = pvt_GetNextSector (nextSecArr, currSecNumInClus, currSecNumPhys, clusIndx, bpb);
+                          if (err == FAILED_READ_SECTOR) 
+                            return FAILED_READ_SECTOR;
                           snPosNextSec = snPosCurrSec - bpb->bytesPerSec;
-                          attrByte = nextSecArr[ snPosNextSec + 11 ];
+                          attrByte = nextSecArr[snPosNextSec + 11];
                           
                           // If snPosNextSec points to long name entry then something is wrong.
-                          if ((attrByte & LONG_NAME_ATTR_MASK) == LONG_NAME_ATTR_MASK) return CORRUPT_FAT_ENTRY;
+                          if ((attrByte & LONG_NAME_ATTR_MASK) == LONG_NAME_ATTR_MASK) 
+                            return CORRUPT_FAT_ENTRY;
 
                           // Only proceed if entry points to a file (i.e. directory attribute flag is not set).
                           if ( !(attrByte & DIRECTORY_ENTRY_ATTR))
@@ -804,15 +825,14 @@ FAT_PrintFile (FatDir * Dir, char * fileNameStr, BPB * bpb)
                                     return CORRUPT_FAT_ENTRY;                                                                  
                                       
                                   // read long name entry into lnStr
-                                  pvt_LoadLongName (SECTOR_LEN - ENTRY_LEN, entryPos, currSecArr, lnStr, &lnStrIndx);
-                                                                             
+                                  pvt_LoadLongName (SECTOR_LEN - ENTRY_LEN, entryPos, currSecArr, lnStr, &lnStrIndx);      
                                 }
                               else return CORRUPT_FAT_ENTRY;
 
                               // print file contents if a matching file entry was found
                               if ( !strcmp(fileNameStr, lnStr))
                                 // returnes either END_OF_FILE or FAILED_READ_SECTOR
-                                return pvt_PrintFatFile (entryPos, currSecArr, bpb);
+                                return pvt_PrintFatFile (snPosNextSec, nextSecArr, bpb);
                             }
                         }
 
@@ -837,8 +857,8 @@ FAT_PrintFile (FatDir * Dir, char * fileNameStr, BPB * bpb)
 
                               // print file contents if a matching entryPos was found
                               if ( !strcmp (fileNameStr, lnStr))
-                                // returnes either END_OF_FILE or FAILED_READ_SECTOR
-                                return pvt_PrintFatFile (entryPos, currSecArr, bpb);                                                                                   
+                                // returns either END_OF_FILE or FAILED_READ_SECTOR
+                                return pvt_PrintFatFile (snPosCurrSec, currSecArr, bpb);                                                                                   
                             }
                         }           
                     }
@@ -846,23 +866,21 @@ FAT_PrintFile (FatDir * Dir, char * fileNameStr, BPB * bpb)
                   // Check if fileNameStr matches a short name if a long name does not exist for current entry.
                   else if ((fileNameStrLen < 13) && !(attrByte & DIRECTORY_ENTRY_ATTR))
                     {                   
-                      
                       char sn[9];
                       char ext[4];
-
                       
                       for (uint8_t k = 0; k < 9; k++) sn[k] = '\0';
                       for (uint8_t k = 0; k < 4; k++) ext[k] = '\0'; 
               
                       // Locate '.', if it exists, in fileNameStr. Exclude first position (indicate hidden).
                       uint8_t pt = fileNameStrLen;
-                      uint8_t extExistsFlag = 0;
+                      uint8_t fileNameExtFlag = 0;
                       for (uint8_t k = 1; k < pt; k++)
                         {
                           if (k+1 >= fileNameStrLen) break;
                           if (fileNameStr[k] == '.')  
                             {
-                              extExistsFlag = 1;
+                              fileNameExtFlag = 1;
                               pt = k;
                               break; 
                             }
@@ -880,21 +898,19 @@ FAT_PrintFile (FatDir * Dir, char * fileNameStr, BPB * bpb)
                       if ( !strcmp (compFN, sn))
                         {                                
                           uint8_t match = 0;
-                          int entryExtExistsFlag = 0;
+                          uint8_t entryExtFlag = 0;
 
-                          for (int k = 0; k < 3; k++)  
-                            {
-                              ext[k] = currSecArr[entryPos + 8 + k]; 
-                              entryExtExistsFlag = 1;
-                            }
+                          for (uint8_t k = 0; k < 3; k++)  
+                            ext[k] = currSecArr[entryPos + 8 + k]; 
 
-                          if (strcmp (ext, "   ") && extExistsFlag) entryExtExistsFlag = 1;
 
-                          if ( !entryExtExistsFlag && !extExistsFlag) 
+                          if (strcmp (ext, "   ")) entryExtFlag = 1;
+
+                          if ( !entryExtFlag && !fileNameExtFlag) 
                             match = 1;
-                          else if ((entryExtExistsFlag && !extExistsFlag) || (!entryExtExistsFlag && extExistsFlag)) 
+                          else if ((entryExtFlag && !fileNameExtFlag) || (!entryExtFlag && fileNameExtFlag)) 
                             match = 0;
-                          else if (entryExtExistsFlag && extExistsFlag)
+                          else if (entryExtFlag && fileNameExtFlag)
                             {
                               char tempEXT[4];
                               for (uint8_t k = 0; k < 3; k++) tempEXT[k] = ' ';
@@ -907,7 +923,8 @@ FAT_PrintFile (FatDir * Dir, char * fileNameStr, BPB * bpb)
                                 }
 
                               // if extensions match set to match to 1
-                              if ( !strcmp (ext, tempEXT)) match = 1;
+                              if ( !strcmp (ext, tempEXT)) 
+                                match = 1;
                             }
                           if(match)
                             // returnes either END_OF_FILE or FAILED_READ_SECTOR
@@ -919,7 +936,7 @@ FAT_PrintFile (FatDir * Dir, char * fileNameStr, BPB * bpb)
         }
     } 
   while ((clusIndx = pvt_GetNextClusterIndex (clusIndx, bpb)) != END_OF_CLUSTER);
-
+  print_str("\n\r ENDING");
   return FILE_NOT_FOUND; 
 }
 
@@ -1527,11 +1544,12 @@ pvt_PrintShortName (uint8_t *sectorArr, uint16_t entryPos, uint8_t entryFilter)
  *
  * Description : Used by FAT_PrintFile() to perform that actual print operation.
  * 
- * Arguments   : entryPos       - Integer that points to the location in *fileSector of the first byte of the short name entryPos of the file whose 
- *                                contents will be printed to the screen. This is required as the first cluster index 
- *                                of the file is located in the short name entryPos.
- *             : *fileSector      pointer to an array that holds the short name entryPos of the file to be printed to the 
- *                                to the screen.
+ * Arguments   : entryPos       - Integer that points to the location in *fileSector of the first byte of the short 
+ *                                name entryPos of the file whose contents will be printed to the screen. This is 
+ *                                required as the first cluster index of the file is located in the short name.
+ *             : *fileSector      pointer to an array that holds the short name entryPos of the file to be printed to 
+ *                                the screen.
+ *             : *bpb           - Pointer to a valid instance of a BPB struct.
 ***********************************************************************************************************************
 */
 
@@ -1550,14 +1568,14 @@ pvt_PrintFatFile (uint16_t entryPos, uint8_t *fileSector, BPB * bpb)
     cluster |= fileSector[entryPos + 27];
     cluster <<= 8;
     cluster |= fileSector[entryPos + 26];
-    
+
     print_str("\n\n\r");
     // read in contents of file starting at relative sector 0 in 'cluster' and print contents to the screen.
     do
       {
         for(uint32_t currSecNumInClus = 0; currSecNumInClus < bpb->secPerClus; currSecNumInClus++) 
           {
-            currSecNumPhys = currSecNumInClus + bpb->dataRegionFirstSector + ( (cluster - 2) * bpb->secPerClus );
+            currSecNumPhys = currSecNumInClus + bpb->dataRegionFirstSector + ((cluster - 2) * bpb->secPerClus);
 
             // function returns either 0 for success for 1 for failed.
             err = FATtoDisk_ReadSingleSector (currSecNumPhys, fileSector);
@@ -1565,7 +1583,7 @@ pvt_PrintFatFile (uint16_t entryPos, uint8_t *fileSector, BPB * bpb)
 
             for (uint16_t k = 0; k < bpb->bytesPerSec; k++)
               {
-                // just for formatting how this shows up on the screen.
+                // for formatting how this shows up on the screen.
                 if (fileSector[k] == '\n') print_str ("\n\r");
                 else if (fileSector[k] != 0) USART_Transmit (fileSector[k]);
               }
@@ -1699,13 +1717,17 @@ pvt_GetNextSector (uint8_t * nextSecArr, uint32_t currSecNumInClus,
                    uint32_t currSecNumPhys, uint32_t clusIndx, BPB * bpb)
 {
   uint32_t nextSecNumPhys;
+  uint8_t  err = 0;
   
   if (currSecNumInClus >= (bpb->secPerClus - 1)) 
     nextSecNumPhys = bpb->dataRegionFirstSector + ((pvt_GetNextClusterIndex (clusIndx, bpb) - 2) * bpb->secPerClus);
   else 
     nextSecNumPhys = 1 + currSecNumPhys;
 
-  // function returns either 0 for success for 1 for failed.
-  if (FATtoDisk_ReadSingleSector (nextSecNumPhys, nextSecArr) == 1) return FAILED_READ_SECTOR;
-  else return SUCCESS;
+  // function returns either 0 for success or 1 for failed.
+  err = FATtoDisk_ReadSingleSector (nextSecNumPhys, nextSecArr);
+  if (err == 1) 
+    return FAILED_READ_SECTOR;
+  else 
+    return SUCCESS;
 }
