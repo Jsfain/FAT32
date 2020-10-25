@@ -82,6 +82,7 @@
 #define INVALID_SECTORS_PER_CLUSTER               0x08
 #define BOOT_SECTOR_NOT_FOUND                     0x10
 #define BOOT_SECTOR_VALID                         0x20
+#define FAILED_READ_BOOT_SECTOR                   0x40
 
 
 // ******* Fat Error Flags
@@ -93,6 +94,7 @@
 #define END_OF_FILE                               0x10
 #define END_OF_DIRECTORY                          0x20
 #define CORRUPT_FAT_ENTRY                         0x40
+#define FAILED_READ_SECTOR                        0x80
 
 
 // ******* Long Name Distribution Flags
@@ -136,16 +138,6 @@
 // Other FAT specific flags / tokens.
 #define LONG_NAME_LAST_ENTRY                      0x40  
 #define LONG_NAME_ORDINAL_MASK                    0x3F
-
-
-// ***** Physical Interface Error Flags
-
-// These error flags can be used by the interface in a specific implementation 
-// of this FAT module between this module and the pysical disk module/driver.
-#define READ_SECTOR_ERROR                         0x01
-#define READ_SECTOR_TIMEOUT                       0x02
-#define READ_SECTOR_SUCCESSFUL                    0x04
-
 
 
 /*

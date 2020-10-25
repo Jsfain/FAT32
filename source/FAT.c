@@ -65,17 +65,17 @@
 // Private function descriptions are only included with their definitions at the bottom of this file.
 
 uint8_t pvt_CheckValidName (char * nameStr, FatDir * Dir);
-void pvt_SetDirectoryToParent (FatDir * Dir, BPB * bpb);
+uint8_t pvt_SetDirectoryToParent (FatDir * Dir, BPB * bpb);
 void pvt_SetDirectoryToChild (FatDir * Dir, uint8_t * sectorArr, uint16_t snPos, char * childDirStr, BPB * bpb);
 void pvt_LoadLongName (int lnFirstEntry, int lnLastEntry, uint8_t * sectorArr, char * lnStr, uint8_t * lnStrIndx);
 uint32_t pvt_GetNextClusterIndex (uint32_t currentClusterIndex, BPB * bpb);
 void pvt_PrintEntryFields (uint8_t * byte, uint16_t entryPos, uint8_t entryFilter);
 void pvt_PrintShortName (uint8_t * byte, uint16_t entryPos, uint8_t entryFilter);
-void pvt_PrintFatFile (uint16_t entryPos, uint8_t * fileSector, BPB * bpb);
+uint8_t pvt_PrintFatFile (uint16_t entryPos, uint8_t * fileSector, BPB * bpb);
 uint8_t pvt_CorrectEntryCheck (uint8_t lnFlags, uint16_t * entryPos, uint16_t * snPosCurrSec, uint16_t * snPosNextSec);           
 void pvt_SetLongNameFlags (uint8_t * lnFlags, uint16_t entryPos, 
                            uint16_t * snPosCurrSec, uint8_t * currSecArr, BPB * bpb);
-void pvt_GetNextSector (uint8_t * nextSecArr, uint32_t currSecNumInClus, 
+uint8_t pvt_GetNextSector (uint8_t * nextSecArr, uint32_t currSecNumInClus, 
                         uint32_t currSecNumPhys, uint32_t clusIndx, BPB* bpb);
 
 
@@ -115,11 +115,16 @@ uint8_t
 FAT_SetBiosParameterBlock (BPB * bpb)
 {
   uint8_t BootSector[SECTOR_LEN];
+  uint8_t err;
 
+  // 0xFFFFFFFF is returned for the boot sector location, then locating it failed.
   bpb->bootSecAddr = FATtoDisk_FindBootSector();
   
   if (bpb->bootSecAddr != 0xFFFFFFFF)
-    FATtoDisk_ReadSingleSector (bpb->bootSecAddr, BootSector);
+    {
+      err = FATtoDisk_ReadSingleSector (bpb->bootSecAddr, BootSector);
+      if (err == 1) return FAILED_READ_BOOT_SECTOR;
+    }
   else
     return BOOT_SECTOR_NOT_FOUND;
 
@@ -292,10 +297,8 @@ FAT_SetDirectory (FatDir * Dir, char * newDirStr, BPB * bpb)
   
   // newDirStr == 'Parent Directory' ?
   if (!strcmp (newDirStr, ".."))
-    {
-      pvt_SetDirectoryToParent (Dir, bpb);
-      return SUCCESS;
-    }
+      // returns either FAILED_READ_SECTOR or SUCCESS
+      return pvt_SetDirectoryToParent (Dir, bpb);
 
   uint8_t  newDirStrLen = strlen (newDirStr);
   uint32_t clusIndx = Dir->FATFirstCluster;
@@ -311,6 +314,7 @@ FAT_SetDirectory (FatDir * Dir, char * newDirStr, BPB * bpb)
   char     lnStr[LONG_NAME_STRING_LEN_MAX];
   uint8_t  lnStrIndx = 0;
   uint8_t  lnFlags = 0;
+  uint8_t  err;
 
   do
     {
@@ -318,7 +322,8 @@ FAT_SetDirectory (FatDir * Dir, char * newDirStr, BPB * bpb)
         {         
           // load sector data into currSecArr
           currSecNumPhys = currSecNumInClus + bpb->dataRegionFirstSector + ((clusIndx - 2) * bpb->secPerClus);
-          FATtoDisk_ReadSingleSector (currSecNumPhys, currSecArr);
+          err = FATtoDisk_ReadSingleSector (currSecNumPhys, currSecArr);
+          if (err == 1) return FAILED_READ_SECTOR;
 
           for (uint16_t entryPos = 0; entryPos < SECTOR_LEN; entryPos += ENTRY_LEN)
             {
@@ -352,7 +357,8 @@ FAT_SetDirectory (FatDir * Dir, char * newDirStr, BPB * bpb)
 
                       if (lnFlags & (LONG_NAME_CROSSES_SECTOR_BOUNDARY | LONG_NAME_LAST_SECTOR_ENTRY))
                         {
-                          pvt_GetNextSector (nextSecArr, currSecNumInClus, currSecNumPhys, clusIndx, bpb);
+                          err = pvt_GetNextSector (nextSecArr, currSecNumInClus, currSecNumPhys, clusIndx, bpb);
+                          if (err == FAILED_READ_SECTOR) return FAILED_READ_SECTOR;
                           snPosNextSec = snPosCurrSec - bpb->bytesPerSec;
                           attrByte = nextSecArr[snPosNextSec + 11];
 
@@ -480,6 +486,7 @@ FAT_PrintDirectory (FatDir * Dir, uint8_t entryFilter, BPB * bpb)
   char     lnStr[LONG_NAME_STRING_LEN_MAX];
   uint8_t  lnStrIndx = 0;
   uint8_t  lnFlags = 0;
+  uint8_t  err;
 
   // Prints column headers according to entryFilter
   print_str("\n\n\r");
@@ -499,7 +506,8 @@ FAT_PrintDirectory (FatDir * Dir, uint8_t entryFilter, BPB * bpb)
         {
           // load sector bytes into currSecArr[]
           currSecNumPhys = currSecNumInClus + bpb->dataRegionFirstSector + ((clusIndx - 2) * bpb->secPerClus);
-          FATtoDisk_ReadSingleSector (currSecNumPhys, currSecArr);
+          err = FATtoDisk_ReadSingleSector (currSecNumPhys, currSecArr);
+          if (err == 1) return FAILED_READ_SECTOR;
 
           for (uint16_t entryPos = 0; entryPos < bpb->bytesPerSec; entryPos = entryPos + ENTRY_LEN)
             {
@@ -533,7 +541,8 @@ FAT_PrintDirectory (FatDir * Dir, uint8_t entryFilter, BPB * bpb)
 
                       if (lnFlags & (LONG_NAME_CROSSES_SECTOR_BOUNDARY | LONG_NAME_LAST_SECTOR_ENTRY))
                         {
-                          pvt_GetNextSector ( nextSecArr, currSecNumInClus, currSecNumPhys, clusIndx, bpb );
+                          err = pvt_GetNextSector ( nextSecArr, currSecNumInClus, currSecNumPhys, clusIndx, bpb );
+                          if (err == FAILED_READ_SECTOR) return FAILED_READ_SECTOR;
                           snPosNextSec = snPosCurrSec - bpb->bytesPerSec;
                           attrByte = nextSecArr[snPosNextSec + 11];
                           
@@ -718,6 +727,7 @@ FAT_PrintFile (FatDir * Dir, char * fileNameStr, BPB * bpb)
   char     lnStr[LONG_NAME_STRING_LEN_MAX];
   uint8_t  lnStrIndx = 0;
   uint8_t  lnFlags = 0;
+  uint8_t  err;
    
   do
     {
@@ -725,8 +735,9 @@ FAT_PrintFile (FatDir * Dir, char * fileNameStr, BPB * bpb)
         {     
           // load sector bytes into currSecArr[]
           currSecNumPhys = currSecNumInClus + bpb->dataRegionFirstSector + ((clusIndx - 2) * bpb->secPerClus);
-          FATtoDisk_ReadSingleSector (currSecNumPhys, currSecArr );
-          
+          err = FATtoDisk_ReadSingleSector (currSecNumPhys, currSecArr );
+          if (err == 1) return FAILED_READ_SECTOR;
+
           // loop through entries in the current sector.
           for (uint16_t entryPos = 0; entryPos < bpb->bytesPerSec; entryPos = entryPos + ENTRY_LEN)
             { 
@@ -760,7 +771,8 @@ FAT_PrintFile (FatDir * Dir, char * fileNameStr, BPB * bpb)
                       lnStrIndx = 0;
                       if (lnFlags & (LONG_NAME_CROSSES_SECTOR_BOUNDARY | LONG_NAME_LAST_SECTOR_ENTRY))
                         {
-                          pvt_GetNextSector (nextSecArr, currSecNumInClus, currSecNumPhys, clusIndx, bpb );
+                          err = pvt_GetNextSector (nextSecArr, currSecNumInClus, currSecNumPhys, clusIndx, bpb );
+                          if (err == FAILED_READ_SECTOR) return FAILED_READ_SECTOR;
                           snPosNextSec = snPosCurrSec - bpb->bytesPerSec;
                           attrByte = nextSecArr[ snPosNextSec + 11 ];
                           
@@ -796,10 +808,8 @@ FAT_PrintFile (FatDir * Dir, char * fileNameStr, BPB * bpb)
 
                               // print file contents if a matching file entry was found
                               if ( !strcmp(fileNameStr, lnStr))
-                                { 
-                                  pvt_PrintFatFile (snPosNextSec, nextSecArr, bpb); 
-                                  return END_OF_FILE;
-                                }
+                                // returnes either END_OF_FILE or FAILED_READ_SECTOR
+                                return pvt_PrintFatFile (entryPos, currSecArr, bpb);
                             }
                         }
 
@@ -824,10 +834,8 @@ FAT_PrintFile (FatDir * Dir, char * fileNameStr, BPB * bpb)
 
                               // print file contents if a matching entryPos was found
                               if ( !strcmp (fileNameStr, lnStr))
-                                { 
-                                  pvt_PrintFatFile(snPosCurrSec, currSecArr, bpb); 
-                                  return END_OF_FILE;
-                                }                                                                                    
+                                // returnes either END_OF_FILE or FAILED_READ_SECTOR
+                                return pvt_PrintFatFile (entryPos, currSecArr, bpb);                                                                                   
                             }
                         }           
                     }
@@ -899,10 +907,8 @@ FAT_PrintFile (FatDir * Dir, char * fileNameStr, BPB * bpb)
                               if ( !strcmp (ext, tempEXT)) match = 1;
                             }
                           if(match)
-                            {
-                              pvt_PrintFatFile (entryPos, currSecArr, bpb);
-                              return END_OF_FILE;
-                            }
+                            // returnes either END_OF_FILE or FAILED_READ_SECTOR
+                            return pvt_PrintFatFile (entryPos, currSecArr, bpb);
                         }
                     }
                 }
@@ -1035,16 +1041,19 @@ pvt_CheckValidName (char * nameStr, FatDir * Dir)
 */
 
 
-void 
+uint8_t
 pvt_SetDirectoryToParent (FatDir * Dir, BPB * bpb)
 {
   uint32_t parentDirFirstClus;
   uint32_t currSecNumPhys;
   uint8_t  currSecArr[bpb->bytesPerSec];
+  uint8_t  err;
 
   currSecNumPhys = bpb->dataRegionFirstSector + ((Dir->FATFirstCluster - 2) * bpb->secPerClus);
 
-  FATtoDisk_ReadSingleSector (currSecNumPhys, currSecArr);
+  // function returns either 0 for success for 1 for failed.
+  err = FATtoDisk_ReadSingleSector (currSecNumPhys, currSecArr);
+  if (err != 0) return FAILED_READ_SECTOR;
 
   parentDirFirstClus = currSecArr[53];
   parentDirFirstClus <<= 8;
@@ -1087,6 +1096,7 @@ pvt_SetDirectoryToParent (FatDir * Dir, BPB * bpb)
 
       Dir->FATFirstCluster = parentDirFirstClus;
     }
+    return SUCCESS;
 }
 
 
@@ -1248,7 +1258,7 @@ pvt_GetNextClusterIndex (uint32_t currClusIndx, BPB * bpb)
   uint32_t fatSectorToRead = clusIndx + bpb->rsvdSecCnt;
 
   uint8_t sectorArr[bpb->bytesPerSec];
-
+  
   FATtoDisk_ReadSingleSector (fatSectorToRead, sectorArr);
 
   cluster = sectorArr[clusIndxStartByte+3];
@@ -1519,11 +1529,12 @@ pvt_PrintShortName (uint8_t *sectorArr, uint16_t entryPos, uint8_t entryFilter)
 ***********************************************************************************************************************
 */
 
-void 
+uint8_t 
 pvt_PrintFatFile (uint16_t entryPos, uint8_t *fileSector, BPB * bpb)
   {
     uint32_t currSecNumPhys;
     uint32_t cluster;
+    uint8_t  err;
 
     //get FAT index for file's first cluster
     cluster =  fileSector[entryPos + 21];
@@ -1542,8 +1553,11 @@ pvt_PrintFatFile (uint16_t entryPos, uint8_t *fileSector, BPB * bpb)
           {
             currSecNumPhys = currSecNumInClus + bpb->dataRegionFirstSector + ( (cluster - 2) * bpb->secPerClus );
 
-            FATtoDisk_ReadSingleSector (currSecNumPhys, fileSector);
-            for (uint16_t k = 0; k < bpb->bytesPerSec; k++)  
+            // function returns either 0 for success for 1 for failed.
+            err = FATtoDisk_ReadSingleSector (currSecNumPhys, fileSector);
+            if (err == 1) return FAILED_READ_SECTOR;
+
+            for (uint16_t k = 0; k < bpb->bytesPerSec; k++)
               {
                 // just for formatting how this shows up on the screen.
                 if (fileSector[k] == '\n') print_str ("\n\r");
@@ -1551,7 +1565,8 @@ pvt_PrintFatFile (uint16_t entryPos, uint8_t *fileSector, BPB * bpb)
               }
           }
       } 
-    while( ( (cluster = pvt_GetNextClusterIndex(cluster,bpb)) != END_OF_CLUSTER ) );
+    while (((cluster = pvt_GetNextClusterIndex(cluster,bpb)) != END_OF_CLUSTER));
+    return END_OF_FILE;
   }
 
 
@@ -1673,16 +1688,18 @@ pvt_SetLongNameFlags ( uint8_t * lnFlags, uint16_t entryPos, uint16_t * snPosCur
 ***********************************************************************************************************************
 */
 
-void
+uint8_t
 pvt_GetNextSector (uint8_t * nextSecArr, uint32_t currSecNumInClus, 
                    uint32_t currSecNumPhys, uint32_t clusIndx, BPB * bpb)
 {
-  uint32_t nextSecNumPhys; 
+  uint32_t nextSecNumPhys;
   
   if (currSecNumInClus >= (bpb->secPerClus - 1)) 
     nextSecNumPhys = bpb->dataRegionFirstSector + ((pvt_GetNextClusterIndex (clusIndx, bpb) - 2) * bpb->secPerClus);
   else 
     nextSecNumPhys = 1 + currSecNumPhys;
 
-  FATtoDisk_ReadSingleSector (nextSecNumPhys, nextSecArr);
+  // function returns either 0 for success for 1 for failed.
+  if (FATtoDisk_ReadSingleSector (nextSecNumPhys, nextSecArr) == 1) return FAILED_READ_SECTOR;
+  else return SUCCESS;
 }

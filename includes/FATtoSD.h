@@ -37,8 +37,19 @@
 
 #include <avr/io.h>
 
+
+// This function is required to interface with the physical disk hosting the FAT volume. It returns
+// a value corresponding to the addressed location of the Boot Sector / Bios Parameter Block on the
+// physical disk. This function is used by FAT_SetBiosParameterBlock().
+uint32_t FATtoDisk_FindBootSector();
+
+
+
+// This function is required to interface with the physical disk hosting the FAT volume. This function
+// should load the contents of the sector at the physical address specified in the address argument into
+// the array pointed at by *sectorByteArray. This function is used by all FAT functions requiring access
+// to the physical disk. The function will return 1 if there is a read failure and 0 if it is successful. 
 uint8_t FATtoDisk_ReadSingleSector( uint32_t address, uint8_t * arr );
 
-uint32_t FATtoDisk_FindBootSector();
 
 #endif //FATTOSD_H
