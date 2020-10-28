@@ -162,6 +162,7 @@ int main(void)
       uint8_t filter = 0; // used with FAT_PrintDirectory()
       uint8_t quit = 0;
 
+      print_str("\n\n\n\r");
       do
         {
           // reset strings and variables

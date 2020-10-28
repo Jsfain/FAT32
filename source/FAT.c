@@ -23,7 +23,7 @@
 *  (7) void     FAT_PrintError(uint8_t err);
 *
 *
-* STRUCTS USED (defined in FAT.H):
+* STRUCTS (defined in FAT.H)
 *  (1) typedef struct BiosParameterBlock BPB
 *  (2) typedef struct FatDirectory FatDir
 *
@@ -517,7 +517,7 @@ FAT_PrintDirectory (FatDir * Dir, uint8_t entryFilter, BPB * bpb)
   if (TYPE & entryFilter) print_str(" TYPE,");
   
   print_str(" NAME");
-  print_str("\n\n\r");
+  print_str("\n\r");
 
   do 
     {
@@ -1066,7 +1066,6 @@ pvt_CheckValidName (char * nameStr, FatDir * Dir)
  *             : *bpb         - Pointer to a valid instance of a BPB struct.
 ***********************************************************************************************************************
 */
-
 
 uint8_t
 pvt_SetDirectoryToParent (FatDir * Dir, BPB * bpb)

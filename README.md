@@ -39,7 +39,7 @@ This FAT module is intended to be independent of a physical disk layer/driver an
 
 The requirements for these physical disk interfacing functions can be found in their description in the header file.
 
-NOTE: This project was tested by using the [AVR-SDCard module](https://github.com/Jsfain/AVR-SDCard) as the physical disk layer. The required source files from that module have also been included in this repo for reference, but they are not considered part of the AVR-FAT module.
+NOTE: This project was tested by using the [AVR-SDCard module](https://github.com/Jsfain/AVR-SDCard) as the physical disk layer. I've included source files from that module in this repo for reference, but they are not considered part of the AVR-FAT module.
 
 
 ### Additional Files
@@ -50,13 +50,14 @@ Other files included are:
  
 
 ## Warning
-Use at your own risk and back up any data on the disk that is to use with this module. The module does not implement any 'write/modify' operations, but things happen and it is possible that a disk could get into a bad state and become corrupted and requiring reformatting.
+Use at your own risk and back up any data on the disk that is to be used with this module. The module does not implement any 'write/modify' operations, but things happen and it is possible that a disk could get into a bad state and become corrupted and requiring reformatting.
 
 
-## Known Limitations
-* Currently only read operations are provided by the module; there are no options to modify the contents of the FAT volume. This means that no files or directories nor any of their property fields can be created or modified, nor can any FAT parameters be modified (i.e. boot sector/BPB, FAT, FSInfo, etc...)
+## Disclaimers / Limitations 
+* I made this for fun to pass the time during quarantine. That is all. Feel free to use however you wish, but no guarantees are made regarding its operability or that any bug finds will be addressed, though feel free to point any out if you find them.
+* Currently only read operations are provided by the module; there are no options to modify the contents of the FAT volume. This means that no files or directories nor any of their property fields can be created or modified, nor can any FAT parameters be modified (i.e. boot sector/BPB, FAT, FSInfo, etc...).
 * Though the AVR-FAT module is designed to operate independent of the physical disk layer as long as the required interfacing functions are implemented correctly, this module has only been tested using FAT32-formatted 2 and 4GB SD Cards using the AVR-SDCard module as the physical disk layer.
-* This module was created by referencing the Microsoft FAT Specification, but there is no guarantee that it completely conforms to the standard.
+* This module was created by referencing the Microsoft FAT Specification, but there is no guarantee that it conforms to the standard.
 
 
 ## License
