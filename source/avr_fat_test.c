@@ -75,7 +75,7 @@
 #include "../includes/sd_spi_base.h"
 #include "../includes/sd_spi_data_access.h"
 #include "../includes/fat.h"
-#include "../includes/fattosd.h"
+#include "../includes/fattodisk_interface.h"
 
 
 // local function used for raw data access. Not part of the avr-fat module. 

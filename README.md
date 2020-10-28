@@ -1,92 +1,68 @@
 # FAT Filesystem Module
-AVR Module for reading a FAT32 formatted disk/volume
-
-# Purpose
-To provide a module to read data/files from a FAT32 formatted disk/volume on an AVR platform.
-
-# Details
-TARGET: ATmega1280
-LANGUAGE: C 
-Successfully compiles with avr-gcc 
-avr-gcc -v output -> gcc version 5.4.0 - AVR_8_bit_GNU_Toolchain_3.6.2_503
-
-# Overview
-This module provides a set of functions that can be used to read files from a FAT32 formatted disk. This module is intended to be independent of a physical disk and thus requires implementation with a disk driver/module to handle the task of retrieving data sectors requested by this module (see Disk Module requirements for specific requirements. 
-
-This FAT module implements three primary operations for interacting with a FAT32 volume, which are separated into three primary functional task:
-
-1) Directory Setter
-2) Directory Reader
-3) File Reader
-
-The idea for their implementation is to initialize a current directory (CD) struct object whose members specify the 'current directory'.  A pointer to the CD object is then passed as the first argument to a function which will act upon it accordingly.  For instance, the "Directory Setter" function will search for a new directory (specified by the second argument) in the current directory and if this new directory is a child or parent of the current directory, then the members of the struct will be updated to point to the new directory.
-
-A test.c file, which contains main() implements a 'Command-Line' like operation that can be used to change or print directories, or print a file.
-
-See the Implementation section below for specifc instructions to implement the module and description of the functions.
-
-# Disk Module Requirements
-Before this module can be implemented a disk driver/module must be available to read raw data sectors from the physical disk. The requirements of the Physical Disk Driver are that it implement a function to read in single 512 byte raw data sectors. The FAT module should interface with the Disk Module by defining and making sure it is included in the FAT module: 
-
-void FAT32_ReadSingleSector( uint32_t address, uint8_t *sectorByteArray)
-
-This functon should operate by requesting the Disk Read function read in a 512 byte sector of raw data located at 'address' on the disk into a 512 byte array pointed at by *sectorByteArray.  The sector address must be the byte address of the first byte of the 512 byte sector, not the sector number.  So if reading sector number 1000 the address 512 * 1000 = 512,000 (assuming the phyiscal sectors are 512 bytes which is the only thing currently supported by the FAT module).
-
-EXAMPLE:
-
-void fat_ReadSingleSector( uint32_t address, uint8_t *sectorByteArray)
-{
-    DataBlock db;
-    db = sd_ReadSingleDataBlock(address);
-    for(int k = 0; k < 512; k++) { sectorByteArray[k] = db.data[k]; }
-};
-
-The file FATtoSD.C defines the required function above to interface with an SD Card by calling a function called sd_ReadSingleSector(address) which passes the sector bytes into a db struct object with a member (uint8_t data[512]) and then passes this to the sectorByteArray.
+Read a FAT32-formatted volume using an AVR microcontroller.
 
 
-Current directory struct: 
-typedef FatCurrentDirectory
-Five Members:
-    * char longName[256] - array to hold the long name string of the current directory. Max 255 characters.
-    * char longParentPath[256] - array to hold the long name path to the current directory's parent directory.
-    * char shortName[9] - array to hold the short name string of the current directory. Only holds the name portion of the 8.3 standard. Extensions in directory names has not been tested.
-    * char shortParentPath[256] - array to hold the short name path to the current directory's parent directory.
-    * uint32_t FATFirstCluster - the index of the first cluster for the current directory in the FAT.  This value must be correctly set to point to a valid directory's first cluster.
+## Purpose
+To provide a module to read data/files from a FAT32 formatted disk/volume from an AVR Microcontroller.
 
 
-# Primary Functions and how to use them description:
-Section to describe how to use the primary functions:
+## How To Use
+Use this module by copying the source files and compile, build, and download the module to an AVR microcontroller. See the MAKE.SH file included in the repo to see how I built the project using the AVR-Toolchain. You should also be able to implement this process easily in Atmel Studio, but I did not have this available on my system.
 
-1) A Directory Setter - SetFatCurrentDirectory(FatCurrentDirectory *currentDirectory, char *newDirectory)
-
-2) A Directory Reader - PrintFatCurrentDirectoryContents(FatCurrentDirectory *currentDirectory, uint8_t FLAG)
-3) A File Reader      - PrintFatFileContents(FatCurrentDirectory *currentDirectory, char *fileName)
+The best way to understand how to implement this module / FAT functions is to see the AVR_FAT_TEST.C file. This file contains main() and implements a command-line like interface using the functions in FAT.C/H.
 
 
-# Known Limitations / Warnings
-* Currently only read operations are allowed; there is no option to modify the contents of the volume. This means no files or directories nor any of their property fields can be created or modified, nor can any FAT parameters be modified (i.e. boot sector/BPB, FAT, FSInfo, etc...)
-* Though the module is designed to operate independent of the physical disk, this module has only been tested using a FAT32 formatted 2GB mini SD Card using the SDCard module and implementing the FAT32TOSD interface (which is included with this module).
-* There is no guarantee it 100% adhere's to the FAT standard.
-    * Directories should not have extensions. 
+## Details
+* TARGET: ATmega1280 - This is expected to be easily implemented on other AVR targets with modification of port assignments and settings, and assuming memory and other resources are sufficient.
+* LANGUAGE: C
+* [AVR-Toolchain](https://github.com/osx-cross/homebrew-avr) 9.3.0 , This includes: 
+  * AVR-GCC 9.3.0: required to compile/build the module.
+  * AVRDUDE 6.3: required to download the to the AVR.
 
-# Who can use
-Anyone can use this and modify it to meet the needs of their system, but let me know if you use it or find it helpful.
 
-# Requirements
-[AVR Toolchain](https://github.com/osx-cross/homebrew-avr)
+## Overview of included files
 
-# List of Functions
-* uint8_t   SetFatCurrentDirectory(FatCurrentDirectory *currentDirectory, char *newDirectory)
-* uint8_t   PrintFatCurrentDirectoryContents(FatCurrentDirectory *currentDirectory, uint8_t FLAG)
-* uint8_t   PrintFatFileContents(FatCurrentDirectory *currentDirectory, char *fileName)
-* void      PrintFatError(uint8_t err)
-* uint16_t  GetFatBytsPerSec()
-* uint8_t   GetFatSecPerClus()
-* uint16_t  GetFatRsvdSecCnt()
-* uint8_t   GetFatNumFATs()
-* uint32_t  GetFatFATSz32()
-* uint32_t  GetFatRootClus()
+### AVR-FAT Module Files
+This module provides a set of functions that can be used to read files and navigate directories on a FAT32 formatted disk using an AVR microcontroller. The files included with the module are:
 
-# Reference Documents:
-1) Atmel ATmega640/V-1280/V-1281/V-2560/V-2561/V Datasheet
-2) SD Specifications Part 1: Physical Layer Specification - Simplified Specification Version 7.10
+1) FAT.C / FAT.H
+2) FATtoDISK_INTERFACE.H
+
+FAT.C and its header FAT.H define/declare the specific FAT functions for setting the current working directory, reading directory contents, and reading file contents. The specifics of how each function operates is provided in the source files. The best way to see how the FAT functions are intended to be used is to see the AVR_FAT_TEST.C.
+
+
+### Physical disk layer
+This FAT module is intended to be independent of a physical disk layer/driver and thus a disk layer is required to read in the raw data from the physical FAT32-formatted disk itself. The file FATtoDISK_INTERFACE.H declares two functions that must be defined to interface the AVR-FAT module to the physical disk layer. These functions are 
+
+1) uint32_t FATtoDisk_FindBootSector();
+2) uint8_t FATtoDisk_ReadSingleSector (uint32_t address, uint8_t * arr); 
+
+The requirements for these physical disk interfacing functions can be found in their description in the header file.
+
+NOTE: This project was tested by using the [AVR-SDCard module](https://github.com/Jsfain/AVR-SDCard) as the physical disk layer. The required source files from that module have also been included in this repo for reference, but they are not considered part of the AVR-FAT module.
+
+
+### Additional Files
+Other files included are:
+1) USART.C/H - this file is used for printing to a screen.
+2) PRINTS.C/H provides a few simple functions for printing strings and integers in decimal (positve numbers only), hexadecimal, and binary forms.
+3) SPI.C/H is included with this specific implementation because it is required by the AVR-SDCard module.
+ 
+
+## Warning
+Use at your own risk and back up any data on the disk that is to use with this module. The module does not implement any 'write/modify' operations, but things happen and it is possible that a disk could get into a bad state and become corrupted and requiring reformatting.
+
+
+## Known Limitations
+* Currently only read operations are provided by the module; there are no options to modify the contents of the FAT volume. This means that no files or directories nor any of their property fields can be created or modified, nor can any FAT parameters be modified (i.e. boot sector/BPB, FAT, FSInfo, etc...)
+* Though the AVR-FAT module is designed to operate independent of the physical disk layer as long as the required interfacing functions are implemented correctly, this module has only been tested using FAT32-formatted 2 and 4GB SD Cards using the AVR-SDCard module as the physical disk layer.
+* This module was created by referencing the Microsoft FAT Specification, but there is no guarantee that it completely conforms to the standard.
+
+
+## License
+[MIT license](https://github.com/Jsfain/AVR-FAT/blob/master/LICENSE)
+
+
+## Requirements
+Mac / Linux - [AVR Toolchain](https://github.com/osx-cross/homebrew-avr)
+Windows - Atmel studio

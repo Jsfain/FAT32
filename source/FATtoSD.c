@@ -6,12 +6,12 @@
 * Author : Joshua Fain
 * Target : ATMega1280
 *
-*
+* 
 * DESCRIPTION:
-* This file in included as an interface between the AVR-FAT module and the AVR-SDCard module. A module/driver for
-* accessing raw data on a FAT32-formatted volume is required. The AVR-FAT module is intended to be independent of the
-* physical volume, and implementing a different raw data access driver would is possible as long as "non-private"
-* functions are implemented that have the same functionality as those here. 
+* This file implements the required disk interface functions declared in FATtoDISK_INTERFACE.H. These have been 
+* implemented here for accessing raw data on a FAT32-formatted SD Card using the AVR-SDCard module. The required 
+* source files from the AVR-SDCard module are included in the repo, though they are technically part of the AVR-FAT
+* module as the the AVR-FAT module, is intended to be independent of disk-type.
 * 
 * FUNCTIONS:
 * (1) uint32_t FATtoDisk_FindBootSector();                                               
@@ -42,7 +42,7 @@
 #include "../includes/sd_spi_base.h"
 #include "../includes/sd_spi_data_access.h"
 #include "../includes/fat.h"
-#include "../includes/fattosd.h"
+#include "../includes/fattodisk_interface.h"
 
 
 

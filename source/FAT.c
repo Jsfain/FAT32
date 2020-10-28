@@ -49,11 +49,11 @@
 
 #include <string.h>
 #include <avr/io.h>
-#include "../includes/fattosd.h"
 #include "../includes/fat.h"
 #include "../includes/prints.h"
 #include "../includes/usart.h"
 
+#include "../includes/fattodisk_interface.h"
 
 
 /*
@@ -301,7 +301,6 @@ FAT_SetDirectory (FatDir * Dir, char * newDirStr, BPB * bpb)
   // newDirStr == 'Parent Directory' ?
   if (!strcmp (newDirStr, ".."))
   {
-    print_str("\n\rSetDir 1");
     // returns either FAILED_READ_SECTOR or SUCCESS
     return pvt_SetDirectoryToParent (Dir, bpb);
   }
@@ -330,10 +329,7 @@ FAT_SetDirectory (FatDir * Dir, char * newDirStr, BPB * bpb)
           currSecNumPhys = currSecNumInClus + bpb->dataRegionFirstSector + ((clusIndx - 2) * bpb->secPerClus);
           err = FATtoDisk_ReadSingleSector (currSecNumPhys, currSecArr);
           if (err == 1) 
-          { 
-            print_str("\n\r first");
             return FAILED_READ_SECTOR;
-          }
 
           for (uint16_t entryPos = 0; entryPos < SECTOR_LEN; entryPos += ENTRY_LEN)
             {
@@ -348,7 +344,8 @@ FAT_SetDirectory (FatDir * Dir, char * newDirStr, BPB * bpb)
               lnFlags = 0;
 
               // If first value of entry is 0 then all subsequent entries are empty.
-              if (currSecArr[entryPos] == 0) return END_OF_DIRECTORY;
+              if (currSecArr[entryPos] == 0) 
+                return END_OF_DIRECTORY;
 
               // If 0xE5 then entry is marked for deletion.
               if (currSecArr[entryPos] != 0xE5)
@@ -358,9 +355,11 @@ FAT_SetDirectory (FatDir * Dir, char * newDirStr, BPB * bpb)
                   // If entry being checked is a long name entryPos
                   if ((attrByte & LONG_NAME_ATTR_MASK) == LONG_NAME_ATTR_MASK)
                     {
-                      if ( !(currSecArr[entryPos] & LONG_NAME_LAST_ENTRY)) return CORRUPT_FAT_ENTRY;
+                      if ( !(currSecArr[entryPos] & LONG_NAME_LAST_ENTRY)) 
+                        return CORRUPT_FAT_ENTRY;
                       
-                      for (uint8_t k = 0; k < LONG_NAME_STRING_LEN_MAX; k++) lnStr[k] = '\0';
+                      for (uint8_t k = 0; k < LONG_NAME_STRING_LEN_MAX; k++) 
+                        lnStr[k] = '\0';
 
                       lnStrIndx = 0;
                       pvt_SetLongNameFlags ( &lnFlags, entryPos, &snPosCurrSec, currSecArr, bpb);
@@ -369,15 +368,14 @@ FAT_SetDirectory (FatDir * Dir, char * newDirStr, BPB * bpb)
                         {
                           err = pvt_GetNextSector (nextSecArr, currSecNumInClus, currSecNumPhys, clusIndx, bpb);
                           if (err == FAILED_READ_SECTOR) 
-                            { 
-                              print_str("\n\r second");
-                              return FAILED_READ_SECTOR;
-                            }
+                            return FAILED_READ_SECTOR;
+
                           snPosNextSec = snPosCurrSec - bpb->bytesPerSec;
                           attrByte = nextSecArr[snPosNextSec + 11];
 
                           // If snPosNextSec points to long name entry then something is wrong.
-                          if ((attrByte & LONG_NAME_ATTR_MASK) == LONG_NAME_ATTR_MASK) return CORRUPT_FAT_ENTRY;
+                          if ((attrByte & LONG_NAME_ATTR_MASK) == LONG_NAME_ATTR_MASK) 
+                            return CORRUPT_FAT_ENTRY;
 
                           // Only continue for current entry if it is a directory.
                           if (attrByte & DIRECTORY_ENTRY_ATTR)
@@ -413,7 +411,8 @@ FAT_SetDirectory (FatDir * Dir, char * newDirStr, BPB * bpb)
                                       return SUCCESS;
                                     }
                                 }
-                              else return CORRUPT_FAT_ENTRY;
+                              else 
+                                return CORRUPT_FAT_ENTRY;
                             }
                         }
 
@@ -444,8 +443,15 @@ FAT_SetDirectory (FatDir * Dir, char * newDirStr, BPB * bpb)
                   else if ((newDirStrLen < 9) && (attrByte & DIRECTORY_ENTRY_ATTR))
                     {                 
                       char sn[9];
-                      for (uint8_t k = 0; k < newDirStrLen; k++) sn[k] = currSecArr[k + entryPos];
-                      sn[newDirStrLen] = '\0';
+                      uint8_t k;
+
+                      for (k = 0; k < 8; k++)
+                        {
+                          sn[k] = currSecArr[k + entryPos];
+                          if (sn[k] == ' ')
+                            break;
+                        }
+                      sn[k] = '\0';
                       if ( !strcmp (newDirStr, sn))
                         { 
                           pvt_SetDirectoryToChild (Dir, currSecArr, entryPos, newDirStr, bpb);
@@ -510,7 +516,6 @@ FAT_PrintDirectory (FatDir * Dir, uint8_t entryFilter, BPB * bpb)
   if (FILE_SIZE & entryFilter) print_str(" SIZE,");
   if (TYPE & entryFilter) print_str(" TYPE,");
   
-  //print_str(" SIZE, TYPE, NAME");
   print_str(" NAME");
   print_str("\n\n\r");
 
@@ -771,7 +776,7 @@ FAT_PrintFile (FatDir * Dir, char * fileNameStr, BPB * bpb)
 
               // If first value of entry is 0 then all subsequent entries are empty.
               if (currSecArr[entryPos] == 0) 
-                { print_str("\n\rthis one");return FILE_NOT_FOUND;}
+                return FILE_NOT_FOUND;
 
               // Only continue checking this entry if it has not been marked for deletion.
               if (currSecArr[entryPos] != 0xE5)
@@ -936,7 +941,6 @@ FAT_PrintFile (FatDir * Dir, char * fileNameStr, BPB * bpb)
         }
     } 
   while ((clusIndx = pvt_GetNextClusterIndex (clusIndx, bpb)) != END_OF_CLUSTER);
-  print_str("\n\r ENDING");
   return FILE_NOT_FOUND; 
 }
 
