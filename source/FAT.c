@@ -8,7 +8,7 @@
 *
 *
 * DESCRIPTION: 
-* Defines functions declared in FAT.H for accessing contents of a FAT32 formatted volume using an AVR microconstroller. 
+* Defines functions declared in FAT.H for accessing contents of a FAT32 formatted volume using an AVR microconstroller.
 * The fuctions defined here only provide READ access to the volume's contents (i.e. print file, print directory), no 
 * WRITE access is currently possible.
 *

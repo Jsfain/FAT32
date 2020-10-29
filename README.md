@@ -1,4 +1,4 @@
-# FAT Filesystem Module
+# FAT File System Module
 Read a FAT32-formatted volume using an AVR microcontroller.
 
 
