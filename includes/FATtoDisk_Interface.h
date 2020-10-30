@@ -1,5 +1,7 @@
 /*
 ***********************************************************************************************************************
+*                                               AVR-FAT to DISK INTERFACE
+*
 * File   : FATtoDISK_INTERFACE.H
 * Author : Joshua Fain
 * Target : ATMega1280
@@ -9,7 +11,7 @@
 * This file in to be used as the interface file between the AVR-FAT module and a physical disk layer/driver. The disk
 * layer will be required for the raw data access on the physical FAT32-formatted disk. The two functions declared here
 * must be implemented in order for the AVR-FAT module to operate. In the current test, these are implemented in the
-* FATtoSD.C file to read access the contents of a FAT32-formatted SD Card. The AVR-SDCard source files are also
+* FATtoSD.C file to read access the contents of a FAT32-formatted SD Card. The AVR-SD Card source files are also
 * included in the repo, but should not be considered part of the module.
 *  
 * 

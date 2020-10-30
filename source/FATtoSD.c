@@ -1,6 +1,6 @@
 /*
 ***********************************************************************************************************************
-*                                           INTERFACE FOR AVR-FAT to AVR-SDCARD
+*                                         INTERFACE FOR AVR-FAT to AVR-SD CARD MODULE
 * 
 * File   : FATtoSD.C
 * Author : Joshua Fain
@@ -9,8 +9,8 @@
 * 
 * DESCRIPTION:
 * This file implements the required disk interface functions declared in FATtoDISK_INTERFACE.H. These have been 
-* implemented here for accessing raw data on a FAT32-formatted SD Card using the AVR-SDCard module. The required 
-* source files from the AVR-SDCard module are included in the repo, though they are technically part of the AVR-FAT
+* implemented here for accessing raw data on a FAT32-formatted SD Card using the AVR-SD Card module. The required 
+* source files from the AVR-SD Card module are included in the repo, though they are technically part of the AVR-FAT
 * module as the the AVR-FAT module, is intended to be independent of disk-type.
 * 
 * FUNCTIONS:

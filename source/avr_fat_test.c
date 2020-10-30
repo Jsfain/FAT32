@@ -11,9 +11,9 @@
 *
 * DESCRIPTION: 
 * This file currently implements a simple command-line like interface to navigate a FAT volume using the functions 
-* available in the AVR-FAT module (i.e. FAT.C / FAT.H). This particular 'test' implementation uses the AVR-SDCard 
+* available in the AVR-FAT module (i.e. FAT.C / FAT.H). This particular 'test' implementation uses the AVR-SD Card 
 * module as a physical disk driver to access the raw data contents of a FAT32-formatted SD card. This driver is 
-* included in the repo, but the AVR-SDCard module should not be considered part of this AVR-FAT module.
+* included in the repo, but the AVR-SD Card module should not be considered part of this AVR-FAT module.
 *
 *
 * COMMANDS:
@@ -44,7 +44,7 @@
 *      /A  :  = /C /LM /LA
 *
 * (9) To exit the command line portion of this testing module, enter 'q'.  After exiting, access to the raw data of the
-*     physical disk is provided using the functionality of the AVR-SDCard module. Prompts are provided there as 
+*     physical disk is provided using the functionality of the AVR-SD Card module. Prompts are provided there as 
 *     instructions, but again, this functionality is not considered part of the AVR-FAT but only specific to how it is
 *     implemented here. 
 *   
