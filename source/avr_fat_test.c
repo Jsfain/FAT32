@@ -95,7 +95,7 @@ int main(void)
   // routine requires it to be passed as an argument. The results will
   // specify whether the card is type SDHC or SDSC, which determines how it 
   // is addressed.
-  CardTypeVersion ctv;
+  CTV ctv;
 
   uint32_t initResponse;
 
