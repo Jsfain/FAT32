@@ -78,9 +78,15 @@
 #include "../includes/fattodisk_interface.h"
 
 
-// local function used for raw data access. Not part of the avr-fat module. 
+// local function used for raw data access sd card access.
+// only used by this test file. In the SD Card Raw Data Access 
+// section. Not the AVR-FAT demo section. 
 uint32_t enterBlockNumber();
 
+
+
+// ********************************************************************
+//                                 MAIN()
 
 int main(void)
 {
@@ -88,13 +94,14 @@ int main(void)
   SPI_MasterInit();
 
 
-  // ******************* SD CARD INITILIAIZATION ****************************
+  // ***********************************************************************
+  //                            SD Card Initialization 
   
   // ctv is a type used specifically by some sd card-specific routines. This
   // is not explicitely used in the FAT module, but the SD card initializing
   // routine requires it to be passed as an argument. The results will
-  // specify whether the card is type SDHC or SDSC, which determines how it 
-  // is addressed.
+  // specify whether the card is type SDHC or SDSC, which is used by the
+  // SD Card routines to determines how it is shoudl be addressed.
   CTV ctv;
 
   uint32_t initResponse;
@@ -118,13 +125,19 @@ int main(void)
           break;
         }
     }
-  // END SD CARD INITIALIZATION
+
+  //                           END SD Card Initialization
   // ************************************************************************
 
 
 
+
+  // if SD card initialization is successful
   if (initResponse == OUT_OF_IDLE)
     {          
+      // ********************************************************************
+      //                       FAT "Command-Line" Section 
+      
       // error variable for errors returned by any of the FAT functions.
       uint8_t err; 
       
@@ -281,14 +294,15 @@ int main(void)
           // ensure USART Data Register is cleared of any remaining garbage bytes.
           for (int k = 0; k < 10; k++) UDR0; 
         }
-      while (quit == 0);      
-      // END command line interface.  
+      while (quit == 0);   
+
+      //                      END FAT "Command-Line" Section
+      // **********************************************************************
 
 
 
-
-      // **********************************************************
-      // SD Card raw data access
+      // **********************************************************************
+      //                         SD Card raw data access
 
       uint32_t startBlockNum;
       uint32_t numOfBlocks;
@@ -339,15 +353,27 @@ int main(void)
           USART_Transmit (answer);
         }
       while (answer != 'q');
-    }
+
+      //                    END SD Card raw data access                         
+      // **********************************************************************
+    }   
   
+
   // Something else to do. Print entered chars to screen.
   while(1)
       USART_Transmit (USART_Receive());
   
   return 0;
 }
+//                               END MAIN()                      
+// **********************************************************************
 
+
+
+                       
+// **********************************************************************
+//                             LOCAL FUNCTIONS
+// **********************************************************************
 
 
 
