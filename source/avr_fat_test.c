@@ -111,8 +111,7 @@ int main(void)
     {
       print_str ("\n\n\r SD Card Initialization Attempt # "); print_dec (i);
       initResponse = SD_InitializeSPImode (&ctv);
-      if (((initResponse & 0xFF) != OUT_OF_IDLE)
-            &&((initResponse & 0xFFF00) != INIT_SUCCESS))
+      if (((initResponse & 0xFF) != 0) && ((initResponse & 0xFFF00) != 0))
         {    
           print_str ("\n\n\r FAILED INITIALIZING SD CARD");
           print_str ("\n\r Initialization Error Response: "); 
@@ -133,7 +132,7 @@ int main(void)
 
 
   // if SD card initialization is successful
-  if (initResponse == OUT_OF_IDLE)
+  if (initResponse == 0)
     {          
       // ********************************************************************
       //                       FAT "Command-Line" Section 
