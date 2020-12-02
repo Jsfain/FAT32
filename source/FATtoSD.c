@@ -79,12 +79,12 @@ uint32_t FATtoDisk_FindBootSector()
     if (cardType == SDHC) addressMultiplier = 1;
     else addressMultiplier =  BLOCK_LEN;
     
-    CS_LOW;
+    CS_SD_LOW;
     SD_SendCommand (READ_MULTIPLE_BLOCK, startBlockNumber * addressMultiplier); // CMD18
     r1 = SD_GetR1();
     if (r1 > 0)
       {
-        CS_HIGH
+        CS_SD_HIGH
         print_str("\n\r R1 ERROR = "); SD_PrintR1(r1);
       }
 
@@ -131,7 +131,7 @@ uint32_t FATtoDisk_FindBootSector()
         SD_SendCommand (STOP_TRANSMISSION, 0);
         SD_ReceiveByteSPI(); // R1b response. Don't care.
       }
-    CS_HIGH;
+    CS_SD_HIGH;
 
     if (bsflag == 1) 
       return blockNumber;
@@ -188,12 +188,12 @@ uint8_t pvt_getCardType()
     uint8_t timeout = 0;
 
     // Get CSD version to determine if card is SDHC or SDSC
-    CS_LOW;
+    CS_SD_LOW;
     SD_SendCommand (SEND_CSD,0);
     r1 = SD_GetR1();
     if (r1 > 0) 
       { 
-        CS_HIGH; 
+        CS_SD_HIGH; 
         return 0xFF; // error getting CSD version
       }
 
@@ -216,7 +216,7 @@ uint8_t pvt_getCardType()
             // Ensure any portion of CSD sent is read in.
             for(int k = 0; k < 20; k++) 
               SD_ReceiveByteSPI();
-            CS_HIGH; 
+            CS_SD_HIGH; 
             return 0xFF; 
           }
       }
@@ -226,7 +226,7 @@ uint8_t pvt_getCardType()
     for(int k = 0; k < 20; k++) 
       SD_ReceiveByteSPI();
     
-    CS_HIGH;
+    CS_SD_HIGH;
 
     return cardType;
 }
