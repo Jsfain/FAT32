@@ -110,13 +110,13 @@ int main(void)
   for (int i = 0; i < 10; i++)
     {
       print_str ("\n\n\r SD Card Initialization Attempt # "); print_dec (i);
-      initResponse = SD_InitializeSPImode (&ctv);
+      initResponse = sd_spi_mode_init (&ctv);
       if (((initResponse & 0xFF) != 0) && ((initResponse & 0xFFF00) != 0))
         {    
           print_str ("\n\n\r FAILED INITIALIZING SD CARD");
           print_str ("\n\r Initialization Error Response: "); 
-          SD_PrintInitError (initResponse);
-          print_str ("\n\r R1 Response: "); SD_PrintR1 (initResponse);
+          sd_spi_print_init_error (initResponse);
+          print_str ("\n\r R1 Response: "); sd_spi_print_r1 (initResponse);
         }
       else
         {   
@@ -329,22 +329,22 @@ int main(void)
           // Print blocks
 
           // SDHC is block addressable
-          if (ctv.type == SDHC) sdErr = SD_PrintMultipleBlocks(startBlockNum, numOfBlocks);
+          if (ctv.type == SDHC) sdErr = sd_spi_print_multiple_blocks (startBlockNum, numOfBlocks);
           // SDSC is byte addressable
-          else sdErr = SD_PrintMultipleBlocks (startBlockNum * BLOCK_LEN, numOfBlocks);
+          else sdErr = sd_spi_print_multiple_blocks (startBlockNum * BLOCK_LEN, numOfBlocks);
           
           if (sdErr != READ_SUCCESS)
             { 
-              print_str ("\n\r >> SD_PrintMultipleBlocks() returned ");
+              print_str ("\n\r >> sd_spi_print_multiple_blocks () returned ");
               if (sdErr & R1_ERROR)
                 {
                   print_str ("R1 error: ");
-                  SD_PrintR1 (sdErr);
+                  sd_spi_print_r1 (sdErr);
                 }
               else 
                 { 
                   print_str (" error "); 
-                  SD_PrintReadError (sdErr);
+                  sd_spi_print_read_error (sdErr);
                 }
             }
           print_str ("\n\rPress 'q' to quit: ");
