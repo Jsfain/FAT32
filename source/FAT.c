@@ -14,13 +14,13 @@
 *
 *
 * FUNCTION "PUBLIC":
-*  (1) uint8_t  FAT_SetBiosParameterBlock(BPB * bpb);
-*  (2) void     FAT_PrintBootSectorError (uint8_t err);
-*  (3) void     FAT_SetDirectoryToRoot(FatDir * Dir, BPB * bpb);
-*  (4) uint8_t  FAT_SetDirectory (FatDir * Dir, char * newDirStr, BPB * bpb);
-*  (5) uint8_t  FAT_PrintDirectory (FatDir * Dir, uint8_t entryFilter, BPB * bpb);
-*  (6) uint8_t  FAT_PrintFile (FatDir * Dir, char * file, BPB * bpb);
-*  (7) void     FAT_PrintError(uint8_t err);
+*  (1) uint8_t  FAT_set_bios_parameter_block (BPB * bpb)
+*  (2) void     FAT_print_boot_sector_error (uint8_t err)
+*  (3) void     FAT_set_directory_to_root (FatDir * Dir, BPB * bpb)
+*  (4) uint8_t  FAT_set_directory (FatDir * Dir, char * newDirStr, BPB * bpb)
+*  (5) uint8_t  FAT_print_directory (FatDir * Dir, uint8_t entryFilter, BPB * bpb)
+*  (6) uint8_t  FAT_print_file (FatDir * Dir, char * file, BPB * bpb)
+*  (7) void     FAT_print_error (uint8_t err)
 *
 *
 * STRUCTS (defined in FAT.H)
@@ -64,19 +64,20 @@
 
 // Private function descriptions are only included with their definitions at the bottom of this file.
 
-uint8_t pvt_CheckValidName (char * nameStr, FatDir * Dir);
-uint8_t pvt_SetDirectoryToParent (FatDir * Dir, BPB * bpb);
-void pvt_SetDirectoryToChild (FatDir * Dir, uint8_t * sectorArr, uint16_t snPos, char * childDirStr, BPB * bpb);
-void pvt_LoadLongName (int lnFirstEntry, int lnLastEntry, uint8_t * sectorArr, char * lnStr, uint8_t * lnStrIndx);
-uint32_t pvt_GetNextClusterIndex (uint32_t currentClusterIndex, BPB * bpb);
-void pvt_PrintEntryFields (uint8_t * byte, uint16_t entryPos, uint8_t entryFilter);
-void pvt_PrintShortName (uint8_t * byte, uint16_t entryPos, uint8_t entryFilter);
-uint8_t pvt_PrintFatFile (uint16_t entryPos, uint8_t * fileSector, BPB * bpb);
-uint8_t pvt_CorrectEntryCheck (uint8_t lnFlags, uint16_t * entryPos, uint16_t * snPosCurrSec, uint16_t * snPosNextSec);           
-void pvt_SetLongNameFlags (uint8_t * lnFlags, uint16_t entryPos, 
-                           uint16_t * snPosCurrSec, uint8_t * currSecArr, BPB * bpb);
-uint8_t pvt_GetNextSector (uint8_t * nextSecArr, uint32_t currSecNumInClus, 
-                        uint32_t currSecNumPhys, uint32_t clusIndx, BPB* bpb);
+uint8_t pvt_check_valid_name (char * nameStr, FatDir * Dir);
+uint8_t pvt_set_directory_to_parent (FatDir * Dir, BPB * bpb);
+void pvt_set_directory_to_child (FatDir * Dir, uint8_t * sectorArr, uint16_t snPos, char * childDirStr, BPB * bpb);
+void pvt_load_long_name (int lnFirstEntry, int lnLastEntry, uint8_t * sectorArr, char * lnStr, uint8_t * lnStrIndx);
+uint32_t pvt_get_next_cluster_index (uint32_t currentClusterIndex, BPB * bpb);
+void pvt_print_entry_fields (uint8_t * byte, uint16_t entryPos, uint8_t entryFilter);
+void pvt_print_short_name (uint8_t * byte, uint16_t entryPos, uint8_t entryFilter);
+uint8_t pvt_print_fat_file (uint16_t entryPos, uint8_t * fileSector, BPB * bpb);
+uint8_t pvt_correct_entry_check (uint8_t lnFlags, uint16_t * entryPos, 
+                                 uint16_t * snPosCurrSec, uint16_t * snPosNextSec);           
+void pvt_set_long_name_flags (uint8_t * lnFlags, uint16_t entryPos, 
+                              uint16_t * snPosCurrSec, uint8_t * currSecArr, BPB * bpb);
+uint8_t pvt_get_next_sector (uint8_t * nextSecArr, uint32_t currSecNumInClus, 
+                             uint32_t currSecNumPhys, uint32_t clusIndx, BPB* bpb);
 
 
 
@@ -101,8 +102,8 @@ uint8_t pvt_GetNextSector (uint8_t * nextSecArr, uint32_t currSecNumInClus,
  * Argument    : *bpb        Pointer to a BPB struct instance. This function will set the members of this instance.
  * 
  * Return      : Boot sector error flag     See the FAT.H header file for a list of these flags. To print the returned
- *                                          value, pass it to FAT_PrintBootSectorError(err). If the BPB instance's
- *                                          members are successfully set then BOOT_SECTOR_VALID is returned. Any other 
+ *                                          value, pass it to FAT_print_boot_sector_error(err). If the BPB instance's
+ *                                          members are successfully set then BOOT_SECTOR_VALID is returned. Any other
  *                                          returned value indicates a failure. 
  * 
  * Note        : This function DOES NOT set the values a physical FAT volume's Bios Parameter Block as would be 
@@ -112,17 +113,17 @@ uint8_t pvt_GetNextSector (uint8_t * nextSecArr, uint32_t currSecNumInClus,
 */
 
 uint8_t 
-FAT_SetBiosParameterBlock (BPB * bpb)
+FAT_set_bios_parameter_block (BPB * bpb)
 {
   uint8_t BootSector[SECTOR_LEN];
   uint8_t err;
 
   // 0xFFFFFFFF is returned for the boot sector location, then locating it failed.
-  bpb->bootSecAddr = FATtoDisk_FindBootSector();
+  bpb->bootSecAddr = FATtoDISK_find_boot_sector();
   
   if (bpb->bootSecAddr != 0xFFFFFFFF)
     {
-      err = FATtoDisk_ReadSingleSector (bpb->bootSecAddr, BootSector);
+      err = FATtoDISK_read_single_sector (bpb->bootSecAddr, BootSector);
       if (err == 1) return FAILED_READ_BOOT_SECTOR;
     }
   else
@@ -183,40 +184,40 @@ FAT_SetBiosParameterBlock (BPB * bpb)
 ***********************************************************************************************************************
  *                                             PRINT BOOT SECTOR ERROR FLAG
  * 
- * Description : Call this function to print the error flag returned by the function FAT_SetBiosParameterBlock(). 
+ * Description : Call this function to print the error flag returned by the function FAT_set_bios_parameter_block(). 
  * 
- * Argument    : err    Boot Sector Error flag returned the function FAT_SetBiosParameterBlock().
+ * Argument    : err    Boot Sector Error flag returned the function FAT_set_bios_parameter_block().
 ***********************************************************************************************************************
 */
 
 void 
-FAT_PrintBootSectorError (uint8_t err)
+FAT_print_boot_sector_error (uint8_t err)
 {  
-  switch(err)
+  switch (err)
   {
     case BOOT_SECTOR_VALID : 
-      print_str("BOOT_SECTOR_VALID ");
+      print_str ("BOOT_SECTOR_VALID ");
       break;
     case CORRUPT_BOOT_SECTOR :
-      print_str("CORRUPT_BOOT_SECTOR ");
+      print_str ("CORRUPT_BOOT_SECTOR ");
       break;
     case NOT_BOOT_SECTOR :
-      print_str("NOT_BOOT_SECTOR ");
+      print_str ("NOT_BOOT_SECTOR ");
       break;
     case INVALID_BYTES_PER_SECTOR:
-      print_str("INVALID_BYTES_PER_SECTOR");
+      print_str ("INVALID_BYTES_PER_SECTOR");
       break;
     case INVALID_SECTORS_PER_CLUSTER:
-      print_str("INVALID_SECTORS_PER_CLUSTER");
+      print_str ("INVALID_SECTORS_PER_CLUSTER");
       break;
     case BOOT_SECTOR_NOT_FOUND:
-      print_str("BOOT_SECTOR_NOT_FOUND");
+      print_str ("BOOT_SECTOR_NOT_FOUND");
       break;
     case FAILED_READ_BOOT_SECTOR:
-      print_str("FAILED_READ_BOOT_SECTOR");
+      print_str ("FAILED_READ_BOOT_SECTOR");
       break;
     default:
-      print_str("UNKNOWN_ERROR");
+      print_str ("UNKNOWN_ERROR");
       break;
   }
 }
@@ -239,7 +240,7 @@ FAT_PrintBootSectorError (uint8_t err)
 */
 
 void
-FAT_SetDirectoryToRoot(FatDir * Dir, BPB * bpb)
+FAT_set_directory_to_root (FatDir * Dir, BPB * bpb)
 {
   for (uint8_t i = 0; i < LONG_NAME_STRING_LEN_MAX; i++)
     Dir->longName[i] = '\0';
@@ -262,11 +263,11 @@ FAT_SetDirectoryToRoot(FatDir * Dir, BPB * bpb)
 ***********************************************************************************************************************
  *                                                   SET FAT DIRECTORY
  *                                        
- * Description : Call this function to set a FatDirectory (FatDir) struct instance to a new directory. The new 
+ * Description : Call this function to set a FatDirectory (FatDir) struct instance to a new directory. The new
  *               directory must be a child, or the parent, of the struct's instance when this function is called. This
  *               function operates by searching the current directory for a name that matches string newDirStr. If a 
- *               matching entryPos is found, the members of the FatDir instance are updated to those corresponding to the 
- *               matching entryPos. To set to parent, pass the string ".." as newDirStr.
+ *               matching entryPos is found, the members of the FatDir instance are updated to those corresponding to
+ *               the matching entryPos. To set to parent, pass the string ".." as newDirStr.
  *
  * Arguments   : *Dir            - Pointer to an instance of FatDir. The members of *Dir must point to a valid FAT32
  *                                 directory when the function is called. The members of the instance are updated by 
@@ -274,14 +275,14 @@ FAT_SetDirectoryToRoot(FatDir * Dir, BPB * bpb)
  *             : *newDirStr      - Pointer to a C-string that specifies the name of the intended new directory. This 
  *                                 function will only search the current FatDir instance's directory for a matching  
  *                                 name, thus it is only possible to set FatDir to a child, or the parent (".."), of 
- *                                 the current directory. Paths must not be included in the string. This string is also 
- *                                 required to be a long name unless a long name does not exist for a given entryPos, only
- *                                 then can a short name be a valid string. This is case-sensitive.
+ *                                 the current directory. Paths must not be included in the string. This string is
+ *                                 also required to be a long name unless a long name does not exist for a given
+ *                                 entryPos, only then can a short name be a valid string. This is case-sensitive.
  *             : *bpb            - Pointer to a valid instance of a BPB struct.
  * 
- * Return      : FAT Error Flag  - The returned value can be read by passing it to FAT_PrintError(ErrorFlag). If 
- *                                 SUCCESS is returned then the FatDir instance members were successfully updated to
- *                                 point the new directory. Any other returned value indicates a failure.
+ * Return      : FAT Error Flag  - The returned value can be read by passing it tp FAT_print_error(err). If SUCCESS
+ *                                 is returned then the FatDir instance members were successfully updated to point to
+ *                                 the new directory. Any other returned value indicates a failure.
  *  
  * Limitation  : This function will not work with absolute paths, it will only set a FatDir instance to a new directory
  *               if the new directory is a child, or the parent, of the current directory.
@@ -289,9 +290,9 @@ FAT_SetDirectoryToRoot(FatDir * Dir, BPB * bpb)
 */
 
 uint8_t 
-FAT_SetDirectory (FatDir * Dir, char * newDirStr, BPB * bpb)
+FAT_set_directory (FatDir * Dir, char * newDirStr, BPB * bpb)
 {
-  if (pvt_CheckValidName (newDirStr, Dir)) 
+  if (pvt_check_valid_name (newDirStr, Dir)) 
     return INVALID_DIR_NAME;
 
   // newDirStr == 'Current Directory' ?
@@ -302,7 +303,7 @@ FAT_SetDirectory (FatDir * Dir, char * newDirStr, BPB * bpb)
   if (!strcmp (newDirStr, ".."))
   {
     // returns either FAILED_READ_SECTOR or SUCCESS
-    return pvt_SetDirectoryToParent (Dir, bpb);
+    return pvt_set_directory_to_parent (Dir, bpb);
   }
 
   uint8_t  newDirStrLen = strlen (newDirStr);
@@ -327,13 +328,13 @@ FAT_SetDirectory (FatDir * Dir, char * newDirStr, BPB * bpb)
         {         
           // load sector data into currSecArr
           currSecNumPhys = currSecNumInClus + bpb->dataRegionFirstSector + ((clusIndx - 2) * bpb->secPerClus);
-          err = FATtoDisk_ReadSingleSector (currSecNumPhys, currSecArr);
+          err = FATtoDISK_read_single_sector (currSecNumPhys, currSecArr);
           if (err == 1) 
             return FAILED_READ_SECTOR;
 
           for (uint16_t entryPos = 0; entryPos < SECTOR_LEN; entryPos += ENTRY_LEN)
             {
-              entryCorrectionFlag = pvt_CorrectEntryCheck (lnFlags, &entryPos, &snPosCurrSec, &snPosNextSec);
+              entryCorrectionFlag = pvt_correct_entry_check (lnFlags, &entryPos, &snPosCurrSec, &snPosNextSec);
               if (entryCorrectionFlag == 1)
                 {
                   entryCorrectionFlag = 0;
@@ -362,11 +363,11 @@ FAT_SetDirectory (FatDir * Dir, char * newDirStr, BPB * bpb)
                         lnStr[k] = '\0';
 
                       lnStrIndx = 0;
-                      pvt_SetLongNameFlags ( &lnFlags, entryPos, &snPosCurrSec, currSecArr, bpb);
+                      pvt_set_long_name_flags ( &lnFlags, entryPos, &snPosCurrSec, currSecArr, bpb);
 
                       if (lnFlags & (LONG_NAME_CROSSES_SECTOR_BOUNDARY | LONG_NAME_LAST_SECTOR_ENTRY))
                         {
-                          err = pvt_GetNextSector (nextSecArr, currSecNumInClus, currSecNumPhys, clusIndx, bpb);
+                          err = pvt_get_next_sector (nextSecArr, currSecNumInClus, currSecNumPhys, clusIndx, bpb);
                           if (err == FAILED_READ_SECTOR) 
                             return FAILED_READ_SECTOR;
 
@@ -387,11 +388,11 @@ FAT_SetDirectory (FatDir * Dir, char * newDirStr, BPB * bpb)
                                     return CORRUPT_FAT_ENTRY;
 
                                   // Load long name entry into lnStr[]
-                                  pvt_LoadLongName (snPosNextSec - ENTRY_LEN, 0, nextSecArr, lnStr, &lnStrIndx);
-                                  pvt_LoadLongName (SECTOR_LEN - ENTRY_LEN, entryPos, currSecArr, lnStr, &lnStrIndx);
+                                  pvt_load_long_name (snPosNextSec - ENTRY_LEN, 0, nextSecArr, lnStr, &lnStrIndx);
+                                  pvt_load_long_name (SECTOR_LEN - ENTRY_LEN, entryPos, currSecArr, lnStr, &lnStrIndx);
                                   if ( !strcmp (newDirStr, lnStr)) 
                                     {                                                        
-                                      pvt_SetDirectoryToChild (Dir, nextSecArr, snPosNextSec, newDirStr, bpb);
+                                      pvt_set_directory_to_child (Dir, nextSecArr, snPosNextSec, newDirStr, bpb);
                                       return SUCCESS;
                                     }
                                 }
@@ -404,10 +405,10 @@ FAT_SetDirectory (FatDir * Dir, char * newDirStr, BPB * bpb)
                                     return CORRUPT_FAT_ENTRY;
 
                                   // Load long name entry into lnStr[]
-                                  pvt_LoadLongName(SECTOR_LEN - ENTRY_LEN, entryPos, currSecArr, lnStr, &lnStrIndx);
+                                  pvt_load_long_name(SECTOR_LEN - ENTRY_LEN, entryPos, currSecArr, lnStr, &lnStrIndx);
                                   if ( !strcmp (newDirStr, lnStr)) 
                                     { 
-                                      pvt_SetDirectoryToChild (Dir, nextSecArr, snPosNextSec, newDirStr, bpb);
+                                      pvt_set_directory_to_child (Dir, nextSecArr, snPosNextSec, newDirStr, bpb);
                                       return SUCCESS;
                                     }
                                 }
@@ -429,10 +430,10 @@ FAT_SetDirectory (FatDir * Dir, char * newDirStr, BPB * bpb)
                           if ((attrByte & DIRECTORY_ENTRY_ATTR))
                             {
                               // load long name entry into lnStr[]
-                              pvt_LoadLongName (snPosCurrSec - ENTRY_LEN, entryPos, currSecArr, lnStr, &lnStrIndx);
+                              pvt_load_long_name (snPosCurrSec - ENTRY_LEN, entryPos, currSecArr, lnStr, &lnStrIndx);
                               if  (!strcmp (newDirStr, lnStr)) 
                                 { 
-                                  pvt_SetDirectoryToChild (Dir, currSecArr, snPosCurrSec, newDirStr, bpb);
+                                  pvt_set_directory_to_child (Dir, currSecArr, snPosCurrSec, newDirStr, bpb);
                                   return SUCCESS;
                                 }                                       
                             }
@@ -454,7 +455,7 @@ FAT_SetDirectory (FatDir * Dir, char * newDirStr, BPB * bpb)
                       sn[k] = '\0';
                       if ( !strcmp (newDirStr, sn))
                         { 
-                          pvt_SetDirectoryToChild (Dir, currSecArr, entryPos, newDirStr, bpb);
+                          pvt_set_directory_to_child (Dir, currSecArr, entryPos, newDirStr, bpb);
                           return SUCCESS;
                         }
                     }              
@@ -462,7 +463,7 @@ FAT_SetDirectory (FatDir * Dir, char * newDirStr, BPB * bpb)
             }
         }
     } 
-  while ((clusIndx = pvt_GetNextClusterIndex(clusIndx, bpb)) != END_OF_CLUSTER);
+  while ((clusIndx = pvt_get_next_cluster_index(clusIndx, bpb)) != END_OF_CLUSTER);
   
   return END_OF_DIRECTORY;
 }
@@ -486,12 +487,12 @@ FAT_SetDirectory (FatDir * Dir, char * newDirStr, BPB * bpb)
  * 
  * Return      : FAT Error Flag     Returns END_OF_DIRECTORY if the function completed successfully and it was able to
  *                                  read in and print entries until reaching the end of the directory. Any other value
- *                                  returned indicates an error. To read, pass the value to FAT_PrintError(ErrorFlag).
+ *                                  returned indicates an error. To read, pass the value to FAT_print_error(err).
 ***********************************************************************************************************************
 */
 
 uint8_t 
-FAT_PrintDirectory (FatDir * Dir, uint8_t entryFilter, BPB * bpb)
+FAT_print_directory (FatDir * Dir, uint8_t entryFilter, BPB * bpb)
 {
   uint32_t clusIndx = Dir->FATFirstCluster;
   uint8_t  currSecArr[bpb->bytesPerSec]; 
@@ -525,12 +526,12 @@ FAT_PrintDirectory (FatDir * Dir, uint8_t entryFilter, BPB * bpb)
         {
           // load sector bytes into currSecArr[]
           currSecNumPhys = currSecNumInClus + bpb->dataRegionFirstSector + ((clusIndx - 2) * bpb->secPerClus);
-          err = FATtoDisk_ReadSingleSector (currSecNumPhys, currSecArr);
+          err = FATtoDISK_read_single_sector (currSecNumPhys, currSecArr);
           if (err == 1) return FAILED_READ_SECTOR;
 
           for (uint16_t entryPos = 0; entryPos < bpb->bytesPerSec; entryPos = entryPos + ENTRY_LEN)
             {
-              entryCorrectionFlag = pvt_CorrectEntryCheck (lnFlags, &entryPos, &snPosCurrSec, &snPosNextSec);
+              entryCorrectionFlag = pvt_correct_entry_check (lnFlags, &entryPos, &snPosCurrSec, &snPosNextSec);
               if (entryCorrectionFlag == 1)
                 {
                   entryCorrectionFlag = 0;
@@ -556,11 +557,11 @@ FAT_PrintDirectory (FatDir * Dir, uint8_t entryFilter, BPB * bpb)
  
                       lnStrIndx = 0;
 
-                      pvt_SetLongNameFlags ( &lnFlags, entryPos, &snPosCurrSec, currSecArr, bpb);
+                      pvt_set_long_name_flags ( &lnFlags, entryPos, &snPosCurrSec, currSecArr, bpb);
 
                       if (lnFlags & (LONG_NAME_CROSSES_SECTOR_BOUNDARY | LONG_NAME_LAST_SECTOR_ENTRY))
                         {
-                          err = pvt_GetNextSector ( nextSecArr, currSecNumInClus, currSecNumPhys, clusIndx, bpb );
+                          err = pvt_get_next_sector ( nextSecArr, currSecNumInClus, currSecNumPhys, clusIndx, bpb );
                           if (err == FAILED_READ_SECTOR) return FAILED_READ_SECTOR;
                           snPosNextSec = snPosCurrSec - bpb->bytesPerSec;
                           attrByte = nextSecArr[snPosNextSec + 11];
@@ -575,8 +576,8 @@ FAT_PrintDirectory (FatDir * Dir, uint8_t entryFilter, BPB * bpb)
                               // print long name's associated short name if filter flag is set.
                               if (entryFilter & SHORT_NAME)
                                 {
-                                  pvt_PrintEntryFields(nextSecArr, snPosNextSec, entryFilter);
-                                  pvt_PrintShortName(nextSecArr, snPosNextSec, entryFilter);
+                                  pvt_print_entry_fields(nextSecArr, snPosNextSec, entryFilter);
+                                  pvt_print_short_name(nextSecArr, snPosNextSec, entryFilter);
                                 }
                               // print long name if filter flag is set.
                               if (entryFilter & LONG_NAME)
@@ -587,7 +588,7 @@ FAT_PrintDirectory (FatDir * Dir, uint8_t entryFilter, BPB * bpb)
                                       if ((nextSecArr[snPosNextSec - ENTRY_LEN] & LONG_NAME_ORDINAL_MASK) != 1) 
                                         return CORRUPT_FAT_ENTRY;                                              
 
-                                      pvt_PrintEntryFields (nextSecArr, snPosNextSec, entryFilter);
+                                      pvt_print_entry_fields (nextSecArr, snPosNextSec, entryFilter);
 
                                       if (attrByte & DIRECTORY_ENTRY_ATTR) 
                                         { 
@@ -601,9 +602,9 @@ FAT_PrintDirectory (FatDir * Dir, uint8_t entryFilter, BPB * bpb)
                                         }
   
                                       // load long name entryPos into lnStr[]
-                                      pvt_LoadLongName (snPosNextSec - ENTRY_LEN, 0, 
+                                      pvt_load_long_name (snPosNextSec - ENTRY_LEN, 0, 
                                                         nextSecArr, lnStr, &lnStrIndx);
-                                      pvt_LoadLongName (SECTOR_LEN - ENTRY_LEN, entryPos, 
+                                      pvt_load_long_name (SECTOR_LEN - ENTRY_LEN, entryPos, 
                                                         currSecArr, lnStr, &lnStrIndx);
                                       print_str(lnStr);
                                     }
@@ -614,7 +615,7 @@ FAT_PrintDirectory (FatDir * Dir, uint8_t entryFilter, BPB * bpb)
                                       if ((currSecArr[SECTOR_LEN - ENTRY_LEN] & LONG_NAME_ORDINAL_MASK) != 1) 
                                         return CORRUPT_FAT_ENTRY;
                             
-                                      pvt_PrintEntryFields (nextSecArr, snPosNextSec, entryFilter);
+                                      pvt_print_entry_fields (nextSecArr, snPosNextSec, entryFilter);
 
 
                                       if (attrByte & DIRECTORY_ENTRY_ATTR) 
@@ -628,7 +629,7 @@ FAT_PrintDirectory (FatDir * Dir, uint8_t entryFilter, BPB * bpb)
                                             print_str (" <FILE>  ");
                                         }
                                       // load long name entryPos into lnStr[]
-                                      pvt_LoadLongName (SECTOR_LEN - ENTRY_LEN, entryPos, 
+                                      pvt_load_long_name (SECTOR_LEN - ENTRY_LEN, entryPos, 
                                                         currSecArr, lnStr, &lnStrIndx);
                                       print_str(lnStr); 
                                     }
@@ -651,8 +652,8 @@ FAT_PrintDirectory (FatDir * Dir, uint8_t entryFilter, BPB * bpb)
                               // print long name's associated short name if filter flag is set.
                               if (entryFilter & SHORT_NAME)
                                 {
-                                  pvt_PrintEntryFields (currSecArr, snPosCurrSec, entryFilter);
-                                  pvt_PrintShortName (currSecArr, snPosCurrSec, entryFilter);
+                                  pvt_print_entry_fields (currSecArr, snPosCurrSec, entryFilter);
+                                  pvt_print_short_name (currSecArr, snPosCurrSec, entryFilter);
                                 }
                               // print long name if filter flag is set.
                               if (entryFilter & LONG_NAME)
@@ -661,7 +662,7 @@ FAT_PrintDirectory (FatDir * Dir, uint8_t entryFilter, BPB * bpb)
                                   if ((currSecArr[snPosCurrSec - ENTRY_LEN] & LONG_NAME_ORDINAL_MASK) != 1) 
                                     return CORRUPT_FAT_ENTRY;
 
-                                  pvt_PrintEntryFields(currSecArr, snPosCurrSec, entryFilter);
+                                  pvt_print_entry_fields(currSecArr, snPosCurrSec, entryFilter);
                                   
                                   if (attrByte & DIRECTORY_ENTRY_ATTR) 
                                     { 
@@ -675,7 +676,7 @@ FAT_PrintDirectory (FatDir * Dir, uint8_t entryFilter, BPB * bpb)
                                     }
 
                                   // load long name entry into lnStr[]
-                                  pvt_LoadLongName (snPosCurrSec - ENTRY_LEN, entryPos, 
+                                  pvt_load_long_name (snPosCurrSec - ENTRY_LEN, entryPos, 
                                                     currSecArr, lnStr, &lnStrIndx);
 
                                   print_str(lnStr);                                       
@@ -692,15 +693,15 @@ FAT_PrintDirectory (FatDir * Dir, uint8_t entryFilter, BPB * bpb)
                       // Print entry if hidden attribute is not set OR if it AND the hidden filter flag are set.
                       if ( (!(attrByte & HIDDEN_ATTR)) || ((attrByte & HIDDEN_ATTR) && (entryFilter & HIDDEN)))
                         {
-                          pvt_PrintEntryFields(currSecArr, entryPos, entryFilter);
-                          pvt_PrintShortName(currSecArr, entryPos, entryFilter);
+                          pvt_print_entry_fields(currSecArr, entryPos, entryFilter);
+                          pvt_print_short_name(currSecArr, entryPos, entryFilter);
                         }
                     }
                 }          
             }
         }
     }
-  while ((clusIndx = pvt_GetNextClusterIndex( clusIndx, bpb )) != END_OF_CLUSTER);
+  while ((clusIndx = pvt_get_next_cluster_index( clusIndx, bpb )) != END_OF_CLUSTER);
 
   return END_OF_DIRECTORY;
 }
@@ -714,21 +715,21 @@ FAT_PrintDirectory (FatDir * Dir, uint8_t entryFilter, BPB * bpb)
  * Description : Prints the contents of a FAT file from the current directory to a terminal/screen.
  * 
  * Arguments   : *Dir              - Pointer to a FatDir struct instance pointing to a valid FAT32 directory.
- *             : *fileNameStr      - Ptr to C-string. This is the name of the file to be printed to the screen. This
- *                                   can only be a long name unless there is no long name for a given entry, in which
- *                                   case it must be a short name.
+ *             : *fileNameStr      - Pointer to C-string. This is the name of the file to be printed to the screen.
+ *                                   This can only be a long name unless there is no long name for a given entry, in
+ *                                   which case it must be a short name.
  *             : *bpb              - Pointer to a valid instance of a BPB struct.
  * 
  * Return      : FAT Error Flag     Returns END_OF_FILE if the function completed successfully and was able to read in
  *                                  and print a file's contents to the screen. Any other value returned indicates an
- *                                  an error. Pass the returned value to FAT_PrintError(ErrorFlag).
+ *                                  an error. Pass the returned value to FAT_print_error(err).
 ***********************************************************************************************************************
 */
 
 uint8_t 
-FAT_PrintFile (FatDir * Dir, char * fileNameStr, BPB * bpb)
+FAT_print_file (FatDir * Dir, char * fileNameStr, BPB * bpb)
 {
-  if (pvt_CheckValidName (fileNameStr, Dir)) 
+  if (pvt_check_valid_name (fileNameStr, Dir)) 
     return INVALID_FILE_NAME;
   
   uint8_t  fileNameStrLen = strlen (fileNameStr);
@@ -754,7 +755,7 @@ FAT_PrintFile (FatDir * Dir, char * fileNameStr, BPB * bpb)
         {     
           // load sector bytes into currSecArr[]
           currSecNumPhys = currSecNumInClus + bpb->dataRegionFirstSector + ((clusIndx - 2) * bpb->secPerClus);
-          err = FATtoDisk_ReadSingleSector (currSecNumPhys, currSecArr );
+          err = FATtoDISK_read_single_sector (currSecNumPhys, currSecArr );
           if (err == 1) 
           {
             print_str("\n\rPRINT FILE 1");
@@ -764,7 +765,7 @@ FAT_PrintFile (FatDir * Dir, char * fileNameStr, BPB * bpb)
           // loop through entries in the current sector.
           for (uint16_t entryPos = 0; entryPos < bpb->bytesPerSec; entryPos = entryPos + ENTRY_LEN)
             { 
-              entryCorrectionFlag = pvt_CorrectEntryCheck (lnFlags, &entryPos, &snPosCurrSec, &snPosNextSec);
+              entryCorrectionFlag = pvt_correct_entry_check (lnFlags, &entryPos, &snPosCurrSec, &snPosNextSec);
               if (entryCorrectionFlag == 1)
                 {
                   entryCorrectionFlag = 0;
@@ -791,14 +792,14 @@ FAT_PrintFile (FatDir * Dir, char * fileNameStr, BPB * bpb)
                       for (uint8_t k = 0; k < LONG_NAME_STRING_LEN_MAX; k++) 
                         lnStr[k] = '\0';
 
-                      pvt_SetLongNameFlags (&lnFlags, entryPos, &snPosCurrSec, currSecArr, bpb);
+                      pvt_set_long_name_flags (&lnFlags, entryPos, &snPosCurrSec, currSecArr, bpb);
                       
                       lnStrIndx = 0;
 
                       // if long name exists and short name entry is in the next sector 
                       if (lnFlags & (LONG_NAME_CROSSES_SECTOR_BOUNDARY | LONG_NAME_LAST_SECTOR_ENTRY))
                         {
-                          err = pvt_GetNextSector (nextSecArr, currSecNumInClus, currSecNumPhys, clusIndx, bpb);
+                          err = pvt_get_next_sector (nextSecArr, currSecNumInClus, currSecNumPhys, clusIndx, bpb);
                           if (err == FAILED_READ_SECTOR) 
                             return FAILED_READ_SECTOR;
                           snPosNextSec = snPosCurrSec - bpb->bytesPerSec;
@@ -818,8 +819,8 @@ FAT_PrintFile (FatDir * Dir, char * fileNameStr, BPB * bpb)
                                     return CORRUPT_FAT_ENTRY; 
                                   
                                   // load long name entry into lnStr[]
-                                  pvt_LoadLongName (snPosNextSec - ENTRY_LEN, 0, nextSecArr, lnStr, &lnStrIndx);
-                                  pvt_LoadLongName (SECTOR_LEN - ENTRY_LEN, entryPos, currSecArr, lnStr, &lnStrIndx);
+                                  pvt_load_long_name (snPosNextSec - ENTRY_LEN, 0, nextSecArr, lnStr, &lnStrIndx);
+                                  pvt_load_long_name (SECTOR_LEN - ENTRY_LEN, entryPos, currSecArr, lnStr, &lnStrIndx);
                                 }
                               else if (lnFlags & LONG_NAME_LAST_SECTOR_ENTRY)
                                 {
@@ -830,14 +831,14 @@ FAT_PrintFile (FatDir * Dir, char * fileNameStr, BPB * bpb)
                                     return CORRUPT_FAT_ENTRY;                                                                  
                                       
                                   // read long name entry into lnStr
-                                  pvt_LoadLongName (SECTOR_LEN - ENTRY_LEN, entryPos, currSecArr, lnStr, &lnStrIndx);      
+                                  pvt_load_long_name (SECTOR_LEN - ENTRY_LEN, entryPos, currSecArr, lnStr, &lnStrIndx);      
                                 }
                               else return CORRUPT_FAT_ENTRY;
 
                               // print file contents if a matching file entry was found
                               if ( !strcmp(fileNameStr, lnStr))
                                 // returnes either END_OF_FILE or FAILED_READ_SECTOR
-                                return pvt_PrintFatFile (snPosNextSec, nextSecArr, bpb);
+                                return pvt_print_fat_file (snPosNextSec, nextSecArr, bpb);
                             }
                         }
 
@@ -858,12 +859,12 @@ FAT_PrintFile (FatDir * Dir, char * fileNameStr, BPB * bpb)
                                 return CORRUPT_FAT_ENTRY;
 
                               // read long name into lnStr
-                              pvt_LoadLongName (snPosCurrSec - ENTRY_LEN, entryPos, currSecArr, lnStr, &lnStrIndx);
+                              pvt_load_long_name (snPosCurrSec - ENTRY_LEN, entryPos, currSecArr, lnStr, &lnStrIndx);
 
                               // print file contents if a matching entryPos was found
                               if ( !strcmp (fileNameStr, lnStr))
                                 // returns either END_OF_FILE or FAILED_READ_SECTOR
-                                return pvt_PrintFatFile (snPosCurrSec, currSecArr, bpb);                                                                                   
+                                return pvt_print_fat_file (snPosCurrSec, currSecArr, bpb);                                                                                   
                             }
                         }           
                     }
@@ -933,14 +934,14 @@ FAT_PrintFile (FatDir * Dir, char * fileNameStr, BPB * bpb)
                             }
                           if(match)
                             // returnes either END_OF_FILE or FAILED_READ_SECTOR
-                            return pvt_PrintFatFile (entryPos, currSecArr, bpb);
+                            return pvt_print_fat_file (entryPos, currSecArr, bpb);
                         }
                     }
                 }
             }
         }
     } 
-  while ((clusIndx = pvt_GetNextClusterIndex (clusIndx, bpb)) != END_OF_CLUSTER);
+  while ((clusIndx = pvt_get_next_cluster_index (clusIndx, bpb)) != END_OF_CLUSTER);
   return FILE_NOT_FOUND; 
 }
 
@@ -956,8 +957,8 @@ FAT_PrintFile (FatDir * Dir, char * fileNameStr, BPB * bpb)
 ***********************************************************************************************************************
 */
 
-void 
-FAT_PrintError (uint8_t err)
+void
+FAT_print_error (uint8_t err)
 {  
   switch(err)
   {
@@ -1012,9 +1013,9 @@ FAT_PrintError (uint8_t err)
  * 
  * Description : Function used to confirm a 'name' string is legal and valid size based on the current settings. This 
  *               function is called by any FAT function that must match a 'name' string argument to a FAT entry name 
- *               (e.g. FAT_PrintFile or FAT_SetDirectory). 
+ *               (e.g. FAT_print_file() or FAT_set_directory() ). 
  * 
- * Argument    : *nameStr    C-string that the calling function needs to be verify is a legal FAT name.
+ * Argument    : *nameStr    - Pointer to C-string that the calling function needs to verify is a legal FAT name.
  *             : *bpb        - Pointer to a valid instance of a BPB struct.
  *            
  * Return      : 0 if name is LEGAL, 1 if name is ILLEGAL.
@@ -1022,7 +1023,7 @@ FAT_PrintError (uint8_t err)
 */
 
 uint8_t
-pvt_CheckValidName (char * nameStr, FatDir * Dir)
+pvt_check_valid_name (char * nameStr, FatDir * Dir)
 {
   // check that long name and path size are 
   // not too large for current settings.
@@ -1058,7 +1059,7 @@ pvt_CheckValidName (char * nameStr, FatDir * Dir)
 ***********************************************************************************************************************
  *                                  (PRIVATE) SET CURRENT DIRECTORY TO ITS PARENT
  * 
- * Description : This function is called by FAT_SetDirectory() if that function has been requested to set the FatDir 
+ * Description : This function is called by FAT_set_directory() if that function has been requested to set the FatDir 
  *               instance to its parent directory. This function will carry out the task of setting the members.
  * 
  * Argument    : *Dir         - Pointer to a FatDir instance whose members will be updated to point to the parent of 
@@ -1068,7 +1069,7 @@ pvt_CheckValidName (char * nameStr, FatDir * Dir)
 */
 
 uint8_t
-pvt_SetDirectoryToParent (FatDir * Dir, BPB * bpb)
+pvt_set_directory_to_parent (FatDir * Dir, BPB * bpb)
 {
   uint32_t parentDirFirstClus;
   uint32_t currSecNumPhys;
@@ -1078,7 +1079,7 @@ pvt_SetDirectoryToParent (FatDir * Dir, BPB * bpb)
   currSecNumPhys = bpb->dataRegionFirstSector + ((Dir->FATFirstCluster - 2) * bpb->secPerClus);
 
   // function returns either 0 for success for 1 for failed.
-  err = FATtoDisk_ReadSingleSector (currSecNumPhys, currSecArr);
+  err = FATtoDISK_read_single_sector (currSecNumPhys, currSecArr);
   if (err != 0) return FAILED_READ_SECTOR;
 
   parentDirFirstClus = currSecArr[53];
@@ -1131,7 +1132,7 @@ pvt_SetDirectoryToParent (FatDir * Dir, BPB * bpb)
 ***********************************************************************************************************************
  *                           (PRIVATE) SET DIRECTORY TO A CHILD DIRECTORY
  * 
- * Description : This function is called by FAT_SetDirectory() if that function has been asked to set an instance of
+ * Description : This function is called by FAT_set_directory() if that function has been asked to set an instance of
  *               FatDir to a child directory and a valid matching entry was found in the directory currently pointed at
  *               by the FatDir instance. This function will only update the struct's members to that of the matching 
  *               entry. It does not perform any of the search/compare required to find the matching entry.
@@ -1152,7 +1153,7 @@ pvt_SetDirectoryToParent (FatDir * Dir, BPB * bpb)
 */
 
 void
-pvt_SetDirectoryToChild (FatDir * Dir, uint8_t * sectorArr, uint16_t snPos, char * childDirStr, BPB * bpb)
+pvt_set_directory_to_child (FatDir * Dir, uint8_t * sectorArr, uint16_t snPos, char * childDirStr, BPB * bpb)
 {
   uint32_t dirFirstClus;
   dirFirstClus = sectorArr[snPos + 21];
@@ -1197,9 +1198,9 @@ pvt_SetDirectoryToChild (FatDir * Dir, uint8_t * sectorArr, uint16_t snPos, char
  *               C-string. The function is called twice if a long name crosses a sector boundary, and *lnStrIndx will
  *               point to the position in the string to begin loading the next characters
  * 
- * Arguments   : lnFirstEntry  - Integer that points to the position in *sectorArr that is the lowest order entry
+ * Arguments   : lnFirstEntry        - Integer that points to the position in *sectorArr that is the lowest order entry
  *                                     of the long name in the sector array.
- *             : lnLastEntry   - Integer that points to the position in *sectorArr that is the highest order
+ *             : lnLastEntry         - Integer that points to the position in *sectorArr that is the highest order
  *                                     entry of the long name in the sector array.
  *             : *sectorArr          - Pointer to an array that holds the physical sector's contents containing the 
  *                                     the entries of the long name that will be loaded into the char arry *lnStr.
@@ -1214,7 +1215,7 @@ pvt_SetDirectoryToChild (FatDir * Dir, uint8_t * sectorArr, uint16_t snPos, char
 */
 
 void
-pvt_LoadLongName (int lnFirstEntry, int lnLastEntry, uint8_t * sectorArr, char * lnStr, uint8_t * lnStrIndx)
+pvt_load_long_name (int lnFirstEntry, int lnLastEntry, uint8_t * sectorArr, char * lnStr, uint8_t * lnStrIndx)
 {
   for (int i = lnFirstEntry; i >= lnLastEntry; i = i - ENTRY_LEN)
     {                                              
@@ -1272,7 +1273,7 @@ pvt_LoadLongName (int lnFirstEntry, int lnLastEntry, uint8_t * sectorArr, char *
 */
 
 uint32_t 
-pvt_GetNextClusterIndex (uint32_t currClusIndx, BPB * bpb)
+pvt_get_next_cluster_index (uint32_t currClusIndx, BPB * bpb)
 {
   uint8_t  bytesPerClusIndx = 4; // for FAT32
   uint16_t numOfIndexedClustersPerSecOfFat = bpb->bytesPerSec / bytesPerClusIndx; // = 128
@@ -1285,7 +1286,7 @@ pvt_GetNextClusterIndex (uint32_t currClusIndx, BPB * bpb)
 
   uint8_t sectorArr[bpb->bytesPerSec];
   
-  FATtoDisk_ReadSingleSector (fatSectorToRead, sectorArr);
+  FATtoDISK_read_single_sector (fatSectorToRead, sectorArr);
 
   cluster = sectorArr[clusIndxStartByte+3];
   cluster <<= 8;
@@ -1304,8 +1305,9 @@ pvt_GetNextClusterIndex (uint32_t currClusIndx, BPB * bpb)
 ***********************************************************************************************************************
  *                                        (PRIVATE) PRINTS THE FIELDS OF FAT ENTRY
  *
- * Description : Used by FAT_PrintDirectory() to print the fields associated with an entry (e.g. creation/last modified
- *               date/time, file size, etc...). Which fields are printed is determined by the entryFilter flags set.
+ * Description : Used by FAT_print_directory() to print the fields associated with an entry (e.g. creation/last 
+ *               modified date/time, file size, etc...). Which fields are printed is determined by the entryFilter 
+ *               flag set.
  * 
  * Arguments   : *sectorArr     - Pointer to an array that holds the short name of the entry that is being printed to
  *                                the screen. Only the short name entry of a short name/long name combination holds
@@ -1318,7 +1320,7 @@ pvt_GetNextClusterIndex (uint32_t currClusIndx, BPB * bpb)
 */
 
 void 
-pvt_PrintEntryFields (uint8_t *sectorArr, uint16_t entryPos, uint8_t entryFilter)
+pvt_print_entry_fields (uint8_t *sectorArr, uint16_t entryPos, uint8_t entryFilter)
 {
   uint16_t creationTime;
   uint16_t creationDate;
@@ -1489,7 +1491,7 @@ pvt_PrintEntryFields (uint8_t *sectorArr, uint16_t entryPos, uint8_t entryFilter
 ***********************************************************************************************************************
  *                                              (PRIVATE) PRINT SHORT NAME
  *
- * Description : Used by FAT_PrintDirectory to print the short name of a FAT file or directory.
+ * Description : Used by FAT_print_directory to print the short name of a FAT file or directory.
  * 
  * Arguments   : *sectorArr     - Pointer to an array that holds the short name of the entry that is to be printed to
  *                                the screen.
@@ -1501,7 +1503,7 @@ pvt_PrintEntryFields (uint8_t *sectorArr, uint16_t entryPos, uint8_t entryFilter
 */
 
 void 
-pvt_PrintShortName (uint8_t *sectorArr, uint16_t entryPos, uint8_t entryFilter)
+pvt_print_short_name (uint8_t *sectorArr, uint16_t entryPos, uint8_t entryFilter)
 {
   char sn[9];
   char ext[5];
@@ -1545,7 +1547,7 @@ pvt_PrintShortName (uint8_t *sectorArr, uint16_t entryPos, uint8_t entryFilter)
 ***********************************************************************************************************************
  *                                              (PRIVATE) PRINT A FAT FILE
  *
- * Description : Used by FAT_PrintFile() to perform that actual print operation.
+ * Description : Used by FAT_print_file() to perform that actual print operation.
  * 
  * Arguments   : entryPos       - Integer that points to the location in *fileSector of the first byte of the short 
  *                                name entryPos of the file whose contents will be printed to the screen. This is 
@@ -1557,7 +1559,7 @@ pvt_PrintShortName (uint8_t *sectorArr, uint16_t entryPos, uint8_t entryFilter)
 */
 
 uint8_t 
-pvt_PrintFatFile (uint16_t entryPos, uint8_t *fileSector, BPB * bpb)
+pvt_print_fat_file (uint16_t entryPos, uint8_t *fileSector, BPB * bpb)
   {
     uint32_t currSecNumPhys;
     uint32_t cluster;
@@ -1581,7 +1583,7 @@ pvt_PrintFatFile (uint16_t entryPos, uint8_t *fileSector, BPB * bpb)
             currSecNumPhys = currSecNumInClus + bpb->dataRegionFirstSector + ((cluster - 2) * bpb->secPerClus);
 
             // function returns either 0 for success for 1 for failed.
-            err = FATtoDisk_ReadSingleSector (currSecNumPhys, fileSector);
+            err = FATtoDISK_read_single_sector (currSecNumPhys, fileSector);
             if (err == 1) return FAILED_READ_SECTOR;
 
             for (uint16_t k = 0; k < bpb->bytesPerSec; k++)
@@ -1592,7 +1594,7 @@ pvt_PrintFatFile (uint16_t entryPos, uint8_t *fileSector, BPB * bpb)
               }
           }
       } 
-    while (((cluster = pvt_GetNextClusterIndex(cluster,bpb)) != END_OF_CLUSTER));
+    while (((cluster = pvt_get_next_cluster_index(cluster,bpb)) != END_OF_CLUSTER));
     return END_OF_FILE;
   }
 
@@ -1627,7 +1629,7 @@ pvt_PrintFatFile (uint16_t entryPos, uint8_t *fileSector, BPB * bpb)
 */
 
 uint8_t 
-pvt_CorrectEntryCheck (uint8_t lnFlags, uint16_t * entryPos, uint16_t * snPosCurrSec, uint16_t * snPosNextSec)
+pvt_correct_entry_check (uint8_t lnFlags, uint16_t * entryPos, uint16_t * snPosCurrSec, uint16_t * snPosNextSec)
 {  
   if (lnFlags & LONG_NAME_EXISTS)
     {
@@ -1677,7 +1679,8 @@ pvt_CorrectEntryCheck (uint8_t lnFlags, uint16_t * entryPos, uint16_t * snPosCur
 */
 
 void
-pvt_SetLongNameFlags ( uint8_t * lnFlags, uint16_t entryPos, uint16_t * snPosCurrSec, uint8_t * currSecArr, BPB * bpb)
+pvt_set_long_name_flags (uint8_t * lnFlags, uint16_t entryPos, uint16_t * snPosCurrSec,
+                         uint8_t * currSecArr, BPB * bpb)
 {
   *lnFlags |= LONG_NAME_EXISTS;
 
@@ -1716,19 +1719,19 @@ pvt_SetLongNameFlags ( uint8_t * lnFlags, uint16_t entryPos, uint16_t * snPosCur
 */
 
 uint8_t
-pvt_GetNextSector (uint8_t * nextSecArr, uint32_t currSecNumInClus, 
-                   uint32_t currSecNumPhys, uint32_t clusIndx, BPB * bpb)
+pvt_get_next_sector (uint8_t * nextSecArr, uint32_t currSecNumInClus, 
+                     uint32_t currSecNumPhys, uint32_t clusIndx, BPB * bpb)
 {
   uint32_t nextSecNumPhys;
   uint8_t  err = 0;
   
   if (currSecNumInClus >= (bpb->secPerClus - 1)) 
-    nextSecNumPhys = bpb->dataRegionFirstSector + ((pvt_GetNextClusterIndex (clusIndx, bpb) - 2) * bpb->secPerClus);
+    nextSecNumPhys = bpb->dataRegionFirstSector + ((pvt_get_next_cluster_index (clusIndx, bpb) - 2) * bpb->secPerClus);
   else 
     nextSecNumPhys = 1 + currSecNumPhys;
 
   // function returns either 0 for success or 1 for failed.
-  err = FATtoDisk_ReadSingleSector (nextSecNumPhys, nextSecArr);
+  err = FATtoDISK_read_single_sector (nextSecNumPhys, nextSecArr);
   if (err == 1) 
     return FAILED_READ_SECTOR;
   else 

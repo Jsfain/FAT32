@@ -144,11 +144,11 @@ int main(void)
       // assist in pointing to region locations in the FAT volume. This only 
       // needs to be called set once.
       BPB bpb;
-      err = FAT_SetBiosParameterBlock (&bpb);
+      err = FAT_set_bios_parameter_block (&bpb);
       if (err != BOOT_SECTOR_VALID)
         {
-          print_str ("\n\r SetBiosParameterBlock() returned ");
-          FAT_PrintBootSectorError (err);
+          print_str ("\n\r FAT_set_bios_parameter_block() returned ");
+          FAT_print_boot_sector_error (err);
         }
     
       // Create a Fat Directory instance. This will hold members which
@@ -156,7 +156,7 @@ int main(void)
       // set to point to the root directory. Afterwards it can be operated
       // on by the other FAT functions.
       FatDir cwd;
-      FAT_SetDirectoryToRoot(&cwd, &bpb);
+      FAT_set_directory_to_root (&cwd, &bpb);
       
 
       // This section implements a command-line like interface for navigating
@@ -171,7 +171,7 @@ int main(void)
       uint8_t lastArgFlag = 0;
       char    *spacePtr;
       uint8_t numOfChars = 0;
-      uint8_t filter = 0; // used with FAT_PrintDirectory()
+      uint8_t filter = 0; // used with FAT_print_directory()
       uint8_t quit = 0;
 
       print_str("\n\n\n\r");
@@ -228,8 +228,8 @@ int main(void)
               // Command: change directory
               if ( !strcmp (cmdStr, "cd"))
                 {   
-                  err = FAT_SetDirectory (&cwd, argStr, &bpb);
-                  if (err != SUCCESS) FAT_PrintError (err);
+                  err = FAT_set_directory (&cwd, argStr, &bpb);
+                  if (err != SUCCESS) FAT_print_error (err);
                 }
                 
               // Command: list directory contents
@@ -262,15 +262,15 @@ int main(void)
                   // Send LONG_NAME as default argument.
                   if ((filter & SHORT_NAME) != SHORT_NAME) filter |= LONG_NAME; 
                   
-                  err = FAT_PrintDirectory (&cwd, filter, &bpb);
-                  if (err != END_OF_DIRECTORY) FAT_PrintError (err);
+                  err = FAT_print_directory (&cwd, filter, &bpb);
+                  if (err != END_OF_DIRECTORY) FAT_print_error (err);
                 }
               
               // Command: open file and print it to screen
               else if (!strcmp(cmdStr, "open")) 
                 { 
-                  err = FAT_PrintFile (&cwd, argStr, &bpb);
-                  if (err != END_OF_FILE) FAT_PrintError (err);
+                  err = FAT_print_file (&cwd, argStr, &bpb);
+                  if (err != END_OF_FILE) FAT_print_error (err);
                 }
 
               // Command: print FatDir members

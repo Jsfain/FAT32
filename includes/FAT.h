@@ -15,13 +15,13 @@
 *
 *
 * FUNCTION "PUBLIC":
-*  (1) uint8_t  FAT_SetBiosParameterBlock(BPB * bpb);
-*  (2) void     FAT_PrintBootSectorError (uint8_t err);
-*  (3) void     FAT_SetDirectoryToRoot(FatDir * Dir, BPB * bpb);
-*  (4) uint8_t  FAT_SetDirectory (FatDir * Dir, char * newDirStr, BPB * bpb);
-*  (5) uint8_t  FAT_PrintDirectory (FatDir * Dir, uint8_t entryFilter, BPB * bpb);
-*  (6) uint8_t  FAT_PrintFile (FatDir * Dir, char * file, BPB * bpb);
-*  (7) void     FAT_PrintError(uint8_t err);
+*  (1) uint8_t  FAT_set_bios_parameter_block (BPB * bpb)
+*  (2) void     FAT_print_boot_sector_error (uint8_t err)
+*  (3) void     FAT_set_directory_to_root (FatDir * Dir, BPB * bpb)
+*  (4) uint8_t  FAT_set_directory (FatDir * Dir, char * newDirStr, BPB * bpb)
+*  (5) uint8_t  FAT_print_directory (FatDir * Dir, uint8_t entryFilter, BPB * bpb)
+*  (6) uint8_t  FAT_print_file (FatDir * Dir, char * file, BPB * bpb)
+*  (7) void     FAT_print_error (uint8_t err)
 *
 *
 * STRUCTS USED (defined in FAT.H):
@@ -110,7 +110,7 @@
 // ******** Entry Filter Flags
 
 // Pass any combination of these flags as the entryFilter argument
-// in FAT_PrintDirectory() to indicate which entries and their
+// in FAT_print_directory() to indicate which entries and their
 // fields to print to the screen.
 #define SHORT_NAME                                0x01
 #define LONG_NAME                                 0x02
@@ -151,7 +151,7 @@
 // An instance of this struct should hold specific values set in the FAT volume's
 // BIOS Parameter Block, as well as a few calculated values based on BPB values.
 // These values should be set only by passing an instance of the struct to 
-// FAT_SetBiosParameterBlock(BPB * bpb)
+// FAT (BPB * bpb)
 typedef struct BiosParameterBlock
 {
   uint16_t bytesPerSec;
@@ -210,7 +210,7 @@ FatDir;
  * Argument    : *bpb        Pointer to a BPB struct instance. This function will set the members of this instance.
  * 
  * Return      : Boot sector error flag     See the FAT.H header file for a list of these flags. To print the returned
- *                                          value, pass it to FAT_PrintBootSectorError(err). If the BPB instance's
+ *                                          value, pass it FATfat_print_boot_sector_error(err). If the BPB instance's
  *                                          members are successfully set then BOOT_SECTOR_VALID is returned. Any other 
  *                                          returned value indicates a failure. 
  * 
@@ -220,8 +220,8 @@ FatDir;
 ***********************************************************************************************************************
 */
 
-uint8_t 
-FAT_SetBiosParameterBlock(BPB * bpb);
+uint8_t
+FAT_set_bios_parameter_block (BPB * bpb);
 
 
 
@@ -229,14 +229,14 @@ FAT_SetBiosParameterBlock(BPB * bpb);
 ***********************************************************************************************************************
  *                                             PRINT BOOT SECTOR ERROR FLAG
  * 
- * Description : Call this function to print the error flag returned by the function FAT_SetBiosParameterBlock(). 
+ * Description : Call this function to print the error flag returned by the functioFAT(). 
  * 
- * Argument    : err    Boot Sector Error flag returned the function FAT_SetBiosParameterBlock().
+ * Argument    : err    Boot Sector Error flag returned the functioFAT().
 ***********************************************************************************************************************
 */
 
-void 
-FAT_PrintBootSectorError (uint8_t err);
+void
+FAT_print_boot_sector_error (uint8_t err);
 
 
 
@@ -256,7 +256,7 @@ FAT_PrintBootSectorError (uint8_t err);
 */
 
 void
-FAT_SetDirectoryToRoot(FatDir * Dir, BPB * bpb);
+FAT_set_directory_to_root(FatDir * Dir, BPB * bpb);
 
 
 
@@ -264,11 +264,11 @@ FAT_SetDirectoryToRoot(FatDir * Dir, BPB * bpb);
 ***********************************************************************************************************************
  *                                                   SET FAT DIRECTORY
  *                                        
- * Description : Call this function to set a FatDirectory (FatDir) struct instance to a new directory. The new 
+ * Description : Call this function to set a FatDirectory (FatDir) struct instance to a new directory. The new
  *               directory must be a child, or the parent, of the struct's instance when this function is called. This
  *               function operates by searching the current directory for a name that matches string newDirStr. If a 
- *               matching entryPos is found, the members of the FatDir instance are updated to those corresponding to the 
- *               matching entryPos. To set to parent, pass the string ".." as newDirStr.
+ *               matching entryPos is found, the members of the FatDir instance are updated to those corresponding to
+ *               the matching entryPos. To set to parent, pass the string ".." as newDirStr.
  *
  * Arguments   : *Dir            - Pointer to an instance of FatDir. The members of *Dir must point to a valid FAT32
  *                                 directory when the function is called. The members of the instance are updated by 
@@ -276,14 +276,14 @@ FAT_SetDirectoryToRoot(FatDir * Dir, BPB * bpb);
  *             : *newDirStr      - Pointer to a C-string that specifies the name of the intended new directory. This 
  *                                 function will only search the current FatDir instance's directory for a matching  
  *                                 name, thus it is only possible to set FatDir to a child, or the parent (".."), of 
- *                                 the current directory. Paths must not be included in the string. This string is also 
- *                                 required to be a long name unless a long name does not exist for a given entryPos, only
- *                                 then can a short name be a valid string. This is case-sensitive.
+ *                                 the current directory. Paths must not be included in the string. This string is
+ *                                 also required to be a long name unless a long name does not exist for a given
+ *                                 entryPos, only then can a short name be a valid string. This is case-sensitive.
  *             : *bpb            - Pointer to a valid instance of a BPB struct.
  * 
- * Return      : FAT Error Flag  - The returned value can be read by passing it to FAT_PrintError(ErrorFlag). If 
- *                                 SUCCESS is returned then the FatDir instance members were successfully updated to
- *                                 point the new directory. Any other returned value indicates a failure.
+ * Return      : FAT Error Flag  - The returned value can be read by passing it tp FAT_print_error(err). If SUCCESS
+ *                                 is returned then the FatDir instance members were successfully updated to point to
+ *                                 the new directory. Any other returned value indicates a failure.
  *  
  * Limitation  : This function will not work with absolute paths, it will only set a FatDir instance to a new directory
  *               if the new directory is a child, or the parent, of the current directory.
@@ -291,7 +291,7 @@ FAT_SetDirectoryToRoot(FatDir * Dir, BPB * bpb);
 */
 
 uint8_t 
-FAT_SetDirectory (FatDir * Dir, char * newDirStr, BPB * bpb);
+FAT_set_directory (FatDir * Dir, char * newDirStr, BPB * bpb);
 
 
 
@@ -312,12 +312,12 @@ FAT_SetDirectory (FatDir * Dir, char * newDirStr, BPB * bpb);
  * 
  * Return      : FAT Error Flag     Returns END_OF_DIRECTORY if the function completed successfully and it was able to
  *                                  read in and print entries until reaching the end of the directory. Any other value
- *                                  returned indicates an error. To read, pass the value to FAT_PrintError(ErrorFlag).
+ *                                  returned indicates an error. To read, pass the value to FAT_print_error(err).
 ***********************************************************************************************************************
 */
 
 uint8_t 
-FAT_PrintDirectory (FatDir * Dir, uint8_t entryFilter, BPB * bpb);
+FAT_print_directory (FatDir * Dir, uint8_t entryFilter, BPB * bpb);
 
 
 
@@ -328,19 +328,19 @@ FAT_PrintDirectory (FatDir * Dir, uint8_t entryFilter, BPB * bpb);
  * Description : Prints the contents of a FAT file from the current directory to a terminal/screen.
  * 
  * Arguments   : *Dir              - Pointer to a FatDir struct instance pointing to a valid FAT32 directory.
- *             : *fileNameStr      - Ptr to C-string. This is the name of the file to be printed to the screen. This
- *                                   can only be a long name unless there is no long name for a given entry, in which
- *                                   case it must be a short name.
+ *             : *fileNameStr      - Pointer to C-string. This is the name of the file to be printed to the screen.
+ *                                   This can only be a long name unless there is no long name for a given entry, in
+ *                                   which case it must be a short name.
  *             : *bpb              - Pointer to a valid instance of a BPB struct.
  * 
  * Return      : FAT Error Flag     Returns END_OF_FILE if the function completed successfully and was able to read in
  *                                  and print a file's contents to the screen. Any other value returned indicates an
- *                                  an error. Pass the returned value to FAT_PrintError(ErrorFlag).
+ *                                  an error. Pass the returned value to FAT_print_error(err).
 ***********************************************************************************************************************
 */
 
 uint8_t 
-FAT_PrintFile (FatDir * Dir, char * file, BPB * bpb);
+FAT_print_file (FatDir * Dir, char * file, BPB * bpb);
 
 
 
@@ -355,7 +355,7 @@ FAT_PrintFile (FatDir * Dir, char * file, BPB * bpb);
 */
 
 void 
-FAT_PrintError(uint8_t err);
+FAT_print_error(uint8_t err);
 
 
 
