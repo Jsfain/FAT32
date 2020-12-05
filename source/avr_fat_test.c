@@ -90,8 +90,8 @@ uint32_t enterBlockNumber();
 
 int main(void)
 {
-  USART_Init();
-  SPI_MasterInit();
+  usart_init();
+  spi_master_init();
 
 
   // ***********************************************************************
@@ -190,7 +190,7 @@ int main(void)
           print_str (cwd.longName); print_str (" > ");
           
           // Enter commands / arguments
-          inputChar = USART_Receive();
+          inputChar = usart_receive();
           while (inputChar != '\r')
             {
               // handle backspaces
@@ -203,13 +203,13 @@ int main(void)
               // print last char entered
               else 
                 { 
-                  USART_Transmit (inputChar);
+                  usart_transmit (inputChar);
                   inputStr[numOfChars] = inputChar;
                   numOfChars++;
                 }
               
               // get next char
-              inputChar = USART_Receive();
+              inputChar = usart_receive();
               if (numOfChars >= cmdLineLenMax) break;
             }
 
@@ -320,8 +320,8 @@ int main(void)
               print_str (" blocks beginning at block number "); 
               print_dec(startBlockNum);
               print_str ("\n\rIs this correct? (y/n)");
-              answer = USART_Receive();
-              USART_Transmit (answer);
+              answer = usart_receive();
+              usart_transmit (answer);
               print_str ("\n\r");
             }
           while (answer != 'y');
@@ -348,8 +348,8 @@ int main(void)
                 }
             }
           print_str ("\n\rPress 'q' to quit: ");
-          answer = USART_Receive();
-          USART_Transmit (answer);
+          answer = usart_receive();
+          usart_transmit (answer);
         }
       while (answer != 'q');
 
@@ -360,7 +360,7 @@ int main(void)
 
   // Something else to do. Print entered chars to screen.
   while(1)
-      USART_Transmit (USART_Receive());
+      usart_transmit (usart_receive());
   
   return 0;
 }
@@ -384,7 +384,7 @@ uint32_t enterBlockNumber()
   uint8_t c;
   uint32_t blockNumber = 0;
 
-  c = USART_Receive();
+  c = usart_receive();
   
   while (c!='\r')
     {
@@ -409,7 +409,7 @@ uint32_t enterBlockNumber()
           print_str ("\n\rblock number is too large.");
           print_str ("\n\rEnter value < 4194304\n\r");
         }
-      c = USART_Receive();
+      c = usart_receive();
     }
   return blockNumber;
 }

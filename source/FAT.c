@@ -1590,7 +1590,7 @@ pvt_print_fat_file (uint16_t entryPos, uint8_t *fileSector, BPB * bpb)
               {
                 // for formatting how this shows up on the screen.
                 if (fileSector[k] == '\n') print_str ("\n\r");
-                else if (fileSector[k] != 0) USART_Transmit (fileSector[k]);
+                else if (fileSector[k] != 0) usart_transmit (fileSector[k]);
               }
           }
       } 

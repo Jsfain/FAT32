@@ -16,7 +16,7 @@
 *  
 * 
 * FUNCTIONS:
-* (1) uint32_t FATtoDISK_find_boot_sector (void);                                               
+* (1) uint32_t FATtoDISK_find_boot_sector (void)                                            
 * (2) uint8_t  FATtoDISK_read_single_sector (uint32_t address, uint8_t *sectorByteArry)
 *                                                
 *                                                       MIT LICENSE
