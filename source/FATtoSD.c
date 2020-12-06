@@ -14,8 +14,8 @@
 * module as the the AVR-FAT module, is intended to be independent of disk-type.
 * 
 * FUNCTIONS:
-* (1) uint32_t FATtoDISK_find_boot_sector (void)                                               
-* (2) uint8_t  FATtoDISK_read_single_sector (uint32_t address, uint8_t *sectorByteArry)
+* (1) uint32_t fat_to_disk_find_boot_sector (void)                                               
+* (2) uint8_t  fat_to_disk_read_single_sector (uint32_t address, uint8_t *sectorByteArry)
 *
 *
 *                                                      MIT LICENSE
@@ -63,7 +63,7 @@ pvt_get_card_type (void);
 // a value corresponding to the addressed location of the Boot Sector / Bios Parameter Block on the
 // physical disk. This function is used by FAT_SetBiosParameterBlock().
 uint32_t 
-FATtoDISK_find_boot_sector (void)
+fat_to_disk_find_boot_sector (void)
 {
     uint8_t  block[512];
     uint16_t timeout = 0;
@@ -147,7 +147,7 @@ FATtoDISK_find_boot_sector (void)
 // should load the contents of the sector at the physical address specified in the address argument into
 // the array pointed at by *sectorByteArray. This function is used by all FAT functions requiring access
 // to the physical disk. The function ill return 1 if there is a read failure and 0 if it is successful. 
-uint8_t FATtoDISK_read_single_sector ( uint32_t address, uint8_t *sectorByteArray)
+uint8_t fat_to_disk_read_single_sector ( uint32_t address, uint8_t *sectorByteArray)
 {
     uint8_t  cardType;
     uint16_t err;

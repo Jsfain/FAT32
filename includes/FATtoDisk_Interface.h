@@ -16,8 +16,8 @@
 *  
 * 
 * FUNCTIONS:
-* (1) uint32_t FATtoDISK_find_boot_sector (void)                                            
-* (2) uint8_t  FATtoDISK_read_single_sector (uint32_t address, uint8_t *sectorByteArry)
+* (1) uint32_t fat_to_disk_find_boot_sector (void)                                            
+* (2) uint8_t  fat_to_disk_read_single_sector (uint32_t address, uint8_t *sectorByteArry)
 *                                                
 *                                                       MIT LICENSE
 *
@@ -45,7 +45,7 @@
 // This function is required to interface with the physical disk hosting the FAT volume. It returns
 // a value corresponding to the addressed location of the Boot Sector / Bios Parameter Block on the
 // physical disk. This function is used by FAT_SetBiosParameterBlock().
-uint32_t FATtoDISK_find_boot_sector (void);
+uint32_t fat_to_disk_find_boot_sector (void);
 
 
 
@@ -53,7 +53,7 @@ uint32_t FATtoDISK_find_boot_sector (void);
 // should load the contents of the sector at the physical address specified in the address argument into
 // the array pointed at by *sectorByteArray. This function is used by all FAT functions requiring access
 // to the physical disk. The function will return 1 if there is a read failure and 0 if it is successful. 
-uint8_t FATtoDISK_read_single_sector (uint32_t address, uint8_t * arr);
+uint8_t fat_to_disk_read_single_sector (uint32_t address, uint8_t * arr);
 
 
 #endif //FATTOSD_H

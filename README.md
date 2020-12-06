@@ -34,8 +34,8 @@ FAT.C and its header FAT.H define/declare the specific FAT functions for setting
 ### Physical disk layer
 This FAT module is intended to be independent of a physical disk layer/driver and thus a disk layer is required to read in the raw data from the physical FAT32-formatted disk itself. The file FATtoDISK_INTERFACE.H declares two functions that must be defined to interface the AVR-FAT module to the physical disk layer. These functions are 
 
-1) uint32_t FATtoDisk_FindBootSector();
-2) uint8_t FATtoDisk_ReadSingleSector (uint32_t address, uint8_t * arr); 
+1) uint32_t fat_to_disk_find_boot_sector (void);
+2) uint8_t fat_to_disk_read_single_sector (uint32_t address, uint8_t * arr); 
 
 The requirements for these physical disk interfacing functions can be found in their description in the header file.
 

@@ -14,13 +14,13 @@
 *
 *
 * FUNCTION "PUBLIC":
-*  (1) uint8_t  FAT_set_bios_parameter_block (BPB * bpb)
-*  (2) void     FAT_print_boot_sector_error (uint8_t err)
-*  (3) void     FAT_set_directory_to_root (FatDir * Dir, BPB * bpb)
-*  (4) uint8_t  FAT_set_directory (FatDir * Dir, char * newDirStr, BPB * bpb)
-*  (5) uint8_t  FAT_print_directory (FatDir * Dir, uint8_t entryFilter, BPB * bpb)
-*  (6) uint8_t  FAT_print_file (FatDir * Dir, char * file, BPB * bpb)
-*  (7) void     FAT_print_error (uint8_t err)
+*  (1) uint8_t  fat_set_bios_parameter_block (BPB * bpb)
+*  (2) void     fat_print_boot_sector_error (uint8_t err)
+*  (3) void     fat_set_directory_to_root (FatDir * Dir, BPB * bpb)
+*  (4) uint8_t  fat_set_directory (FatDir * Dir, char * newDirStr, BPB * bpb)
+*  (5) uint8_t  fat_print_directory (FatDir * Dir, uint8_t entryFilter, BPB * bpb)
+*  (6) uint8_t  fat_print_file (FatDir * Dir, char * file, BPB * bpb)
+*  (7) void     fat_print_error (uint8_t err)
 *
 *
 * STRUCTS (defined in FAT.H)
@@ -52,7 +52,6 @@
 #include "../includes/fat.h"
 #include "../includes/prints.h"
 #include "../includes/usart.h"
-
 #include "../includes/fattodisk_interface.h"
 
 
@@ -102,7 +101,7 @@ uint8_t pvt_get_next_sector (uint8_t * nextSecArr, uint32_t currSecNumInClus,
  * Argument    : *bpb        Pointer to a BPB struct instance. This function will set the members of this instance.
  * 
  * Return      : Boot sector error flag     See the FAT.H header file for a list of these flags. To print the returned
- *                                          value, pass it to FAT_print_boot_sector_error(err). If the BPB instance's
+ *                                          value, pass it to fat_print_boot_sector_error(err). If the BPB instance's
  *                                          members are successfully set then BOOT_SECTOR_VALID is returned. Any other
  *                                          returned value indicates a failure. 
  * 
@@ -113,17 +112,17 @@ uint8_t pvt_get_next_sector (uint8_t * nextSecArr, uint32_t currSecNumInClus,
 */
 
 uint8_t 
-FAT_set_bios_parameter_block (BPB * bpb)
+fat_set_bios_parameter_block (BPB * bpb)
 {
   uint8_t BootSector[SECTOR_LEN];
   uint8_t err;
 
   // 0xFFFFFFFF is returned for the boot sector location, then locating it failed.
-  bpb->bootSecAddr = FATtoDISK_find_boot_sector();
+  bpb->bootSecAddr = fat_to_disk_find_boot_sector();
   
   if (bpb->bootSecAddr != 0xFFFFFFFF)
     {
-      err = FATtoDISK_read_single_sector (bpb->bootSecAddr, BootSector);
+      err = fat_to_disk_read_single_sector (bpb->bootSecAddr, BootSector);
       if (err == 1) return FAILED_READ_BOOT_SECTOR;
     }
   else
@@ -142,7 +141,7 @@ FAT_set_bios_parameter_block (BPB * bpb)
       // secPerClus
       bpb->secPerClus = BootSector[13];
 
-      if ((  bpb->secPerClus != 1 ) && (bpb->secPerClus != 2 ) && (bpb->secPerClus != 4 ) && (bpb->secPerClus != 8) 
+      if ((bpb->secPerClus != 1 ) && (bpb->secPerClus != 2 ) && (bpb->secPerClus != 4 ) && (bpb->secPerClus != 8) 
          && (bpb->secPerClus != 16) && (bpb->secPerClus != 32) && (bpb->secPerClus != 64) && (bpb->secPerClus != 128))
         {
           return INVALID_SECTORS_PER_CLUSTER;
@@ -184,14 +183,14 @@ FAT_set_bios_parameter_block (BPB * bpb)
 ***********************************************************************************************************************
  *                                             PRINT BOOT SECTOR ERROR FLAG
  * 
- * Description : Call this function to print the error flag returned by the function FAT_set_bios_parameter_block(). 
+ * Description : Call this function to print the error flag returned by the function fat_set_bios_parameter_block(). 
  * 
- * Argument    : err    Boot Sector Error flag returned the function FAT_set_bios_parameter_block().
+ * Argument    : err    Boot Sector Error flag returned the function fat_set_bios_parameter_block().
 ***********************************************************************************************************************
 */
 
 void 
-FAT_print_boot_sector_error (uint8_t err)
+fat_print_boot_sector_error (uint8_t err)
 {  
   switch (err)
   {
@@ -240,7 +239,7 @@ FAT_print_boot_sector_error (uint8_t err)
 */
 
 void
-FAT_set_directory_to_root (FatDir * Dir, BPB * bpb)
+fat_set_directory_to_root (FatDir * Dir, BPB * bpb)
 {
   for (uint8_t i = 0; i < LONG_NAME_STRING_LEN_MAX; i++)
     Dir->longName[i] = '\0';
@@ -280,7 +279,7 @@ FAT_set_directory_to_root (FatDir * Dir, BPB * bpb)
  *                                 entryPos, only then can a short name be a valid string. This is case-sensitive.
  *             : *bpb            - Pointer to a valid instance of a BPB struct.
  * 
- * Return      : FAT Error Flag  - The returned value can be read by passing it tp FAT_print_error(err). If SUCCESS
+ * Return      : FAT Error Flag  - The returned value can be read by passing it tp fat_print_error(err). If SUCCESS
  *                                 is returned then the FatDir instance members were successfully updated to point to
  *                                 the new directory. Any other returned value indicates a failure.
  *  
@@ -290,7 +289,7 @@ FAT_set_directory_to_root (FatDir * Dir, BPB * bpb)
 */
 
 uint8_t 
-FAT_set_directory (FatDir * Dir, char * newDirStr, BPB * bpb)
+fat_set_directory (FatDir * Dir, char * newDirStr, BPB * bpb)
 {
   if (pvt_check_valid_name (newDirStr, Dir)) 
     return INVALID_DIR_NAME;
@@ -328,7 +327,7 @@ FAT_set_directory (FatDir * Dir, char * newDirStr, BPB * bpb)
         {         
           // load sector data into currSecArr
           currSecNumPhys = currSecNumInClus + bpb->dataRegionFirstSector + ((clusIndx - 2) * bpb->secPerClus);
-          err = FATtoDISK_read_single_sector (currSecNumPhys, currSecArr);
+          err = fat_to_disk_read_single_sector (currSecNumPhys, currSecArr);
           if (err == 1) 
             return FAILED_READ_SECTOR;
 
@@ -487,12 +486,12 @@ FAT_set_directory (FatDir * Dir, char * newDirStr, BPB * bpb)
  * 
  * Return      : FAT Error Flag     Returns END_OF_DIRECTORY if the function completed successfully and it was able to
  *                                  read in and print entries until reaching the end of the directory. Any other value
- *                                  returned indicates an error. To read, pass the value to FAT_print_error(err).
+ *                                  returned indicates an error. To read, pass the value to fat_print_error(err).
 ***********************************************************************************************************************
 */
 
 uint8_t 
-FAT_print_directory (FatDir * Dir, uint8_t entryFilter, BPB * bpb)
+fat_print_directory (FatDir * Dir, uint8_t entryFilter, BPB * bpb)
 {
   uint32_t clusIndx = Dir->FATFirstCluster;
   uint8_t  currSecArr[bpb->bytesPerSec]; 
@@ -526,7 +525,7 @@ FAT_print_directory (FatDir * Dir, uint8_t entryFilter, BPB * bpb)
         {
           // load sector bytes into currSecArr[]
           currSecNumPhys = currSecNumInClus + bpb->dataRegionFirstSector + ((clusIndx - 2) * bpb->secPerClus);
-          err = FATtoDISK_read_single_sector (currSecNumPhys, currSecArr);
+          err = fat_to_disk_read_single_sector (currSecNumPhys, currSecArr);
           if (err == 1) return FAILED_READ_SECTOR;
 
           for (uint16_t entryPos = 0; entryPos < bpb->bytesPerSec; entryPos = entryPos + ENTRY_LEN)
@@ -722,12 +721,12 @@ FAT_print_directory (FatDir * Dir, uint8_t entryFilter, BPB * bpb)
  * 
  * Return      : FAT Error Flag     Returns END_OF_FILE if the function completed successfully and was able to read in
  *                                  and print a file's contents to the screen. Any other value returned indicates an
- *                                  an error. Pass the returned value to FAT_print_error(err).
+ *                                  an error. Pass the returned value to fat_print_error(err).
 ***********************************************************************************************************************
 */
 
 uint8_t 
-FAT_print_file (FatDir * Dir, char * fileNameStr, BPB * bpb)
+fat_print_file (FatDir * Dir, char * fileNameStr, BPB * bpb)
 {
   if (pvt_check_valid_name (fileNameStr, Dir)) 
     return INVALID_FILE_NAME;
@@ -755,7 +754,7 @@ FAT_print_file (FatDir * Dir, char * fileNameStr, BPB * bpb)
         {     
           // load sector bytes into currSecArr[]
           currSecNumPhys = currSecNumInClus + bpb->dataRegionFirstSector + ((clusIndx - 2) * bpb->secPerClus);
-          err = FATtoDISK_read_single_sector (currSecNumPhys, currSecArr );
+          err = fat_to_disk_read_single_sector (currSecNumPhys, currSecArr );
           if (err == 1) 
           {
             print_str("\n\rPRINT FILE 1");
@@ -958,7 +957,7 @@ FAT_print_file (FatDir * Dir, char * fileNameStr, BPB * bpb)
 */
 
 void
-FAT_print_error (uint8_t err)
+fat_print_error (uint8_t err)
 {  
   switch(err)
   {
@@ -1013,7 +1012,7 @@ FAT_print_error (uint8_t err)
  * 
  * Description : Function used to confirm a 'name' string is legal and valid size based on the current settings. This 
  *               function is called by any FAT function that must match a 'name' string argument to a FAT entry name 
- *               (e.g. FAT_print_file() or FAT_set_directory() ). 
+ *               (e.g. fat_print_file() or fat_set_directory() ). 
  * 
  * Argument    : *nameStr    - Pointer to C-string that the calling function needs to verify is a legal FAT name.
  *             : *bpb        - Pointer to a valid instance of a BPB struct.
@@ -1059,7 +1058,7 @@ pvt_check_valid_name (char * nameStr, FatDir * Dir)
 ***********************************************************************************************************************
  *                                  (PRIVATE) SET CURRENT DIRECTORY TO ITS PARENT
  * 
- * Description : This function is called by FAT_set_directory() if that function has been requested to set the FatDir 
+ * Description : This function is called by fat_set_directory() if that function has been requested to set the FatDir 
  *               instance to its parent directory. This function will carry out the task of setting the members.
  * 
  * Argument    : *Dir         - Pointer to a FatDir instance whose members will be updated to point to the parent of 
@@ -1079,7 +1078,7 @@ pvt_set_directory_to_parent (FatDir * Dir, BPB * bpb)
   currSecNumPhys = bpb->dataRegionFirstSector + ((Dir->FATFirstCluster - 2) * bpb->secPerClus);
 
   // function returns either 0 for success for 1 for failed.
-  err = FATtoDISK_read_single_sector (currSecNumPhys, currSecArr);
+  err = fat_to_disk_read_single_sector (currSecNumPhys, currSecArr);
   if (err != 0) return FAILED_READ_SECTOR;
 
   parentDirFirstClus = currSecArr[53];
@@ -1132,7 +1131,7 @@ pvt_set_directory_to_parent (FatDir * Dir, BPB * bpb)
 ***********************************************************************************************************************
  *                           (PRIVATE) SET DIRECTORY TO A CHILD DIRECTORY
  * 
- * Description : This function is called by FAT_set_directory() if that function has been asked to set an instance of
+ * Description : This function is called by fat_set_directory() if that function has been asked to set an instance of
  *               FatDir to a child directory and a valid matching entry was found in the directory currently pointed at
  *               by the FatDir instance. This function will only update the struct's members to that of the matching 
  *               entry. It does not perform any of the search/compare required to find the matching entry.
@@ -1286,7 +1285,7 @@ pvt_get_next_cluster_index (uint32_t currClusIndx, BPB * bpb)
 
   uint8_t sectorArr[bpb->bytesPerSec];
   
-  FATtoDISK_read_single_sector (fatSectorToRead, sectorArr);
+  fat_to_disk_read_single_sector (fatSectorToRead, sectorArr);
 
   cluster = sectorArr[clusIndxStartByte+3];
   cluster <<= 8;
@@ -1305,7 +1304,7 @@ pvt_get_next_cluster_index (uint32_t currClusIndx, BPB * bpb)
 ***********************************************************************************************************************
  *                                        (PRIVATE) PRINTS THE FIELDS OF FAT ENTRY
  *
- * Description : Used by FAT_print_directory() to print the fields associated with an entry (e.g. creation/last 
+ * Description : Used by fat_print_directory() to print the fields associated with an entry (e.g. creation/last 
  *               modified date/time, file size, etc...). Which fields are printed is determined by the entryFilter 
  *               flag set.
  * 
@@ -1491,7 +1490,7 @@ pvt_print_entry_fields (uint8_t *sectorArr, uint16_t entryPos, uint8_t entryFilt
 ***********************************************************************************************************************
  *                                              (PRIVATE) PRINT SHORT NAME
  *
- * Description : Used by FAT_print_directory to print the short name of a FAT file or directory.
+ * Description : Used by fat_print_directory to print the short name of a FAT file or directory.
  * 
  * Arguments   : *sectorArr     - Pointer to an array that holds the short name of the entry that is to be printed to
  *                                the screen.
@@ -1547,7 +1546,7 @@ pvt_print_short_name (uint8_t *sectorArr, uint16_t entryPos, uint8_t entryFilter
 ***********************************************************************************************************************
  *                                              (PRIVATE) PRINT A FAT FILE
  *
- * Description : Used by FAT_print_file() to perform that actual print operation.
+ * Description : Used by fat_print_file() to perform that actual print operation.
  * 
  * Arguments   : entryPos       - Integer that points to the location in *fileSector of the first byte of the short 
  *                                name entryPos of the file whose contents will be printed to the screen. This is 
@@ -1583,7 +1582,7 @@ pvt_print_fat_file (uint16_t entryPos, uint8_t *fileSector, BPB * bpb)
             currSecNumPhys = currSecNumInClus + bpb->dataRegionFirstSector + ((cluster - 2) * bpb->secPerClus);
 
             // function returns either 0 for success for 1 for failed.
-            err = FATtoDISK_read_single_sector (currSecNumPhys, fileSector);
+            err = fat_to_disk_read_single_sector (currSecNumPhys, fileSector);
             if (err == 1) return FAILED_READ_SECTOR;
 
             for (uint16_t k = 0; k < bpb->bytesPerSec; k++)
@@ -1731,7 +1730,7 @@ pvt_get_next_sector (uint8_t * nextSecArr, uint32_t currSecNumInClus,
     nextSecNumPhys = 1 + currSecNumPhys;
 
   // function returns either 0 for success or 1 for failed.
-  err = FATtoDISK_read_single_sector (nextSecNumPhys, nextSecArr);
+  err = fat_to_disk_read_single_sector (nextSecNumPhys, nextSecArr);
   if (err == 1) 
     return FAILED_READ_SECTOR;
   else 

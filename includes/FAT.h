@@ -15,13 +15,13 @@
 *
 *
 * FUNCTION "PUBLIC":
-*  (1) uint8_t  FAT_set_bios_parameter_block (BPB * bpb)
-*  (2) void     FAT_print_boot_sector_error (uint8_t err)
-*  (3) void     FAT_set_directory_to_root (FatDir * Dir, BPB * bpb)
-*  (4) uint8_t  FAT_set_directory (FatDir * Dir, char * newDirStr, BPB * bpb)
-*  (5) uint8_t  FAT_print_directory (FatDir * Dir, uint8_t entryFilter, BPB * bpb)
-*  (6) uint8_t  FAT_print_file (FatDir * Dir, char * file, BPB * bpb)
-*  (7) void     FAT_print_error (uint8_t err)
+*  (1) uint8_t  fat_set_bios_parameter_block (BPB * bpb)
+*  (2) void     fat_print_boot_sector_error (uint8_t err)
+*  (3) void     fat_set_directory_to_root (FatDir * Dir, BPB * bpb)
+*  (4) uint8_t  fat_set_directory (FatDir * Dir, char * newDirStr, BPB * bpb)
+*  (5) uint8_t  fat_print_directory (FatDir * Dir, uint8_t entryFilter, BPB * bpb)
+*  (6) uint8_t  fat_print_file (FatDir * Dir, char * file, BPB * bpb)
+*  (7) void     fat_print_error (uint8_t err)
 *
 *
 * STRUCTS USED (defined in FAT.H):
@@ -110,7 +110,7 @@
 // ******** Entry Filter Flags
 
 // Pass any combination of these flags as the entryFilter argument
-// in FAT_print_directory() to indicate which entries and their
+// in fat_print_directory() to indicate which entries and their
 // fields to print to the screen.
 #define SHORT_NAME                                0x01
 #define LONG_NAME                                 0x02
@@ -221,7 +221,7 @@ FatDir;
 */
 
 uint8_t
-FAT_set_bios_parameter_block (BPB * bpb);
+fat_set_bios_parameter_block (BPB * bpb);
 
 
 
@@ -236,7 +236,7 @@ FAT_set_bios_parameter_block (BPB * bpb);
 */
 
 void
-FAT_print_boot_sector_error (uint8_t err);
+fat_print_boot_sector_error (uint8_t err);
 
 
 
@@ -256,7 +256,7 @@ FAT_print_boot_sector_error (uint8_t err);
 */
 
 void
-FAT_set_directory_to_root(FatDir * Dir, BPB * bpb);
+fat_set_directory_to_root(FatDir * Dir, BPB * bpb);
 
 
 
@@ -281,7 +281,7 @@ FAT_set_directory_to_root(FatDir * Dir, BPB * bpb);
  *                                 entryPos, only then can a short name be a valid string. This is case-sensitive.
  *             : *bpb            - Pointer to a valid instance of a BPB struct.
  * 
- * Return      : FAT Error Flag  - The returned value can be read by passing it tp FAT_print_error(err). If SUCCESS
+ * Return      : FAT Error Flag  - The returned value can be read by passing it tp fat_print_error(err). If SUCCESS
  *                                 is returned then the FatDir instance members were successfully updated to point to
  *                                 the new directory. Any other returned value indicates a failure.
  *  
@@ -291,7 +291,7 @@ FAT_set_directory_to_root(FatDir * Dir, BPB * bpb);
 */
 
 uint8_t 
-FAT_set_directory (FatDir * Dir, char * newDirStr, BPB * bpb);
+fat_set_directory (FatDir * Dir, char * newDirStr, BPB * bpb);
 
 
 
@@ -312,12 +312,12 @@ FAT_set_directory (FatDir * Dir, char * newDirStr, BPB * bpb);
  * 
  * Return      : FAT Error Flag     Returns END_OF_DIRECTORY if the function completed successfully and it was able to
  *                                  read in and print entries until reaching the end of the directory. Any other value
- *                                  returned indicates an error. To read, pass the value to FAT_print_error(err).
+ *                                  returned indicates an error. To read, pass the value to fat_print_error(err).
 ***********************************************************************************************************************
 */
 
 uint8_t 
-FAT_print_directory (FatDir * Dir, uint8_t entryFilter, BPB * bpb);
+fat_print_directory (FatDir * Dir, uint8_t entryFilter, BPB * bpb);
 
 
 
@@ -335,12 +335,12 @@ FAT_print_directory (FatDir * Dir, uint8_t entryFilter, BPB * bpb);
  * 
  * Return      : FAT Error Flag     Returns END_OF_FILE if the function completed successfully and was able to read in
  *                                  and print a file's contents to the screen. Any other value returned indicates an
- *                                  an error. Pass the returned value to FAT_print_error(err).
+ *                                  an error. Pass the returned value to fat_print_error(err).
 ***********************************************************************************************************************
 */
 
 uint8_t 
-FAT_print_file (FatDir * Dir, char * file, BPB * bpb);
+fat_print_file (FatDir * Dir, char * file, BPB * bpb);
 
 
 
@@ -355,7 +355,7 @@ FAT_print_file (FatDir * Dir, char * file, BPB * bpb);
 */
 
 void 
-FAT_print_error(uint8_t err);
+fat_print_error(uint8_t err);
 
 
 
