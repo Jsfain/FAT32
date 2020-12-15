@@ -37,11 +37,25 @@ status=$?
 sleep $t
 if [ $status -gt 0 ]
 then
-    echo -e "error compiling FAT32.C"
+    echo -e "error compiling FAT.C"
     echo -e "program exiting with code $status"
     exit $status
 else
-    echo -e "Compiling FAT32.C successful"
+    echo -e "Compiling FAT.C successful"
+fi
+
+
+echo -e "\n\r>> COMPILE: "${Compile[@]}" "$buildDir"/fat_bpb.o "$sourceDir"/fat_bpb.c"
+"${Compile[@]}" $buildDir/fat_bpb.o $sourceDir/fat_bpb.c
+status=$?
+sleep $t
+if [ $status -gt 0 ]
+then
+    echo -e "error compiling FAT_BPB.C"
+    echo -e "program exiting with code $status"
+    exit $status
+else
+    echo -e "Compiling FAT_BPB.C successful"
 fi
 
 
@@ -51,11 +65,11 @@ status=$?
 sleep $t
 if [ $status -gt 0 ]
 then
-    echo -e "error compiling FAT32TOSD.C"
+    echo -e "error compiling FATTOSD.C"
     echo -e "program exiting with code $status"
     exit $status
 else
-    echo -e "Compiling FAT32TOSD.C successful"
+    echo -e "Compiling FATTOSD.C successful"
 fi
 
 
@@ -129,8 +143,8 @@ else
 fi
 
 
-echo -e "\n\r>> LINK: "${Link[@]}" "$buildDir"/avr_fat_test.elf "$buildDir"/avr_fat_test.o  "$buildDir"/spi.o "$buildDir"/sd_spi_base.o "$buildDir"/sd_spi_data_access.o "$buildDir"/usart.o "$buildDir"/prints.o "$buildDir"/fat.o "$buildDir"/fattosd.o"
-"${Link[@]}" $buildDir/avr_fat_test.elf $buildDir/avr_fat_test.o $buildDir/spi.o $buildDir/sd_spi_base.o $buildDir/sd_spi_data_access.o $buildDir/usart.o $buildDir/prints.o $buildDir/fat.o $buildDir/fattosd.o
+echo -e "\n\r>> LINK: "${Link[@]}" "$buildDir"/avr_fat_test.elf "$buildDir"/avr_fat_test.o  "$buildDir"/spi.o "$buildDir"/sd_spi_base.o "$buildDir"/sd_spi_data_access.o "$buildDir"/usart.o "$buildDir"/prints.o "$buildDir"/fat_bpb.o "$buildDir"/fat.o "$buildDir"/fattosd.o"
+"${Link[@]}" $buildDir/avr_fat_test.elf $buildDir/avr_fat_test.o $buildDir/spi.o $buildDir/sd_spi_base.o $buildDir/sd_spi_data_access.o $buildDir/usart.o $buildDir/prints.o $buildDir/fat.o $buildDir/fat_bpb.o $buildDir/fattosd.o
 status=$?
 sleep $t
 if [ $status -gt 0 ]

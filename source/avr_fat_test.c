@@ -74,6 +74,7 @@
 #include "../includes/prints.h"
 #include "../includes/sd_spi_base.h"
 #include "../includes/sd_spi_data_access.h"
+#include "../includes/fat_bpb.h"
 #include "../includes/fat.h"
 #include "../includes/fattodisk_interface.h"
 
@@ -151,6 +152,91 @@ int main(void)
           fat_print_boot_sector_error (err);
         }
     
+      /*
+      print_str("\n\rbytesPerSec           = ");print_dec(bpb.bytesPerSec);
+      print_str("\n\rsecPerClus            = ");print_dec(bpb.secPerClus);
+      print_str("\n\rrsvdSecCnt            = ");print_dec(bpb.rsvdSecCnt);
+      print_str("\n\rnumOfFats             = ");print_dec(bpb.numOfFats);
+      print_str("\n\rfatSize32             = ");print_dec(bpb.fatSize32);
+      print_str("\n\rrootClus              = ");print_dec(bpb.rootClus);
+      print_str("\n\rbootSecAddr           = ");print_dec(bpb.bootSecAddr);
+      print_str("\n\rdataRegionFirstSector = ");print_dec(bpb.dataRegionFirstSector);
+      */
+      
+      //MP3Dir artistDir = {" ", bpb.rootClus, bpb.rootClus, 0, 0, 0, 0, 0};
+      FatDir cwd;
+      fat_set_directory_to_root (&cwd, &bpb);
+
+      FatEntry ent;
+
+      
+      fat_init_entry(&ent, &bpb);
+      
+      print_str("\n\rent.longName                   = ");print_str(ent.longName);
+      print_str("\n\rent.shortName                  = ");print_str(ent.shortName);
+      print_str("\n\rent.shortNameEntry             = { ");
+      for (uint8_t i = 0; i < 31; i++)
+        { 
+          print_hex(ent.shortNameEntry[i]);
+          print_str(", ");
+        }
+      print_hex(ent.shortNameEntry[31]);
+      print_str("} ");
+      print_str("\n\rent.longNameEntryCount         = ");print_dec(ent.longNameEntryCount);
+      print_str("\n\rent.shortNameEntryClusIndex    = ");print_dec(ent.shortNameEntryClusIndex);
+      print_str("\n\rent.shortNameEntrySecNumInClus = ");print_dec(ent.shortNameEntrySecNumInClus);
+      print_str("\n\rent.shortNameEntryPosInSec     = ");print_dec(ent.shortNameEntryPosInSec);
+      print_str("\n\rent.lnFlags                    = ");print_dec(ent.lnFlags);
+      print_str("\n\rent.snPosCurrSec               = ");print_dec(ent.snPosCurrSec);
+      print_str("\n\rent.snPosCurrSec               = ");print_dec(ent.snPosCurrSec);
+
+ 
+
+      print_str("\n\n\r");
+      while(1)
+      {
+        usart_receive();
+        err = fat_next_entry(&cwd,&ent,&bpb);
+
+        print_str("\n\rerr = ");print_hex(err);
+        print_str("\n\rent.longName                   = ");print_str(ent.longName);
+        print_str("\n\rent.shortName                  = ");print_str(ent.shortName);
+        print_str("\n\rent.shortNameEntry             = { ");
+        for (uint8_t i = 0; i < 31; i++)
+          { 
+            print_hex(ent.shortNameEntry[i]);
+            print_str(", ");
+          }
+        print_hex(ent.shortNameEntry[31]);
+        print_str("} ");
+        print_str("\n\rent.longNameEntryCount         = ");print_dec(ent.longNameEntryCount);
+        print_str("\n\rent.shortNameEntryClusIndex    = ");print_dec(ent.shortNameEntryClusIndex);
+        print_str("\n\rent.shortNameEntrySecNumInClus = ");print_dec(ent.shortNameEntrySecNumInClus);
+        print_str("\n\rent.shortNameEntryPosInSec     = ");print_dec(ent.shortNameEntryPosInSec);
+        print_str("\n\rent.lnFlags                    = ");print_dec(ent.lnFlags);
+        print_str("\n\rent.snPosCurrSec               = ");print_dec(ent.snPosCurrSec);
+        print_str("\n\rent.snPosCurrSec               = ");print_dec(ent.snPosCurrSec);
+      }
+/*
+      print_str("\n\rPORTL = 0x");print_hex(PORTL);
+      print_str("\n\rPINL = 0x");print_hex(PINL);
+      print_str("\n\rDDRL = 0x");print_hex(DDRL);
+
+      DDRL &= ~(1 << DDL2);
+      print_str("\n\n\rDDRL = 0x");print_hex(DDRL);
+      print_str("\n\rPORTL = 0x");print_hex(PORTL);
+
+    
+      //print_str("\n\rerr = 0x"); print_hex(err);
+      while(1)
+      {        
+        while ( !(PINL & PINL2));
+        err = mp3_next_artist(&artistDir,&bpb);
+        print_str(artistDir.dirName);
+        while (PINL & PINL2);
+      };
+*/
+      /*
       // Create a Fat Directory instance. This will hold members which
       // specify a current working directory. This instance should first be
       // set to point to the root directory. Afterwards it can be operated
@@ -297,7 +383,7 @@ int main(void)
 
       //                      END FAT "Command-Line" Section
       // **********************************************************************
-
+      */
 
 
       // **********************************************************************

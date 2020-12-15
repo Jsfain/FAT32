@@ -2,9 +2,11 @@
 ***********************************************************************************************************************
 *                                                       AVR-FAT MODULE
 *
-* File   : FAT.C
-* Author : Joshua Fain
-* Target : ATMega1280
+* File    : FAT.C
+* Version : 0.0.0.2
+* Author  : Joshua Fain
+* Target  : ATMega1280
+* Copyright (c) 2020 Joshua Fain
 *
 *
 * DESCRIPTION: 
@@ -14,34 +16,20 @@
 *
 *
 * FUNCTION "PUBLIC":
-*  (1) uint8_t  fat_set_bios_parameter_block (BPB * bpb)
-*  (2) void     fat_print_boot_sector_error (uint8_t err)
-*  (3) void     fat_set_directory_to_root (FatDir * Dir, BPB * bpb)
-*  (4) uint8_t  fat_set_directory (FatDir * Dir, char * newDirStr, BPB * bpb)
-*  (5) uint8_t  fat_print_directory (FatDir * Dir, uint8_t entryFilter, BPB * bpb)
-*  (6) uint8_t  fat_print_file (FatDir * Dir, char * file, BPB * bpb)
-*  (7) void     fat_print_error (uint8_t err)
+*  (1) void     fat_set_directory_to_root (FatDir * Dir, BPB * bpb)
+*  (2) uint8_t  fat_set_directory (FatDir * Dir, char * newDirStr, BPB * bpb)
+*  (3) uint8_t  fat_print_directory (FatDir * Dir, uint8_t entryFilter, BPB * bpb)
+*  (4) uint8_t  fat_print_file (FatDir * Dir, char * file, BPB * bpb)
+*  (5) void     fat_print_error (uint8_t err)
 *
 *
 * STRUCTS (defined in FAT.H)
-*  (1) typedef struct BiosParameterBlock BPB
-*  (2) typedef struct FatDirectory FatDir
+*  typedef struct FatDirectory FatDir
 *
 *                                                 
 *                                                       MIT LICENSE
 *
 * Copyright (c) 2020 Joshua Fain
-*
-* Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated 
-* documentation files (the "Software"), to deal in the Software without restriction, including without limitation the 
-* rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to 
-* permit ersons to whom the Software is furnished to do so, subject to the following conditions: The above copyright 
-* notice and this permission notice shall be included in all copies or substantial portions of the Software.
-* 
-* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE 
-* WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
-* COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR 
-* OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ***********************************************************************************************************************
 */
 
@@ -49,6 +37,7 @@
 
 #include <string.h>
 #include <avr/io.h>
+#include "../includes/fat_bpb.h"
 #include "../includes/fat.h"
 #include "../includes/prints.h"
 #include "../includes/usart.h"
@@ -81,145 +70,7 @@ uint8_t pvt_get_next_sector (uint8_t * nextSecArr, uint32_t currSecNumInClus,
 
 
 
-/*
-***********************************************************************************************************************
- *                                            "PUBLIC" FUNCTION DEFINITIONS
-***********************************************************************************************************************
-*/
 
-
-/*
-***********************************************************************************************************************
- *                                   SET MEMBERS OF THE BIOS PARAMETER BLOCK STRUCT
- * 
- * A valid BPB struct instance is a required argument of any function that accesses the FAT volume, therefore this
- * function should be called first, before implementing any other parts of this FAT module.
- *                                         
- * Description : This function will set the members of a BiosParameterBlock (BPB) struct instance according to the
- *               values specified within the FAT volume's Bios Parameter Block / Boot Sector. 
- * 
- * Argument    : *bpb        Pointer to a BPB struct instance. This function will set the members of this instance.
- * 
- * Return      : Boot sector error flag     See the FAT.H header file for a list of these flags. To print the returned
- *                                          value, pass it to fat_print_boot_sector_error(err). If the BPB instance's
- *                                          members are successfully set then BOOT_SECTOR_VALID is returned. Any other
- *                                          returned value indicates a failure. 
- * 
- * Note        : This function DOES NOT set the values a physical FAT volume's Bios Parameter Block as would be 
- *               required during formatting of a FAT volume. This module can only read a FAT volume's contents and does
- *               not have the capability to modify anything on the volume itself, this includes formatting a volume.
-***********************************************************************************************************************
-*/
-
-uint8_t 
-fat_set_bios_parameter_block (BPB * bpb)
-{
-  uint8_t BootSector[SECTOR_LEN];
-  uint8_t err;
-
-  // 0xFFFFFFFF is returned for the boot sector location, then locating it failed.
-  bpb->bootSecAddr = fat_to_disk_find_boot_sector();
-  
-  if (bpb->bootSecAddr != 0xFFFFFFFF)
-    {
-      err = fat_to_disk_read_single_sector (bpb->bootSecAddr, BootSector);
-      if (err == 1) return FAILED_READ_BOOT_SECTOR;
-    }
-  else
-    return BOOT_SECTOR_NOT_FOUND;
-
-  // Confirm signature bytes
-  if ((BootSector[SECTOR_LEN - 2] == 0x55) && (BootSector[SECTOR_LEN - 1] == 0xAA))
-    {
-      bpb->bytesPerSec = BootSector[12];
-      bpb->bytesPerSec <<= 8;
-      bpb->bytesPerSec |= BootSector[11];
-      
-      if (bpb->bytesPerSec != SECTOR_LEN)
-        return INVALID_BYTES_PER_SECTOR;
-
-      // secPerClus
-      bpb->secPerClus = BootSector[13];
-
-      if ((bpb->secPerClus != 1 ) && (bpb->secPerClus != 2 ) && (bpb->secPerClus != 4 ) && (bpb->secPerClus != 8) 
-         && (bpb->secPerClus != 16) && (bpb->secPerClus != 32) && (bpb->secPerClus != 64) && (bpb->secPerClus != 128))
-        {
-          return INVALID_SECTORS_PER_CLUSTER;
-        }
-
-      bpb->rsvdSecCnt = BootSector[15];
-      bpb->rsvdSecCnt <<= 8;
-      bpb->rsvdSecCnt |= BootSector[14];
-
-      bpb->numOfFats = BootSector[16];
-
-      bpb->fatSize32 =  BootSector[39];
-      bpb->fatSize32 <<= 8;
-      bpb->fatSize32 |= BootSector[38];
-      bpb->fatSize32 <<= 8;
-      bpb->fatSize32 |= BootSector[37];
-      bpb->fatSize32 <<= 8;
-      bpb->fatSize32 |= BootSector[36];
-
-      bpb->rootClus =  BootSector[47];
-      bpb->rootClus <<= 8;
-      bpb->rootClus |= BootSector[46];
-      bpb->rootClus <<= 8;
-      bpb->rootClus |= BootSector[45];
-      bpb->rootClus <<= 8;
-      bpb->rootClus |= BootSector[44];
-
-      bpb->dataRegionFirstSector = bpb->bootSecAddr + bpb->rsvdSecCnt + (bpb->numOfFats * bpb->fatSize32);
-      
-      return BOOT_SECTOR_VALID;
-    }
-  else 
-    return NOT_BOOT_SECTOR;
-}
-
-
-
-/*
-***********************************************************************************************************************
- *                                             PRINT BOOT SECTOR ERROR FLAG
- * 
- * Description : Call this function to print the error flag returned by the function fat_set_bios_parameter_block(). 
- * 
- * Argument    : err    Boot Sector Error flag returned the function fat_set_bios_parameter_block().
-***********************************************************************************************************************
-*/
-
-void 
-fat_print_boot_sector_error (uint8_t err)
-{  
-  switch (err)
-  {
-    case BOOT_SECTOR_VALID : 
-      print_str ("BOOT_SECTOR_VALID ");
-      break;
-    case CORRUPT_BOOT_SECTOR :
-      print_str ("CORRUPT_BOOT_SECTOR ");
-      break;
-    case NOT_BOOT_SECTOR :
-      print_str ("NOT_BOOT_SECTOR ");
-      break;
-    case INVALID_BYTES_PER_SECTOR:
-      print_str ("INVALID_BYTES_PER_SECTOR");
-      break;
-    case INVALID_SECTORS_PER_CLUSTER:
-      print_str ("INVALID_SECTORS_PER_CLUSTER");
-      break;
-    case BOOT_SECTOR_NOT_FOUND:
-      print_str ("BOOT_SECTOR_NOT_FOUND");
-      break;
-    case FAILED_READ_BOOT_SECTOR:
-      print_str ("FAILED_READ_BOOT_SECTOR");
-      break;
-    default:
-      print_str ("UNKNOWN_ERROR");
-      break;
-  }
-}
 
 
 
@@ -257,6 +108,26 @@ fat_set_directory_to_root (FatDir * Dir, BPB * bpb)
 
 
 
+void
+fat_init_entry(FatEntry * ent, BPB * bpb)
+{
+  for(uint8_t i = 0; i < LONG_NAME_STRING_LEN_MAX; i++)
+    ent->longName[i] = '\0';
+
+  for(uint8_t i = 0; i < 13; i++)
+    ent->shortName[i] = '\0';
+
+  for(uint8_t i = 0; i < 32; i++)
+    ent->shortNameEntry[i] = 0;
+
+  ent->longNameEntryCount = 0;
+  ent->shortNameEntryClusIndex = bpb->rootClus;
+  ent->shortNameEntrySecNumInClus = 0;
+  ent->shortNameEntryPosInSec = 0;
+  ent->lnFlags = 0;
+  ent->snPosCurrSec = 0;
+  ent->snPosCurrSec = 0;
+}
 
 /*
 ***********************************************************************************************************************
@@ -462,7 +333,7 @@ fat_set_directory (FatDir * Dir, char * newDirStr, BPB * bpb)
             }
         }
     } 
-  while ((clusIndx = pvt_get_next_cluster_index(clusIndx, bpb)) != END_OF_CLUSTER);
+  while ((clusIndx = pvt_get_next_cluster_index(clusIndx, bpb)) != END_CLUSTER);
   
   return END_OF_DIRECTORY;
 }
@@ -700,7 +571,7 @@ fat_print_directory (FatDir * Dir, uint8_t entryFilter, BPB * bpb)
             }
         }
     }
-  while ((clusIndx = pvt_get_next_cluster_index( clusIndx, bpb )) != END_OF_CLUSTER);
+  while ((clusIndx = pvt_get_next_cluster_index( clusIndx, bpb )) != END_CLUSTER);
 
   return END_OF_DIRECTORY;
 }
@@ -940,10 +811,274 @@ fat_print_file (FatDir * Dir, char * fileNameStr, BPB * bpb)
             }
         }
     } 
-  while ((clusIndx = pvt_get_next_cluster_index (clusIndx, bpb)) != END_OF_CLUSTER);
+  while ((clusIndx = pvt_get_next_cluster_index (clusIndx, bpb)) != END_CLUSTER);
   return FILE_NOT_FOUND; 
 }
 
+
+
+uint8_t 
+fat_next_entry (FatDir * currDir, FatEntry * currEntry, BPB * bpb)
+{
+  uint8_t  currSecArr[bpb->bytesPerSec]; 
+  uint8_t  nextSecArr[bpb->bytesPerSec];
+  uint8_t  attrByte;       // attribute byte
+  uint32_t currSecNumPhys; // physical (disk) sector number
+  uint8_t  entryCorrectionFlag = 0;
+  char     lnStr[LONG_NAME_STRING_LEN_MAX];
+  uint8_t  lnStrIndx = 0;
+  uint8_t  err;
+
+  uint32_t clusIndx = currEntry->shortNameEntryClusIndex;
+  uint8_t  currSecNumInClus = currEntry->shortNameEntrySecNumInClus;
+  uint16_t entryPos = currEntry->shortNameEntryPosInSec;
+  uint8_t  lnFlags = currEntry->lnFlags;
+  uint16_t snPosCurrSec = currEntry->snPosCurrSec;
+  uint16_t snPosNextSec = currEntry->snPosNextSec;
+
+  uint8_t  currSecNumInClusStart = 1;
+  uint8_t  entryPosStart = 1;
+
+  do 
+    {
+      if (currSecNumInClusStart == 0) currSecNumInClus = 0; 
+      for (; currSecNumInClus < bpb->secPerClus; currSecNumInClus++)
+        {
+          currSecNumInClusStart = 0;
+
+          // load sector bytes into currSecArr[]
+          currSecNumPhys = currSecNumInClus + bpb->dataRegionFirstSector + ((clusIndx - 2) * bpb->secPerClus);
+          err = fat_to_disk_read_single_sector (currSecNumPhys, currSecArr);
+          if (err == 1) return FAILED_READ_SECTOR;
+          
+          if (entryPosStart == 0) entryPos = 0; 
+          for (; entryPos < bpb->bytesPerSec; entryPos = entryPos + ENTRY_LEN)
+            {
+              entryPosStart = 0;
+
+              entryCorrectionFlag = pvt_correct_entry_check (lnFlags, &(entryPos), &(snPosCurrSec), &(snPosNextSec));
+              
+              if (entryCorrectionFlag == 1)
+                {
+                  entryCorrectionFlag = 0;
+                  break;    
+                }
+
+              // reset long name flags
+              lnFlags = 0;
+
+              // If first value of entry is 0 then all subsequent entries are empty.
+              if (currSecArr[entryPos] == 0) 
+                return END_OF_DIRECTORY;
+
+              // Skip and go to next entry if Only continue with current entry if it has not been marked for deletion
+              if (currSecArr[entryPos] != 0xE5)
+                {
+                  attrByte = currSecArr[entryPos + 11];
+                  
+                  if ((attrByte & LONG_NAME_ATTR_MASK) == LONG_NAME_ATTR_MASK)
+                    {
+                      if ( !(currSecArr[entryPos] & LONG_NAME_LAST_ENTRY)) return CORRUPT_FAT_ENTRY;
+
+                      for (uint8_t k = 0; k < LONG_NAME_STRING_LEN_MAX; k++) lnStr[k] = '\0';
+ 
+                      lnStrIndx = 0;
+
+                      pvt_set_long_name_flags ( &lnFlags, entryPos, &snPosCurrSec, currSecArr, bpb);
+
+                      if (lnFlags & (LONG_NAME_CROSSES_SECTOR_BOUNDARY | LONG_NAME_LAST_SECTOR_ENTRY))
+                        {
+                          err = pvt_get_next_sector (nextSecArr, currSecNumInClus, currSecNumPhys, clusIndx, bpb);
+
+                          if (err == FAILED_READ_SECTOR) return FAILED_READ_SECTOR;
+                          snPosNextSec = snPosCurrSec - bpb->bytesPerSec;
+                          attrByte = nextSecArr[snPosNextSec + 11];
+
+                          // If snPosNextSec points to a long name entry then something is wrong.
+                          if ((attrByte & LONG_NAME_ATTR_MASK) == LONG_NAME_ATTR_MASK)
+                            return CORRUPT_FAT_ENTRY;
+                          
+                          // print long name if filter flag is set.
+                          if (lnFlags & LONG_NAME_CROSSES_SECTOR_BOUNDARY)
+                            {
+                              // Entry immediately preceeding short name must be the long names's first entry.
+                              if ((nextSecArr[snPosNextSec - ENTRY_LEN] & LONG_NAME_ORDINAL_MASK) != 1) 
+                                return CORRUPT_FAT_ENTRY;                                              
+
+                              //pvt_print_entry_fields (nextSecArr, snPosNextSec, 0);
+
+                              // load long name entryPos into lnStr[]
+                              pvt_load_long_name (snPosNextSec - ENTRY_LEN, 0, nextSecArr, lnStr, &lnStrIndx);
+                              pvt_load_long_name (SECTOR_LEN - ENTRY_LEN, entryPos, currSecArr, lnStr, &lnStrIndx);
+                              
+                              for (uint8_t i = 0; i < LONG_NAME_STRING_LEN_MAX; i++)
+                                {
+                                  currEntry->longName[i] = lnStr[i];
+                                  if (lnStr == '\0') break;
+                                }
+
+                              currEntry->shortNameEntryPosInSec = entryPos;
+                              currEntry->shortNameEntrySecNumInClus = currSecNumInClus;
+                              currEntry->shortNameEntryClusIndex = clusIndx;
+                              currEntry->snPosCurrSec = snPosCurrSec;
+                              currEntry->snPosNextSec = snPosNextSec;
+                              currEntry->lnFlags = lnFlags;
+                              currEntry->longNameEntryCount = currSecArr[entryPos] & 0x3F;
+
+                              for (uint8_t i = 0; i < 32; i++)
+                                currEntry->shortNameEntry[i] = nextSecArr[snPosNextSec + i];
+
+                              uint8_t snLen;
+                              if (strlen(lnStr) < 8) snLen = strlen(lnStr);
+                              else snLen = 8; 
+
+                              char sn[9];                                    
+                              for (uint8_t k = 0; k < snLen; k++)  
+                                sn[k] = nextSecArr[snPosNextSec + k];
+                              sn[snLen] = '\0';
+
+                              strcpy(currEntry->shortName, sn);
+
+                              return SUCCESS;
+                            }
+
+                          else if (lnFlags & LONG_NAME_LAST_SECTOR_ENTRY)
+                            {
+                              // Entry immediately preceeding short name must be the long names's first entry.
+                              if ((currSecArr[SECTOR_LEN - ENTRY_LEN] & LONG_NAME_ORDINAL_MASK) != 1) 
+                                return CORRUPT_FAT_ENTRY;
+                    
+                              pvt_print_entry_fields (nextSecArr, snPosNextSec, 0);
+
+                              // load long name entryPos into lnStr[]
+                              pvt_load_long_name (SECTOR_LEN - ENTRY_LEN, entryPos, currSecArr, lnStr, &lnStrIndx);
+                              
+                              for (uint8_t i = 0; i < LONG_NAME_STRING_LEN_MAX; i++)
+                                {
+                                  currEntry->longName[i] = lnStr[i];
+                                  if (lnStr == '\0') break;
+                                }
+
+                              currEntry->shortNameEntryPosInSec = entryPos;
+                              currEntry->shortNameEntrySecNumInClus = currSecNumInClus;
+                              currEntry->shortNameEntryClusIndex = clusIndx;
+                              currEntry->snPosCurrSec = snPosCurrSec;
+                              currEntry->snPosNextSec = snPosNextSec;
+                              currEntry->lnFlags = lnFlags;
+                              currEntry->longNameEntryCount = currSecArr[entryPos] & 0x3F;
+
+                              for (uint8_t i = 0; i < 32; i++)
+                                currEntry->shortNameEntry[i] = currSecArr[snPosCurrSec + i];
+
+                              uint8_t snLen;
+                              if (strlen(lnStr) < 8) snLen = strlen(lnStr);
+                              else snLen = 8; 
+
+                              char sn[9];                                    
+                              for (uint8_t k = 0; k < snLen; k++)  
+                                sn[k] = currSecArr[snPosCurrSec + k];
+                              sn[snLen] = '\0';
+
+                              strcpy(currEntry->shortName, sn);
+
+                              return SUCCESS;
+                            }
+                          else return CORRUPT_FAT_ENTRY;
+                        }
+
+                      // Long name exists and is entirely in current sector along with the short name
+                      else
+                        {   
+                          attrByte = currSecArr[snPosCurrSec + 11];
+                          
+                          // if snPosCurrSec points to long name entry, then somethine is wrong.
+                          if ((attrByte & LONG_NAME_ATTR_MASK) == LONG_NAME_ATTR_MASK) return CORRUPT_FAT_ENTRY;
+                 
+                          // Confirm entry preceding short name is first entryPos of a long name.
+                          if ((currSecArr[snPosCurrSec - ENTRY_LEN] & LONG_NAME_ORDINAL_MASK) != 1) 
+                            return CORRUPT_FAT_ENTRY;
+                          
+
+                          // load long name entry into lnStr[]
+                          pvt_load_long_name (snPosCurrSec - ENTRY_LEN, entryPos, currSecArr, lnStr, &lnStrIndx);
+
+                          for (uint8_t i = 0; i < LONG_NAME_STRING_LEN_MAX; i++)
+                            {
+                              currEntry->longName[i] = lnStr[i];
+                              if (lnStr == '\0') break;
+                            }
+
+                          currEntry->shortNameEntryPosInSec = entryPos;
+                          currEntry->shortNameEntrySecNumInClus = currSecNumInClus;
+                          currEntry->shortNameEntryClusIndex = clusIndx;
+                          currEntry->snPosCurrSec = snPosCurrSec;
+                          currEntry->snPosNextSec = snPosNextSec;
+                          currEntry->lnFlags = lnFlags;
+                          currEntry->longNameEntryCount = currSecArr[entryPos] & 0x3F;
+
+                          for (uint8_t i = 0; i < 32; i++)
+                            currEntry->shortNameEntry[i] = currSecArr[snPosCurrSec + i];
+
+                          uint8_t snLen;
+                          if (strlen(lnStr) < 8) snLen = strlen(lnStr);
+                          else snLen = 8; 
+
+                          char sn[9];                                    
+                          for (uint8_t k = 0; k < snLen; k++)  
+                            sn[k] = currSecArr[snPosCurrSec + k];
+                          sn[snLen] = '\0';
+
+                          strcpy(currEntry->shortName, sn);
+
+                          return SUCCESS;                                                             
+                        }                   
+                    }
+
+                  // Long name entry does not exist, use short name instead regardless of SHORT_NAME entryFilter.
+                  else
+                    {
+                      attrByte = currSecArr[entryPos + 11];
+
+                      uint8_t attr = currSecArr[entryPos + 11];
+                      if (attr & 0x10)
+                        {                                
+                          for (uint8_t k = 0; k < 8; k++) 
+                            currEntry->longName[k] = currSecArr[entryPos + k];
+                          
+                          currEntry->longName[8] = '\0';
+
+                          currEntry->shortNameEntryPosInSec = entryPos;
+                          currEntry->shortNameEntrySecNumInClus = currSecNumInClus;
+                          currEntry->shortNameEntryClusIndex = clusIndx;
+                          currEntry->snPosCurrSec = snPosCurrSec;
+                          currEntry->snPosNextSec = snPosNextSec;
+                          currEntry->lnFlags = lnFlags;
+                          currEntry->longNameEntryCount = 0;
+
+                          for (uint8_t i = 0; i < 32; i++)
+                            currEntry->shortNameEntry[i] = currSecArr[snPosCurrSec + i];
+
+                          uint8_t snLen;
+                          if (strlen(lnStr) < 8) snLen = strlen(lnStr);
+                          else snLen = 8; 
+
+                          char sn[9];                                    
+                          for (uint8_t k = 0; k < snLen; k++)  
+                            sn[k] = currSecArr[snPosCurrSec + k];
+                          sn[snLen] = '\0';
+
+                          strcpy(currEntry->shortName, sn);
+                          return SUCCESS;  
+                        }
+                    }
+                }
+            }
+        }
+    }
+  while ((clusIndx = pvt_get_next_cluster_index(clusIndx, bpb)) != END_CLUSTER);
+
+  return END_OF_DIRECTORY;
+}
 
 
 /*
@@ -993,6 +1128,8 @@ fat_print_error (uint8_t err)
       break;
   }
 }
+
+
 
 
 
@@ -1593,7 +1730,7 @@ pvt_print_fat_file (uint16_t entryPos, uint8_t *fileSector, BPB * bpb)
               }
           }
       } 
-    while (((cluster = pvt_get_next_cluster_index(cluster,bpb)) != END_OF_CLUSTER));
+    while (((cluster = pvt_get_next_cluster_index(cluster,bpb)) != END_CLUSTER));
     return END_OF_FILE;
   }
 

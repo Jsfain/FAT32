@@ -2,9 +2,11 @@
 ***********************************************************************************************************************
 *                                                       AVR-FAT MODULE
 *
-* File   : FAT.H
-* Author : Joshua Fain
-* Target : ATMega1280
+* File    : FAT.H
+* Version : 0.0.0.2
+* Author  : Joshua Fain
+* Target  : ATMega1280
+* Copyright (c) 2020 Joshua Fain
 *
 *
 * DESCRIPTION: 
@@ -15,34 +17,16 @@
 *
 *
 * FUNCTION "PUBLIC":
-*  (1) uint8_t  fat_set_bios_parameter_block (BPB * bpb)
-*  (2) void     fat_print_boot_sector_error (uint8_t err)
-*  (3) void     fat_set_directory_to_root (FatDir * Dir, BPB * bpb)
-*  (4) uint8_t  fat_set_directory (FatDir * Dir, char * newDirStr, BPB * bpb)
-*  (5) uint8_t  fat_print_directory (FatDir * Dir, uint8_t entryFilter, BPB * bpb)
-*  (6) uint8_t  fat_print_file (FatDir * Dir, char * file, BPB * bpb)
-*  (7) void     fat_print_error (uint8_t err)
+*  (1) void     fat_set_directory_to_root (FatDir * Dir, BPB * bpb)
+*  (2) uint8_t  fat_set_directory (FatDir * Dir, char * newDirStr, BPB * bpb)
+*  (3) uint8_t  fat_print_directory (FatDir * Dir, uint8_t entryFilter, BPB * bpb)
+*  (4) uint8_t  fat_print_file (FatDir * Dir, char * file, BPB * bpb)
+*  (5) void     fat_print_error (uint8_t err)
 *
 *
 * STRUCTS USED (defined in FAT.H):
-*  (1) typedef struct BiosParameterBlock BPB
-*  (2) typedef struct FatDirectory FatDir
+*  typedef struct FatDirectory FatDir
 *
-*                                                 
-*                                                       MIT LICENSE
-*
-* Copyright (c) 2020 Joshua Fain
-*
-* Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated 
-* documentation files (the "Software"), to deal in the Software without restriction, including without limitation the 
-* rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to 
-* permit ersons to whom the Software is furnished to do so, subject to the following conditions: The above copyright 
-* notice and this permission notice shall be included in all copies or substantial portions of the Software.
-* 
-* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE 
-* WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
-* COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR 
-* OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ***********************************************************************************************************************
 */
 
@@ -63,7 +47,7 @@
 
 #define SECTOR_LEN                                512
 #define ENTRY_LEN                                 32
-#define END_OF_CLUSTER                            0x0FFFFFFF
+#define END_CLUSTER                            0x0FFFFFFF
 
 
 // ******* Maximum FAT String Length Flags
@@ -74,15 +58,6 @@
 #define PATH_STRING_LEN_MAX                       100
 #define LONG_NAME_STRING_LEN_MAX                  100
 
-
-// ******* Boot Sector Error Flags
-#define CORRUPT_BOOT_SECTOR                       0x01
-#define NOT_BOOT_SECTOR                           0x02
-#define INVALID_BYTES_PER_SECTOR                  0x04
-#define INVALID_SECTORS_PER_CLUSTER               0x08
-#define BOOT_SECTOR_NOT_FOUND                     0x10
-#define BOOT_SECTOR_VALID                         0x20
-#define FAILED_READ_BOOT_SECTOR                   0x40
 
 
 // ******* Fat Error Flags
@@ -146,25 +121,7 @@
 ***********************************************************************************************************************
 */
 
-// ****** Bios Paramater Block struct
 
-// An instance of this struct should hold specific values set in the FAT volume's
-// BIOS Parameter Block, as well as a few calculated values based on BPB values.
-// These values should be set only by passing an instance of the struct to 
-// FAT (BPB * bpb)
-typedef struct BiosParameterBlock
-{
-  uint16_t bytesPerSec;
-  uint8_t  secPerClus;
-  uint16_t rsvdSecCnt;
-  uint8_t  numOfFats;
-  uint32_t fatSize32;
-  uint32_t rootClus;
-
-  uint32_t bootSecAddr;
-  uint32_t dataRegionFirstSector;
-} 
-BPB;
 
 
 // ****** FAT Directory Struct
@@ -189,54 +146,29 @@ typedef struct FatDirectory
 FatDir;
 
 
+// Holds state of an entry in a Fat directory
+typedef struct FatEntry
+{
+  char longName[LONG_NAME_STRING_LEN_MAX];
+  char shortName[13]; // size 13 for 8+3 entry size, '.' separator and '\0' string termination 
+  uint8_t  shortNameEntry[32]; // Array to hold all of the entry points 
+  uint8_t  longNameEntryCount; 
+  uint32_t shortNameEntryClusIndex; 
+  uint8_t  shortNameEntrySecNumInClus; 
+  uint16_t shortNameEntryPosInSec;
+
+  uint8_t  lnFlags;;
+  uint16_t snPosCurrSec;
+  uint16_t snPosNextSec;
+}
+FatEntry;
+
 
 /*
 ***********************************************************************************************************************
  *                                                       FUNCTIONS
 ***********************************************************************************************************************
 */
-
-
-/*
-***********************************************************************************************************************
- *                                   SET MEMBERS OF THE BIOS PARAMETER BLOCK STRUCT
- * 
- * A valid BPB struct instance is a required argument of any function that accesses the FAT volume, therefore this
- * function should be called first, before implementing any other parts of this FAT module.
- *                                         
- * Description : This function will set the members of a BiosParameterBlock (BPB) struct instance according to the
- *               values specified within the FAT volume's Bios Parameter Block / Boot Sector. 
- * 
- * Argument    : *bpb        Pointer to a BPB struct instance. This function will set the members of this instance.
- * 
- * Return      : Boot sector error flag     See the FAT.H header file for a list of these flags. To print the returned
- *                                          value, pass it FATfat_print_boot_sector_error(err). If the BPB instance's
- *                                          members are successfully set then BOOT_SECTOR_VALID is returned. Any other 
- *                                          returned value indicates a failure. 
- * 
- * Note        : This function DOES NOT set the values a physical FAT volume's Bios Parameter Block as would be 
- *               required during formatting of a FAT volume. This module can only read a FAT volume's contents and does
- *               not have the capability to modify anything on the volume itself, this includes formatting a volume.
-***********************************************************************************************************************
-*/
-
-uint8_t
-fat_set_bios_parameter_block (BPB * bpb);
-
-
-
-/*
-***********************************************************************************************************************
- *                                             PRINT BOOT SECTOR ERROR FLAG
- * 
- * Description : Call this function to print the error flag returned by the functioFAT(). 
- * 
- * Argument    : err    Boot Sector Error flag returned the functioFAT().
-***********************************************************************************************************************
-*/
-
-void
-fat_print_boot_sector_error (uint8_t err);
 
 
 
@@ -259,6 +191,8 @@ void
 fat_set_directory_to_root(FatDir * Dir, BPB * bpb);
 
 
+void
+fat_init_entry(FatEntry * ent, BPB * bpb);
 
 /*
 ***********************************************************************************************************************
@@ -341,6 +275,11 @@ fat_print_directory (FatDir * Dir, uint8_t entryFilter, BPB * bpb);
 
 uint8_t 
 fat_print_file (FatDir * Dir, char * file, BPB * bpb);
+
+
+
+uint8_t 
+fat_next_entry (FatDir * currDir, FatEntry * currEntry, BPB * bpb);
 
 
 

@@ -41,6 +41,7 @@
 #include "../includes/prints.h"
 #include "../includes/sd_spi_base.h"
 #include "../includes/sd_spi_data_access.h"
+#include "../includes/fat_bpb.h"
 #include "../includes/fat.h"
 #include "../includes/fattodisk_interface.h"
 
