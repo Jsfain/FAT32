@@ -360,6 +360,7 @@ fat_set_directory (FatDir * Dir, char * newDirStr, BPB * bpb)
  *                                  returned indicates an error. To read, pass the value to fat_print_error(err).
 ***********************************************************************************************************************
 */
+/*
 
 uint8_t 
 fat_print_directory (FatDir * Dir, uint8_t entryFilter, BPB * bpb)
@@ -575,7 +576,7 @@ fat_print_directory (FatDir * Dir, uint8_t entryFilter, BPB * bpb)
 
   return END_OF_DIRECTORY;
 }
-
+*/
 
 
 /*
@@ -1076,6 +1077,74 @@ fat_next_entry (FatDir * currDir, FatEntry * currEntry, BPB * bpb)
         }
     }
   while ((clusIndx = pvt_get_next_cluster_index(clusIndx, bpb)) != END_CLUSTER);
+
+  return END_OF_DIRECTORY;
+}
+
+
+/*
+***********************************************************************************************************************
+ *                                       PRINT ENTRIES IN A DIRECTORY TO A SCREEN
+ * 
+ * Description : Prints a list of the entries (files and directories) contained in the directory pointed to by the
+ *               FatDir struct instance. Which entries and fields (e.g. hidden files, creation date, etc...) are
+ *               selected by passing the desired combination of Entry Filter Flags as the entryFilter argument. See the
+ *               specific Entry Filter Flags that can be passed in the FAT.H header file.
+ * 
+ * Arguments   : *Dir             - Pointer to a FatDir struct whose members must be associated with a valid FAT32 Dir
+ *             : entryFilter      - Byte whose value specifies which entries and fields will be printed (short name, 
+ *                                  long name, hidden, creation date, etc...). Any combination of flags can be passed. 
+ *                                  If neither LONG_NAME or SHORT_NAME are passed then no entries will be printed.
+ *             : *bpb             - Pointer to a valid instance of a BPB struct.
+ * 
+ * Return      : FAT Error Flag     Returns END_OF_DIRECTORY if the function completed successfully and it was able to
+ *                                  read in and print entries until reaching the end of the directory. Any other value
+ *                                  returned indicates an error. To read, pass the value to fat_print_error(err).
+***********************************************************************************************************************
+*/
+
+uint8_t 
+fat_print_directory (FatDir * Dir, uint8_t entryFilter, BPB * bpb)
+{
+  //uint32_t clusIndx = Dir->FATFirstCluster;
+ // uint8_t  currSecArr[bpb->bytesPerSec]; 
+ // uint8_t  nextSecArr[bpb->bytesPerSec];
+  //uint8_t  attrByte; // attribute byte
+  //uint32_t currSecNumPhys; // physical (disk) sector number
+  //uint8_t  entryCorrectionFlag = 0;
+  // sn -> short name
+  //uint16_t snPosCurrSec = 0; 
+  //uint16_t snPosNextSec = 0;
+  // ln -> long name
+  //char     lnStr[LONG_NAME_STRING_LEN_MAX];
+  //uint8_t  lnStrIndx = 0;
+  //uint8_t  lnFlags = 0;
+  uint8_t  err;
+
+  // Prints column headers according to entryFilter
+  print_str("\n\n\r");
+  if (CREATION & entryFilter) print_str(" CREATION DATE & TIME,");
+  if (LAST_ACCESS & entryFilter) print_str(" LAST ACCESS DATE,");
+  if (LAST_MODIFIED & entryFilter) print_str(" LAST MODIFIED DATE & TIME,");
+  if (FILE_SIZE & entryFilter) print_str(" SIZE,");
+  if (TYPE & entryFilter) print_str(" TYPE,");
+  
+  print_str(" NAME");
+  print_str("\n\r");
+
+  FatEntry ent;
+  fat_init_entry(&ent, bpb);
+  ent.shortNameEntryClusIndex = Dir->FATFirstCluster;
+
+  
+  do 
+    {
+      err = fat_next_entry(Dir, &ent, bpb);
+      pvt_print_entry_fields (ent.shortNameEntry, 0, entryFilter);
+      print_str(ent.longName);
+      print_str("\n\r");
+    }
+  while (err != END_OF_DIRECTORY);
 
   return END_OF_DIRECTORY;
 }

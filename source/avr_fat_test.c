@@ -191,7 +191,7 @@ int main(void)
       print_str("\n\rent.snPosCurrSec               = ");print_dec(ent.snPosCurrSec);
 
  
-
+/*
       print_str("\n\n\r");
       while(1)
       {
@@ -217,6 +217,10 @@ int main(void)
         print_str("\n\rent.snPosCurrSec               = ");print_dec(ent.snPosCurrSec);
         print_str("\n\rent.snPosCurrSec               = ");print_dec(ent.snPosCurrSec);
       }
+      */
+
+      
+      fat_print_directory (&cwd, ALL, &bpb);
 /*
       print_str("\n\rPORTL = 0x");print_hex(PORTL);
       print_str("\n\rPINL = 0x");print_hex(PINL);
