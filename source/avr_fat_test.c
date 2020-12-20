@@ -79,10 +79,18 @@
 #include "../includes/fattodisk_interface.h"
 
 
+void
+fat_print_fat_entry_members(FatEntry * entry);
+
+void
+fat_print_fat_directory_members(FatDir * dir);
+
+
 // local function used for raw data access sd card access.
 // only used by this test file. In the SD Card Raw Data Access 
 // section. Not the AVR-FAT demo section. 
-uint32_t enterBlockNumber();
+uint32_t 
+enterBlockNumber();
 
 
 
@@ -110,18 +118,19 @@ int main(void)
   // Attempt, up to 10 times, to initialize the SD card.
   for (int i = 0; i < 10; i++)
     {
-      print_str ("\n\n\r SD Card Initialization Attempt # "); print_dec (i);
+      print_str("\n\n\r SD Card Initialization Attempt # "); print_dec(i);
       initResponse = sd_spi_mode_init (&ctv);
       if (((initResponse & 0xFF) != 0) && ((initResponse & 0xFFF00) != 0))
         {    
-          print_str ("\n\n\r FAILED INITIALIZING SD CARD");
-          print_str ("\n\r Initialization Error Response: "); 
-          sd_spi_print_init_error (initResponse);
-          print_str ("\n\r R1 Response: "); sd_spi_print_r1 (initResponse);
+          print_str("\n\n\r FAILED INITIALIZING SD CARD");
+          print_str("\n\r Initialization Error Response: "); 
+          sd_spi_print_init_error(initResponse);
+          print_str ("\n\r R1 Response: "); 
+          sd_spi_print_r1 (initResponse);
         }
       else
         {   
-          print_str ("\n\r SUCCESSFULLY INITIALIZED SD CARD");
+          print_str("\n\r SUCCESSFULLY INITIALIZED SD CARD");
           break;
         }
     }
@@ -141,112 +150,29 @@ int main(void)
       // error variable for errors returned by any of the FAT functions.
       uint8_t err; 
       
+
       // Create and set Bios Parameter Block instance. These members will 
       // assist in pointing to region locations in the FAT volume. This only 
       // needs to be called set once.
       BPB bpb;
-      err = fat_set_bios_parameter_block (&bpb);
+      err = fat_set_bios_parameter_block(&bpb);
       if (err != BOOT_SECTOR_VALID)
         {
-          print_str ("\n\r fat_set_bios_parameter_block() returned ");
-          fat_print_boot_sector_error (err);
+          print_str("\n\r fat_set_bios_parameter_block() returned ");
+          fat_print_boot_sector_error(err);
         }
     
-      /*
-      print_str("\n\rbytesPerSec           = ");print_dec(bpb.bytesPerSec);
-      print_str("\n\rsecPerClus            = ");print_dec(bpb.secPerClus);
-      print_str("\n\rrsvdSecCnt            = ");print_dec(bpb.rsvdSecCnt);
-      print_str("\n\rnumOfFats             = ");print_dec(bpb.numOfFats);
-      print_str("\n\rfatSize32             = ");print_dec(bpb.fatSize32);
-      print_str("\n\rrootClus              = ");print_dec(bpb.rootClus);
-      print_str("\n\rbootSecAddr           = ");print_dec(bpb.bootSecAddr);
-      print_str("\n\rdataRegionFirstSector = ");print_dec(bpb.dataRegionFirstSector);
-      */
-      
-      //MP3Dir artistDir = {" ", bpb.rootClus, bpb.rootClus, 0, 0, 0, 0, 0};
-      FatDir cwd;
-      fat_set_directory_to_root (&cwd, &bpb);
 
+      // Holds parameters/state of an entry in a FAT directory.
+      // Initialize by passing it to fat_init_entry();
       FatEntry ent;
-
-      
       fat_init_entry(&ent, &bpb);
-      
-      print_str("\n\rent.longName                   = ");print_str(ent.longName);
-      print_str("\n\rent.shortName                  = ");print_str(ent.shortName);
-      print_str("\n\rent.shortNameEntry             = { ");
-      for (uint8_t i = 0; i < 31; i++)
-        { 
-          print_hex(ent.shortNameEntry[i]);
-          print_str(", ");
-        }
-      print_hex(ent.shortNameEntry[31]);
-      print_str("} ");
-      print_str("\n\rent.longNameEntryCount         = ");print_dec(ent.longNameEntryCount);
-      print_str("\n\rent.shortNameEntryClusIndex    = ");print_dec(ent.shortNameEntryClusIndex);
-      print_str("\n\rent.shortNameEntrySecNumInClus = ");print_dec(ent.shortNameEntrySecNumInClus);
-      print_str("\n\rent.shortNameEntryPosInSec     = ");print_dec(ent.shortNameEntryPosInSec);
-      print_str("\n\rent.lnFlags                    = ");print_dec(ent.lnFlags);
-      print_str("\n\rent.snPosCurrSec               = ");print_dec(ent.snPosCurrSec);
-      print_str("\n\rent.snPosCurrSec               = ");print_dec(ent.snPosCurrSec);
 
- 
-/*
-      print_str("\n\n\r");
-      while(1)
-      {
-        usart_receive();
-        err = fat_next_entry(&cwd,&ent,&bpb);
 
-        print_str("\n\rerr = ");print_hex(err);
-        print_str("\n\rent.longName                   = ");print_str(ent.longName);
-        print_str("\n\rent.shortName                  = ");print_str(ent.shortName);
-        print_str("\n\rent.shortNameEntry             = { ");
-        for (uint8_t i = 0; i < 31; i++)
-          { 
-            print_hex(ent.shortNameEntry[i]);
-            print_str(", ");
-          }
-        print_hex(ent.shortNameEntry[31]);
-        print_str("} ");
-        print_str("\n\rent.longNameEntryCount         = ");print_dec(ent.longNameEntryCount);
-        print_str("\n\rent.shortNameEntryClusIndex    = ");print_dec(ent.shortNameEntryClusIndex);
-        print_str("\n\rent.shortNameEntrySecNumInClus = ");print_dec(ent.shortNameEntrySecNumInClus);
-        print_str("\n\rent.shortNameEntryPosInSec     = ");print_dec(ent.shortNameEntryPosInSec);
-        print_str("\n\rent.lnFlags                    = ");print_dec(ent.lnFlags);
-        print_str("\n\rent.snPosCurrSec               = ");print_dec(ent.snPosCurrSec);
-        print_str("\n\rent.snPosCurrSec               = ");print_dec(ent.snPosCurrSec);
-      }
-      */
-
-      
-      fat_print_directory (&cwd, ALL, &bpb);
-/*
-      print_str("\n\rPORTL = 0x");print_hex(PORTL);
-      print_str("\n\rPINL = 0x");print_hex(PINL);
-      print_str("\n\rDDRL = 0x");print_hex(DDRL);
-
-      DDRL &= ~(1 << DDL2);
-      print_str("\n\n\rDDRL = 0x");print_hex(DDRL);
-      print_str("\n\rPORTL = 0x");print_hex(PORTL);
-
-    
-      //print_str("\n\rerr = 0x"); print_hex(err);
-      while(1)
-      {        
-        while ( !(PINL & PINL2));
-        err = mp3_next_artist(&artistDir,&bpb);
-        print_str(artistDir.dirName);
-        while (PINL & PINL2);
-      };
-*/
-      /*
-      // Create a Fat Directory instance. This will hold members which
-      // specify a current working directory. This instance should first be
-      // set to point to the root directory. Afterwards it can be operated
-      // on by the other FAT functions.
+      // Holds parameters to reference a FAT directory.
+      // Must be initialized to the root directory.
       FatDir cwd;
-      fat_set_directory_to_root (&cwd, &bpb);
+      fat_set_directory_to_root(&cwd, &bpb);
       
 
       // This section implements a command-line like interface for navigating
@@ -276,8 +202,10 @@ int main(void)
           numOfChars = 0;
           
           // print cmdStr prompt to screen
-          print_str ("\n\r"); print_str (cwd.longParentPath);
-          print_str (cwd.longName); print_str (" > ");
+          print_str("\n\r"); 
+          print_str(cwd.longParentPath);
+          print_str(cwd.longName); 
+          print_str (" > ");
           
           // Enter commands / arguments
           inputChar = usart_receive();
@@ -387,7 +315,7 @@ int main(void)
 
       //                      END FAT "Command-Line" Section
       // **********************************************************************
-      */
+      
 
 
       // **********************************************************************
@@ -502,4 +430,39 @@ uint32_t enterBlockNumber()
       c = usart_receive();
     }
   return blockNumber;
+}
+
+
+
+void
+fat_print_fat_entry_members(FatEntry * entry)
+{
+  print_str("\n\rentry->longName                   = ");print_str(entry->longName);
+  print_str("\n\rentry->shortName                  = ");print_str(entry->shortName);
+  print_str("\n\rentry->shortNameEntry             = { ");
+  for (uint8_t i = 0; i < 31; i++)
+    { 
+      print_hex(entry->shortNameEntry[i]);
+      print_str(", ");
+    }
+  print_hex(entry->shortNameEntry[31]);
+  print_str("} ");
+  print_str("\n\rentry->longNameEntryCount         = ");print_dec(entry->longNameEntryCount);
+  print_str("\n\rentry->shortNameEntryClusIndex    = ");print_dec(entry->shortNameEntryClusIndex);
+  print_str("\n\rentry->shortNameEntrySecNumInClus = ");print_dec(entry->shortNameEntrySecNumInClus);
+  print_str("\n\rentry->entryPos                   = ");print_dec(entry->entryPos);
+  print_str("\n\rentry->lnFlags                    = ");print_dec(entry->lnFlags);
+  print_str("\n\rentry->snPosCurrSec               = ");print_dec(entry->snPosCurrSec);
+  print_str("\n\rentry->snPosNextSec               = ");print_dec(entry->snPosNextSec);
+}
+
+
+void
+fat_print_fat_directory_members(FatDir * dir)
+{
+  print_str ("\n\rshortName = "); print_str (dir->shortName);
+  print_str ("\n\rshortParentPath = "); print_str (dir->shortParentPath);
+  print_str ("\n\rlongName = "); print_str (dir->longName);
+  print_str ("\n\rlongParentPath = "); print_str (dir->longParentPath);
+  print_str ("\n\rFATFirstCluster = "); print_dec (dir->FATFirstCluster);
 }

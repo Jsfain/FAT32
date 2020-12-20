@@ -152,14 +152,16 @@ typedef struct FatEntry
   char longName[LONG_NAME_STRING_LEN_MAX];
   char shortName[13]; // size 13 for 8+3 entry size, '.' separator and '\0' string termination 
   uint8_t  shortNameEntry[32]; // Array to hold all of the entry points 
+  
+  
+  // these parameters are used to save the state when using "fat_next_entry()"
   uint8_t  longNameEntryCount; 
   uint32_t shortNameEntryClusIndex; 
   uint8_t  shortNameEntrySecNumInClus; 
-  uint16_t shortNameEntryPosInSec;
-
-  uint8_t  lnFlags;;
-  uint16_t snPosCurrSec;
-  uint16_t snPosNextSec;
+  uint16_t entryPos;  
+  uint8_t  lnFlags;
+  uint16_t snPosCurrSec;  // need these for the error correction flag check.
+  uint16_t snPosNextSec;  // which will also reset these.
 }
 FatEntry;
 
@@ -193,6 +195,7 @@ fat_set_directory_to_root(FatDir * Dir, BPB * bpb);
 
 void
 fat_init_entry(FatEntry * ent, BPB * bpb);
+
 
 /*
 ***********************************************************************************************************************
