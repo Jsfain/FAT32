@@ -244,8 +244,6 @@ fat_next_entry (FatDir * currDir, FatEntry * currEntry, BPB * bpb)
                               if ((nextSecArr[snPosNextSec - ENTRY_LEN] & LONG_NAME_ORDINAL_MASK) != 1) 
                                 return CORRUPT_FAT_ENTRY;                                              
 
-                              //pvt_print_entry_fields (nextSecArr, snPosNextSec, 0);
-
                               // load long name entryPos into lnStr[]
                               pvt_load_long_name (snPosNextSec - ENTRY_LEN, 0, nextSecArr, lnStr, &lnStrIndx);
                               pvt_load_long_name (SECTOR_LEN - ENTRY_LEN, entryPos, currSecArr, lnStr, &lnStrIndx);
@@ -283,11 +281,10 @@ fat_next_entry (FatDir * currDir, FatEntry * currEntry, BPB * bpb)
 
                           else if (lnFlags & LONG_NAME_LAST_SECTOR_ENTRY)
                             {
+                              
                               // Entry immediately preceeding short name must be the long names's first entry.
                               if ((currSecArr[SECTOR_LEN - ENTRY_LEN] & LONG_NAME_ORDINAL_MASK) != 1) 
                                 return CORRUPT_FAT_ENTRY;
-                    
-                              pvt_print_entry_fields (nextSecArr, snPosNextSec, 0);
 
                               // load long name entryPos into lnStr[]
                               pvt_load_long_name (SECTOR_LEN - ENTRY_LEN, entryPos, currSecArr, lnStr, &lnStrIndx);
@@ -297,7 +294,7 @@ fat_next_entry (FatDir * currDir, FatEntry * currEntry, BPB * bpb)
                                   currEntry->longName[i] = lnStr[i];
                                   if (lnStr == '\0') break;
                                 }
-
+                              
                               currEntry->entryPos = entryPos;
                               currEntry->shortNameEntrySecNumInClus = currSecNumInClus;
                               currEntry->shortNameEntryClusIndex = clusIndx;
@@ -307,7 +304,7 @@ fat_next_entry (FatDir * currDir, FatEntry * currEntry, BPB * bpb)
                               currEntry->longNameEntryCount = currSecArr[entryPos] & 0x3F;
 
                               for (uint8_t i = 0; i < 32; i++)
-                                currEntry->shortNameEntry[i] = currSecArr[snPosCurrSec + i];
+                                currEntry->shortNameEntry[i] = nextSecArr[snPosNextSec + i];
 
                               uint8_t snLen;
                               if (strlen(lnStr) < 8) snLen = strlen(lnStr);
@@ -315,7 +312,7 @@ fat_next_entry (FatDir * currDir, FatEntry * currEntry, BPB * bpb)
 
                               char sn[9];                                    
                               for (uint8_t k = 0; k < snLen; k++)  
-                                sn[k] = currSecArr[snPosCurrSec + k];
+                                sn[k] = nextSecArr[snPosNextSec + k];
                               sn[snLen] = '\0';
 
                               strcpy(currEntry->shortName, sn);
@@ -588,6 +585,33 @@ uint8_t
 fat_print_file (FatDir * Dir, char * fileNameStr, BPB * bpb)
 {
   if (pvt_check_valid_name (fileNameStr, Dir)) 
+    return INVALID_DIR_NAME;
+
+  FatEntry * ent = malloc(sizeof * ent);
+  fat_init_entry(ent, bpb);
+  ent->shortNameEntryClusIndex = Dir->FATFirstCluster;
+
+  uint8_t err = 0;
+  do 
+    {
+      err = fat_next_entry(Dir, ent, bpb);
+      if (err != SUCCESS) return err;
+      
+      if (!strcmp(ent->longName, fileNameStr))// && (ent->shortNameEntry[11] & DIRECTORY_ENTRY_ATTR))
+        {                                                        
+          return pvt_print_fat_file (0, ent->shortNameEntry, bpb);
+        }
+    }
+  while (err != END_OF_DIRECTORY);
+
+  return END_OF_DIRECTORY;
+}
+
+/*
+uint8_t 
+fat_print_file (FatDir * Dir, char * fileNameStr, BPB * bpb)
+{
+  if (pvt_check_valid_name (fileNameStr, Dir)) 
     return INVALID_FILE_NAME;
   
   uint8_t  fileNameStrLen = strlen (fileNameStr);
@@ -801,8 +825,7 @@ fat_print_file (FatDir * Dir, char * fileNameStr, BPB * bpb)
   while ((clusIndx = pvt_get_next_cluster_index (clusIndx, bpb)) != END_CLUSTER);
   return FILE_NOT_FOUND; 
 }
-
-
+*/
 
 
 /*
@@ -1435,7 +1458,6 @@ pvt_print_fat_file (uint16_t entryPos, uint8_t *fileSector, BPB * bpb)
     cluster <<= 8;
     cluster |= fileSector[entryPos + 26];
 
-    print_str("\n\n\r");
     // read in contents of file starting at relative sector 0 in 'cluster' and print contents to the screen.
     do
       {
