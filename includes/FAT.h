@@ -56,7 +56,7 @@
 // of a FatDir instance. These are lower than required by FAT32 specs 
 // (255), to conserve memory. Adjust as needed.  
 #define PATH_STRING_LEN_MAX                       100
-#define LONG_NAME_STRING_LEN_MAX                  100
+#define LN_STRING_LEN_MAX                  100
 
 
 
@@ -77,9 +77,9 @@
 // These are set and used by a calling function to indicate
 // how a particular entry long/short name is distributed among
 // adjacent sectors.
-#define LONG_NAME_EXISTS                          0x01
-#define LONG_NAME_CROSSES_SECTOR_BOUNDARY         0x02
-#define LONG_NAME_LAST_SECTOR_ENTRY               0x04
+#define LN_EXISTS            0x01
+#define LN_CROSS_SEC         0x02
+#define LN_LAST_SEC_ENTRY    0x04
 
 
 // ******** Entry Filter Flags
@@ -107,12 +107,12 @@
 #define HIDDEN_ATTR                               0x02
 #define SYSTEM_ATTR                               0x04
 #define VOLUME_ID_ATTR                            0x08
-#define DIRECTORY_ENTRY_ATTR                      0x10
+#define DIR_ENTRY_ATTR                            0x10
 #define ARCHIVE_ATTR                              0x20
-#define LONG_NAME_ATTR_MASK                       0x0F // OR'd lowest 4 attributes
+#define LN_ATTR_MASK                              0x0F // OR'd lowest 4 attribute bits
 // Other FAT specific flags / tokens.
-#define LONG_NAME_LAST_ENTRY                      0x40  
-#define LONG_NAME_ORDINAL_MASK                    0x3F
+#define LN_LAST_ENTRY                             0x40  
+#define LN_ORD_MASK                           0x3F
 
 
 /*
@@ -136,7 +136,7 @@
 // manipulated by passing it to other FAT functions.
 typedef struct FatDirectory
 {
-  char longName[LONG_NAME_STRING_LEN_MAX];        // max 255 characters + '\0'
+  char longName[LN_STRING_LEN_MAX];        // max 255 characters + '\0'
   char longParentPath[PATH_STRING_LEN_MAX];  // long name path to PARENT Dir 
   char shortName[9];         // max 8 char + '\0'. Directory extensions
                               // for short names not currently supported.
@@ -149,7 +149,7 @@ FatDir;
 // Holds state of an entry in a Fat directory
 typedef struct FatEntry
 {
-  char longName[LONG_NAME_STRING_LEN_MAX];
+  char longName[LN_STRING_LEN_MAX];
   char shortName[13]; // size 13 for 8+3 entry size, '.' separator and '\0' string termination 
   uint8_t  shortNameEntry[32]; // Array to hold all of the entry points 
   
