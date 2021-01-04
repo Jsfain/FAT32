@@ -1,6 +1,6 @@
 /*
-***********************************************************************************************************************
-*                                                       AVR-FAT MODULE
+*******************************************************************************
+*                              AVR-FAT MODULE
 *
 * File    : FAT.C
 * Version : 0.0.0.2 (Previous version commit - Sat Dec 5 22:26:05 2020)
@@ -10,24 +10,12 @@
 * Copyright (c) 2020 Joshua Fain
 * 
 *
-*
 * DESCRIPTION: 
-* Defines functions declared in FAT.H for accessing contents of a FAT32 formatted volume using an AVR microconstroller.
-* The fuctions defined here only provide READ access to the volume's contents (i.e. print file, print directory), no 
-* WRITE access is currently possible.
-*
-*
-* FUNCTION "PUBLIC":
-*  (1) void     fat_set_directory_to_root (FatDir * Dir, BPB * bpb)
-*  (2) uint8_t  fat_set_directory (FatDir * Dir, char * newDirStr, BPB * bpb)
-*  (3) uint8_t  fat_print_directory (FatDir * Dir, uint8_t entryFilter, BPB * bpb)
-*  (4) uint8_t  fat_print_file (FatDir * Dir, char * file, BPB * bpb)
-*  (5) void     fat_print_error (uint8_t err)
-*
-*
-* STRUCTS (defined in FAT.H)
-*  typedef struct FatDirectory FatDir
-***********************************************************************************************************************
+* Defines functions declared in FAT.H for accessing contents of a FAT32 
+* formatted volume using an AVR microconstroller. The fuctions defined here 
+* only provide READ access to the volume's contents (i.e. print file, print 
+* directory), no WRITE access is currently possible.
+*******************************************************************************
 */
 
 
@@ -43,43 +31,42 @@
 
 
 /*
------------------------------------------------------------------------------------------------------------------------
-|                                            "PRIVATE" FUNCTION DECLARATIONS
------------------------------------------------------------------------------------------------------------------------
+*******************************************************************************
+|                       "PRIVATE" FUNCTION DECLARATIONS
+*******************************************************************************
 */
 
-// Private function descriptions are only included with their definitions at the bottom of this file.
-
-uint8_t pvt_check_valid_name (char * nameStr, FatDir * Dir);
-uint8_t pvt_set_directory_to_parent (FatDir * Dir, BPB * bpb);
-void pvt_set_directory_to_child (FatDir * Dir, uint8_t * sectorArr, uint16_t snPos, char * childDirStr, BPB * bpb);
-void pvt_load_long_name (int lnFirstEntry, int lnLastEntry, uint8_t * sectorArr, char * lnStr, uint8_t * lnStrIndx);
-uint32_t pvt_get_next_cluster_index (uint32_t currentClusterIndex, BPB * bpb);
-void pvt_print_entry_fields (uint8_t * byte, uint16_t entryPos, uint8_t entryFilter);
-void pvt_print_short_name (uint8_t * byte, uint16_t entryPos, uint8_t entryFilter);
-uint8_t pvt_print_fat_file (uint16_t entryPos, uint8_t * fileSector, BPB * bpb);
-uint8_t pvt_correct_entry_check (uint8_t lnFlags, uint16_t * entryPos, 
-                                 uint16_t * snPosCurrSec, uint16_t * snPosNextSec);           
-void pvt_set_long_name_flags (uint8_t * lnFlags, uint16_t entryPos, 
-                              uint16_t * snPosCurrSec, uint8_t * currSecArr, BPB * bpb);
+uint8_t pvt_check_valid_name (char *nameStr, FatDir * Dir);
+uint8_t pvt_set_directory_to_parent (FatDir *Dir, BPB *bpb);
+void pvt_load_long_name (int lnFirstEnt, int lnLastEnt, uint8_t *secArr, 
+                         char *lnStr, uint8_t *lnStrIndx);
+uint32_t pvt_get_next_cluster_index (uint32_t currClusIndx, BPB *bpb);
+void pvt_print_entry_fields (uint8_t *byte, uint16_t entPos, uint8_t entFilt);
+void pvt_print_short_name (uint8_t *byte, uint16_t entPos, uint8_t entFilt);
+uint8_t pvt_print_fat_file (uint16_t entPos, uint8_t * fileSec, BPB *bpb);
 uint8_t pvt_get_next_sector (uint8_t * nextSecArr, uint32_t currSecNumInClus, 
-                             uint32_t currSecNumPhys, uint32_t clusIndx, BPB* bpb);
+                         uint32_t currSecNumPhys, uint32_t clusIndx, BPB *bpb);
 
 
 
 /*
-***********************************************************************************************************************
- *                                SET MEMBERS OF FAT DIRECTORY INSTANCE TO ROOT DIRECTORY
- * 
- * This function should be called before maniupulating/accessing the FatDir instance using the other FAT functions.
- * Call this function to set the members of the FatDir struct's instance to the root directory
- *                                         
- * Description : This function will set the members of a BiosParameterBlock (BPB) struct instance according to the
- *               values specified within the FAT volume's Bios Parameter Block / Boot Sector. 
- * 
- * Arguments   : *Dir          - Pointer to a FatDir struct whose members will be set to point to the root directory.
- *             : *bpb          - Pointer to a BPB struct instance.
-***********************************************************************************************************************
+*******************************************************************************
+|                           FUNCTION DECLARATIONS
+*******************************************************************************
+*/
+
+
+
+/* 
+------------------------------------------------------------------------------
+| SET ROOT DIRECTORY
+|                                        
+| Description : Sets an instance of FatDir to the root direcotry.
+|
+| Arguments   : *Dir    - Pointer to the instance of FatDir that will be set to
+|                         the root directory.
+|             : *bpb    - Pointer to a valid instance of a BPB struct.
+-------------------------------------------------------------------------------
 */
 
 void
@@ -100,6 +87,17 @@ fat_set_directory_to_root(FatDir * Dir, BPB * bpb)
 }
 
 
+
+/*
+-------------------------------------------------------------------------------
+|                       INITIALIZE ENTRY STRUCT INSTANCE
+|                                        
+| Description : Initializes an entry of FatEntry.
+|
+| Arguments   : *ent   - Pointer to FatEntry instance that will be initialized.
+|             : *bpb   - Pointer to a valid instance of a BPB struct.
+-------------------------------------------------------------------------------
+*/
 
 void
 fat_init_entry(FatEntry * ent, BPB * bpb)
@@ -124,35 +122,23 @@ fat_init_entry(FatEntry * ent, BPB * bpb)
 
 
 
-
 /*
-***********************************************************************************************************************
- *                                                   SET FAT DIRECTORY
- *                                        
- * Description : Call this function to set a FatDirectory (FatDir) struct instance to a new directory. The new
- *               directory must be a child, or the parent, of the struct's instance when this function is called. This
- *               function operates by searching the current directory for a name that matches string newDirStr. If a 
- *               matching entryPos is found, the members of the FatDir instance are updated to those corresponding to
- *               the matching entryPos. To set to parent, pass the string ".." as newDirStr.
- *
- * Arguments   : *Dir            - Pointer to an instance of FatDir. The members of *Dir must point to a valid FAT32
- *                                 directory when the function is called. The members of the instance are updated by 
- *                                 this function.
- *             : *newDirStr      - Pointer to a C-string that specifies the name of the intended new directory. This 
- *                                 function will only search the current FatDir instance's directory for a matching  
- *                                 name, thus it is only possible to set FatDir to a child, or the parent (".."), of 
- *                                 the current directory. Paths must not be included in the string. This string is
- *                                 also required to be a long name unless a long name does not exist for a given
- *                                 entryPos, only then can a short name be a valid string. This is case-sensitive.
- *             : *bpb            - Pointer to a valid instance of a BPB struct.
- * 
- * Return      : FAT Error Flag  - The returned value can be read by passing it tp fat_print_error(err). If SUCCESS
- *                                 is returned then the FatDir instance members were successfully updated to point to
- *                                 the new directory. Any other returned value indicates a failure.
- *  
- * Limitation  : This function will not work with absolute paths, it will only set a FatDir instance to a new directory
- *               if the new directory is a child, or the parent, of the current directory.
-***********************************************************************************************************************
+-------------------------------------------------------------------------------
+|                               SET TO NEXT ENTRY 
+|                                        
+| Description : Updates the currEntry, a FatEntry instance, to the next entry
+|               in the current directory (currDir).
+|
+| Arguments   : *currDir        - Current directory. Pointer to an instance
+|                                 of FatDir.
+|             : *currEntry      - Current etnry. Pointer to an instance of 
+|                                 FatEntry
+|             : *bpb            - Pointer to a valid instance of a BPB struct.
+| 
+| Return      : FAT Error Flag  - If any value other than SUCCESS is returned 
+|                                 the function was unable to update the
+|                                 FatEntry. To read, pass to fat_print_error().
+-------------------------------------------------------------------------------
 */
 
 uint8_t 
@@ -166,7 +152,6 @@ fat_next_entry (FatDir * currDir, FatEntry * currEntry, BPB * bpb)
   uint8_t  nextSecArr[bps];
   uint8_t  attrByte;       // attribute byte
   uint32_t currSecNumPhys; // physical (disk) sector number
-  uint8_t  entCorrFlag = 0;
   char     lnStr[LN_STRING_LEN_MAX];
 
   uint8_t  lnStrIndx = 0;
@@ -205,14 +190,27 @@ fat_next_entry (FatDir * currDir, FatEntry * currEntry, BPB * bpb)
             {
               entryPosStart = 0;
 
-              entCorrFlag = pvt_correct_entry_check(lnMask, &entryPos,
-                                                    &snPosCurrSec, 
-                                                    &snPosNextSec);
-          
-              if (entCorrFlag == 1)
+              // check if adjust entryPos is needed.
+              if (lnMask & LN_EXISTS)
                 {
-                  entCorrFlag = 0;
-                  break;    
+                  if (snPosCurrSec >= SECTOR_LEN - ENTRY_LEN)
+                    {
+                      if (entryPos != 0) //get next sector
+                        break; 
+                      else 
+                        snPosCurrSec = -ENTRY_LEN;
+                    }
+
+                  if (lnMask & (LN_CROSS_SEC | LN_LAST_SEC_ENTRY))
+                    {
+                      entryPos = snPosNextSec + ENTRY_LEN; 
+                      snPosNextSec = 0;
+                    }
+                  else 
+                    {
+                      entryPos = snPosCurrSec + ENTRY_LEN;
+                      snPosCurrSec = 0;
+                    }
                 }
 
               // reset long name flags
@@ -542,6 +540,29 @@ fat_next_entry (FatDir * currDir, FatEntry * currEntry, BPB * bpb)
 
 
 
+/*
+-------------------------------------------------------------------------------
+|                              SET FAT DIRECTORY
+|                                        
+| Description : Set Dir (FatDir instance) to directory specified by newDirStr.
+|
+| Arguments   : *Dir            - Pointer to the FatDir instance that will be
+|                                 set to the new directory.
+|             : *newDirStr      - Pointer to a string that specifies the name 
+|                                 of the new directory.
+|             : *bpb            - Pointer to a valid instance of a BPB struct.
+| 
+| Return      : FAT Error Flag  - If any value other than SUCCESS is returned 
+|                                 the function was unable to update the
+|                                 FatEntry. To read, pass to fat_print_error().
+|  
+| Notes       : - Can only set the directory to a child or parent of the  
+|                 current FatDir directory when the function is called.
+|               - newDirStr must be a directory name. Will not work with paths.  
+|               - newDirStr is case-sensitive.
+-------------------------------------------------------------------------------
+*/
+
 uint8_t 
 fat_set_directory (FatDir * Dir, char * newDirStr, BPB * bpb)
 {
@@ -563,14 +584,14 @@ fat_set_directory (FatDir * Dir, char * newDirStr, BPB * bpb)
   fat_init_entry(ent, bpb);
   ent->shortNameEntryClusIndex = Dir->FATFirstCluster;
 
-
   uint8_t err = 0;
   do 
     {
       err = fat_next_entry(Dir, ent, bpb);
       if (err != SUCCESS) return err;
       
-      if (!strcmp(ent->longName, newDirStr) && (ent->shortNameEntry[11] & DIR_ENTRY_ATTR))
+      if (!strcmp(ent->longName, newDirStr) 
+           && (ent->shortNameEntry[11] & DIR_ENTRY_ATTR))
         {                                                        
           Dir->FATFirstCluster = ent->shortNameEntry[21];
           Dir->FATFirstCluster <<= 8;
@@ -610,37 +631,40 @@ fat_set_directory (FatDir * Dir, char * newDirStr, BPB * bpb)
 }
 
 
+
 /*
-***********************************************************************************************************************
- *                                       PRINT ENTRIES IN A DIRECTORY TO A SCREEN
- * 
- * Description : Prints a list of the entries (files and directories) contained in the directory pointed to by the
- *               FatDir struct instance. Which entries and fields (e.g. hidden files, creation date, etc...) are
- *               selected by passing the desired combination of Entry Filter Flags as the entryFilter argument. See the
- *               specific Entry Filter Flags that can be passed in the FAT.H header file.
- * 
- * Arguments   : *Dir             - Pointer to a FatDir struct whose members must be associated with a valid FAT32 Dir
- *             : entryFilter      - Byte whose value specifies which entries and fields will be printed (short name, 
- *                                  long name, hidden, creation date, etc...). Any combination of flags can be passed. 
- *                                  If neither LONG_NAME or SHORT_NAME are passed then no entries will be printed.
- *             : *bpb             - Pointer to a valid instance of a BPB struct.
- * 
- * Return      : FAT Error Flag     Returns END_OF_DIRECTORY if the function completed successfully and it was able to
- *                                  read in and print entries until reaching the end of the directory. Any other value
- *                                  returned indicates an error. To read, pass the value to fat_print_error(err).
-***********************************************************************************************************************
+-------------------------------------------------------------------------------
+|                  PRINT ENTRIES IN A DIRECTORY TO A SCREEN
+|
+| 
+| Description : Prints the entries (files / dirs) in the FatDir directory. 
+|  
+| Arguments   : *Dir         - Pointer to a FatDir struct. This directory's
+|                              entries will be printed to the screen.
+|             : entFilt    - Byte of Entry Filter Flags. This specifies which
+|                              entries and fields will be printed.
+|             : *bpb         - Pointer to a valid instance of a BPB struct.
+| 
+| Return      : FAT Error Flag   - Returns END_OF_DIRECTORY if the function 
+|                                  completes without issue. Any other value
+|                                  indicates an error. To read, pass the value
+|                                  to fat_print_error().
+| 
+| Notes       : If neither LONG_NAME or SHORT_NAME are passed to entFilt
+|               then no entries will be printed to the screen.   
+-------------------------------------------------------------------------------
 */
 
 uint8_t 
-fat_print_directory (FatDir * dir, uint8_t entryFilter, BPB * bpb)
+fat_print_directory (FatDir * dir, uint8_t entFilt, BPB * bpb)
 {
-  // Prints column headers according to entryFilter
+  // Prints column headers according to entFilt
   print_str("\n\n\r");
-  if (CREATION & entryFilter) print_str(" CREATION DATE & TIME,");
-  if (LAST_ACCESS & entryFilter) print_str(" LAST ACCESS DATE,");
-  if (LAST_MODIFIED & entryFilter) print_str(" LAST MODIFIED DATE & TIME,");
-  if (FILE_SIZE & entryFilter) print_str(" SIZE,");
-  if (TYPE & entryFilter) print_str(" TYPE,");
+  if (CREATION & entFilt) print_str(" CREATION DATE & TIME,");
+  if (LAST_ACCESS & entFilt) print_str(" LAST ACCESS DATE,");
+  if (LAST_MODIFIED & entFilt) print_str(" LAST MODIFIED DATE & TIME,");
+  if (FILE_SIZE & entFilt) print_str(" SIZE,");
+  if (TYPE & entFilt) print_str(" TYPE,");
   
   print_str(" NAME");
   print_str("\n\r");
@@ -653,25 +677,25 @@ fat_print_directory (FatDir * dir, uint8_t entryFilter, BPB * bpb)
     { 
       if ((  !(ent->shortNameEntry[11] & HIDDEN_ATTR)) 
            ||((ent->shortNameEntry[11] & HIDDEN_ATTR) 
-           && (entryFilter & HIDDEN)))
+           && (entFilt & HIDDEN)))
         {      
-          if ((entryFilter & SHORT_NAME) == SHORT_NAME)
+          if ((entFilt & SHORT_NAME) == SHORT_NAME)
             {
-              pvt_print_entry_fields (ent->shortNameEntry, 0, entryFilter);
-              pvt_print_short_name(ent->shortNameEntry, 0, entryFilter);
+              pvt_print_entry_fields (ent->shortNameEntry, 0, entFilt);
+              pvt_print_short_name(ent->shortNameEntry, 0, entFilt);
             }
 
-          if ((entryFilter & LONG_NAME) == LONG_NAME)
+          if ((entFilt & LONG_NAME) == LONG_NAME)
             {
-              pvt_print_entry_fields (ent->shortNameEntry, 0, entryFilter);
+              pvt_print_entry_fields (ent->shortNameEntry, 0, entFilt);
               if (ent->shortNameEntry[11] & DIR_ENTRY_ATTR) 
                 { 
-                  if ((entryFilter & TYPE) == TYPE) 
+                  if ((entFilt & TYPE) == TYPE) 
                     print_str (" <DIR>   ");
                 }
               else 
                 { 
-                  if ((entryFilter & TYPE) == TYPE) 
+                  if ((entFilt & TYPE) == TYPE) 
                     print_str (" <FILE>  ");
                 }
               print_str(ent->longName);
@@ -682,23 +706,26 @@ fat_print_directory (FatDir * dir, uint8_t entryFilter, BPB * bpb)
 }
 
 
-
 /*
-***********************************************************************************************************************
- *                                               PRINT FILE TO SCREEN
- * 
- * Description : Prints the contents of a FAT file from the current directory to a terminal/screen.
- * 
- * Arguments   : *Dir              - Pointer to a FatDir struct instance pointing to a valid FAT32 directory.
- *             : *fileNameStr      - Pointer to C-string. This is the name of the file to be printed to the screen.
- *                                   This can only be a long name unless there is no long name for a given entry, in
- *                                   which case it must be a short name.
- *             : *bpb              - Pointer to a valid instance of a BPB struct.
- * 
- * Return      : FAT Error Flag     Returns END_OF_FILE if the function completed successfully and was able to read in
- *                                  and print a file's contents to the screen. Any other value returned indicates an
- *                                  an error. Pass the returned value to fat_print_error(err).
-***********************************************************************************************************************
+-------------------------------------------------------------------------------
+|                                               PRINT FILE TO SCREEN
+| 
+| Description : Prints the contents of a file to the screen.
+| 
+| Arguments   : *Dir           - Pointer to a FatDir instance. This directory
+|                                must contain the file to be printed.
+|             : *fileNameStr   - Pointer to string. This is the name of the 
+|                                file who's contents will be printed.
+|             : *bpb           - Pointer to a valid instance of a BPB struct.
+| 
+| Return      : FAT Error Flag   - Returns END_OF_FILE if the function 
+|                                  completes without issue. Any other value 
+|                                  indicates an error. To read, pass the value
+|                                  to fat_print_error().
+|                               
+| Notes       : fileNameStr must be a long name unless a long name for a given
+|               entry does not exist, in which case it must be a short name.
+-------------------------------------------------------------------------------
 */
 
 uint8_t 
@@ -732,13 +759,13 @@ fat_print_file(FatDir * Dir, char * fileNameStr, BPB * bpb)
 
 
 /*
-***********************************************************************************************************************
- *                                        PRINT ERROR RETURNED BY A FAT FUNCTION
- * 
- * Description : Call this function to print an error flag returned by one of the FAT functions to the screen. 
- * 
- * Argument    : err    This should be an error flag returned by one of the FAT file/directory functions.
-***********************************************************************************************************************
+-------------------------------------------------------------------------------
+|                               PRINT FAT ERROR FLAG
+| 
+| Description : Prints the FAT Error Flag passed as the arguement. 
+| 
+| Arguments   : err      - An error flag returned by one of the FAT functions.
+-------------------------------------------------------------------------------
 */
 
 void
@@ -781,35 +808,27 @@ fat_print_error (uint8_t err)
 
 
 
-
-
-
 /*
-***********************************************************************************************************************
- *                                          "PRIVATE" FUNCTION DEFINITIONS
-***********************************************************************************************************************
+*******************************************************************************
+ *                      "PRIVATE" FUNCTION DEFINITIONS
+*******************************************************************************
 */
 
 
 
-
 /*
-***********************************************************************************************************************
- *                                          (PRIVATE) CHECK FOR LEGAL NAME
- * 
- * Description : Function used to confirm a 'name' string is legal and valid size based on the current settings. This 
- *               function is called by any FAT function that must match a 'name' string argument to a FAT entry name 
- *               (e.g. fat_print_file() or fat_set_directory() ). 
- * 
- * Argument    : *nameStr    - Pointer to C-string that the calling function needs to verify is a legal FAT name.
- *             : *bpb        - Pointer to a valid instance of a BPB struct.
- *            
- * Return      : 0 if name is LEGAL, 1 if name is ILLEGAL.
-***********************************************************************************************************************
+-------------------------------------------------------------------------------
+|                       (PRIVATE) CHECK FOR LEGAL NAME
+| 
+| Description : Checks if a string is a valid FAT entry name (short or long). 
+|
+| Argument    : *nameStr - string to be verified as a legal FAT name.
+| Return      : 0 if name is LEGAL, 1 if name is ILLEGAL.
+-------------------------------------------------------------------------------
 */
 
 uint8_t
-pvt_check_valid_name (char * nameStr, FatDir * Dir)
+pvt_check_valid_name (char *nameStr, FatDir *Dir)
 {
   // check that long name and path size are 
   // not too large for current settings.
@@ -842,16 +861,17 @@ pvt_check_valid_name (char * nameStr, FatDir * Dir)
 
 
 /*
-***********************************************************************************************************************
- *                                  (PRIVATE) SET CURRENT DIRECTORY TO ITS PARENT
- * 
- * Description : This function is called by fat_set_directory() if that function has been requested to set the FatDir 
- *               instance to its parent directory. This function will carry out the task of setting the members.
- * 
- * Argument    : *Dir         - Pointer to a FatDir instance whose members will be updated to point to the parent of 
- *                              the directory pointed to by the current instance's members.
- *             : *bpb         - Pointer to a valid instance of a BPB struct.
-***********************************************************************************************************************
+-------------------------------------------------------------------------------
+|               (PRIVATE) SET CURRENT DIRECTORY TO ITS PARENT
+| 
+| Description : Sets a FatDir instance to its parent directory. 
+|
+| Argument    : *Dir  - Ptr to FatDir instance. The members of this instance
+|                       will be set to its parent directory.
+|             : *bpb  - Ptr to a valid instance of a BPB struct.
+|
+| Return      : SUCCESS or FAILED_READ_SECTOR.
+-------------------------------------------------------------------------------
 */
 
 uint8_t
@@ -914,65 +934,6 @@ pvt_set_directory_to_parent (FatDir * Dir, BPB * bpb)
 
 
 
-/*
-***********************************************************************************************************************
- *                           (PRIVATE) SET DIRECTORY TO A CHILD DIRECTORY
- * 
- * Description : This function is called by fat_set_directory() if that function has been asked to set an instance of
- *               FatDir to a child directory and a valid matching entry was found in the directory currently pointed at
- *               by the FatDir instance. This function will only update the struct's members to that of the matching 
- *               entry. It does not perform any of the search/compare required to find the matching entry.
- * 
- * Argument    : *Dir            - Pointer to an instance of a FatDir whose members will be updated to point to the 
- *                                 directory whose name matches *childDirStr.
- *             : *sectorArr      - Pointer to an array that holds the physical sector's contents containing the short
- *                                 name of the entry whose name matches *childDirStr.
- *             : snPos           - Integer that specifies the position of the first byte of the 32-byte short name 
- *                                 entry in *sectorArr.
- *             : *childDirStr    - Pointer to a C-string whose name matches an entry in the current directory FatDir is
- *                                 set to. This is the name of the directory FatDir will be set to by this function. 
- *                                 This is a long name, unless a long name does not exist for a given entry. In that
- *                                 case the longName and shortName members of the FatDir instance will both be set to 
- *                                 the short name of the entry.  
- *             : *bpb            - Pointer to a valid instance of a BPB struct.
-***********************************************************************************************************************
-*/
-
-void
-pvt_set_directory_to_child (FatDir * Dir, uint8_t * sectorArr, uint16_t snPos, char * childDirStr, BPB * bpb)
-{
-  uint32_t dirFirstClus;
-  dirFirstClus = sectorArr[snPos + 21];
-  dirFirstClus <<= 8;
-  dirFirstClus |= sectorArr[snPos + 20];
-  dirFirstClus <<= 8;
-  dirFirstClus |= sectorArr[snPos + 27];
-  dirFirstClus <<= 8;
-  dirFirstClus |= sectorArr[snPos + 26];
-
-  Dir->FATFirstCluster = dirFirstClus;
-  
-  uint8_t snLen;
-  if (strlen(childDirStr) < 8) snLen = strlen(childDirStr);
-  else snLen = 8; 
-
-  char sn[9];                                    
-  for (uint8_t k = 0; k < snLen; k++)  
-    sn[k] = sectorArr[snPos + k];
-  sn[snLen] = '\0';
-
-  strcat (Dir->longParentPath,  Dir->longName );
-  strcat (Dir->shortParentPath, Dir->shortName);
-
-  // if current directory is not root then append '/'
-  if (Dir->longName[0] != '/') 
-    strcat(Dir->longParentPath, "/"); 
-  strcpy(Dir->longName, childDirStr);
-  
-  if (Dir->shortName[0] != '/') 
-    strcat(Dir->shortParentPath, "/");
-  strcpy(Dir->shortName, sn);
-}
 
 
 
@@ -984,11 +945,11 @@ pvt_set_directory_to_child (FatDir * Dir, uint8_t * sectorArr, uint16_t snPos, c
  *               C-string. The function is called twice if a long name crosses a sector boundary, and *lnStrIndx will
  *               point to the position in the string to begin loading the next characters
  * 
- * Arguments   : lnFirstEntry        - Integer that points to the position in *sectorArr that is the lowest order entry
+ * Arguments   : lnFirstEnt          - Integer that points to the position in *secArr that is the lowest order entry
  *                                     of the long name in the sector array.
- *             : lnLastEntry         - Integer that points to the position in *sectorArr that is the highest order
+ *             : lnLastEnt           - Integer that points to the position in *secArr that is the highest order
  *                                     entry of the long name in the sector array.
- *             : *sectorArr          - Pointer to an array that holds the physical sector's contents containing the 
+ *             : *secArr             - Pointer to an array that holds the physical sector's contents containing the 
  *                                     the entries of the long name that will be loaded into the char arry *lnStr.
  *             : *lnStr              - Pointer to a null terminated char array (C-string) that will be loaded with the
  *                                     long name characters from the sector. Usually starts as an array of NULLs.
@@ -1000,37 +961,62 @@ pvt_set_directory_to_child (FatDir * Dir, uint8_t * sectorArr, uint16_t snPos, c
 ***********************************************************************************************************************
 */
 
+/*
+-------------------------------------------------------------------------------
+|             (PRIVATE) LOAD A LONG NAME ENTRY INTO A STRING 
+| 
+| Description  : Loads the characters of a long name into a string char array.  
+|
+| Arguments   : lnFirstEnt   - int specifying position of the lowest order
+|                              entry in *secArr of the long name.
+|             : lnLastEnt    - int specifying position of the highest order
+|                              entry in *secArr of the long name.
+|             : *secArr      - ptr to an array holding the contents of a single
+|                              sector of a directory from a FAT-formatted disk.
+|             : *lnStr       - ptr to a string array that will be loaded with
+|                              the long name chars.
+|             : *lnStrIndx   - ptr to an int specifying the position in *lnStr
+|                              to begin loading chars when this function is 
+|                              called. Typically 0, unless the long name 
+|                              crosses a sector boundary which requires calling
+|                              this function twice to finish loading *lnStr.
+|
+| Notes       : Must called twice if long name crosses sector boundary.
+-------------------------------------------------------------------------------
+*/
+
 void
-pvt_load_long_name (int lnFirstEntry, int lnLastEntry, uint8_t * sectorArr, char * lnStr, uint8_t * lnStrIndx)
+pvt_load_long_name (int lnFirstEnt, int lnLastEnt, uint8_t * secArr, 
+                    char *lnStr, uint8_t *lnStrIndx)
 {
-  for (int i = lnFirstEntry; i >= lnLastEntry; i = i - ENTRY_LEN)
+  for (int i = lnFirstEnt; i >= lnLastEnt; i = i - ENTRY_LEN)
     {                                              
       for (uint16_t n = i + 1; n < i + 11; n++)
         {                                  
-          if ((sectorArr[n] == 0) || (sectorArr[n] > 126));
+          if ((secArr[n] == 0) || (secArr[n] > 126));
           else 
             { 
-              lnStr[*lnStrIndx] = sectorArr[n];
+              lnStr[*lnStrIndx] = secArr[n];
               (*lnStrIndx)++;  
             }
         }
 
       for (uint16_t n = i + 14; n < i + 26; n++)
         {                                  
-          if ((sectorArr[n] == 0) || (sectorArr[n] > 126));
+          if ((secArr[n] == 0) || (secArr[n] > 126));
           else 
             { 
-              lnStr[*lnStrIndx] = sectorArr[n];
+              lnStr[*lnStrIndx] = secArr[n];
               (*lnStrIndx)++;  
             }
         }
       
       for (uint16_t n = i + 28; n < i + 32; n++)
         {                                  
-          if ((sectorArr[n] == 0) || (sectorArr[n] > 126));
+          if ((secArr[n] == 0) || (secArr[n] > 126));
           else 
             { 
-              lnStr[*lnStrIndx] = sectorArr[n];  
+              lnStr[*lnStrIndx] = secArr[n];  
               (*lnStrIndx)++;  
             }
         }        
@@ -1092,21 +1078,21 @@ pvt_get_next_cluster_index (uint32_t currClusIndx, BPB * bpb)
  *                                        (PRIVATE) PRINTS THE FIELDS OF FAT ENTRY
  *
  * Description : Used by fat_print_directory() to print the fields associated with an entry (e.g. creation/last 
- *               modified date/time, file size, etc...). Which fields are printed is determined by the entryFilter 
+ *               modified date/time, file size, etc...). Which fields are printed is determined by the entFilt 
  *               flag set.
  * 
- * Arguments   : *sectorArr     - Pointer to an array that holds the short name of the entry that is being printed to
+ * Arguments   : *secArr        - Pointer to an array that holds the short name of the entry that is being printed to
  *                                the screen. Only the short name entry of a short name/long name combination holds
  *                                the values of these fields.
- *             : entryPos       - Integer specifying the location in *sectorArr of the first byte of the short name 
+ *             : entPos         - Integer specifying the location in *secArr of the first byte of the short name 
  *                                entry whose fields should be printed to the screen.
- *             : entryFilter    - Byte specifying the entryFlag settings. This is used to determined which fields of 
+ *             : entFilt      - Byte specifying the entryFlag settings. This is used to determined which fields of 
  *                                the entry will be printed.
 ***********************************************************************************************************************
 */
 
 void 
-pvt_print_entry_fields (uint8_t *sectorArr, uint16_t entryPos, uint8_t entryFilter)
+pvt_print_entry_fields (uint8_t *secArr, uint16_t entPos, uint8_t entFilt)
 {
   uint16_t creationTime;
   uint16_t creationDate;
@@ -1115,50 +1101,50 @@ pvt_print_entry_fields (uint8_t *sectorArr, uint16_t entryPos, uint8_t entryFilt
   uint16_t writeDate;
   uint32_t fileSize;
 
-  // Load fields with values from sectorArr
+  // Load fields with values from secArr
 
-  if (CREATION & entryFilter)
+  if (CREATION & entFilt)
     {
-      creationTime = sectorArr[entryPos + 15];
+      creationTime = secArr[entPos + 15];
       creationTime <<= 8;
-      creationTime |= sectorArr[entryPos + 14];
+      creationTime |= secArr[entPos + 14];
       
-      creationDate = sectorArr[entryPos + 17];
+      creationDate = secArr[entPos + 17];
       creationDate <<= 8;
-      creationDate |= sectorArr[entryPos + 16];
+      creationDate |= secArr[entPos + 16];
     }
 
-  if (LAST_ACCESS & entryFilter)
+  if (LAST_ACCESS & entFilt)
     {
-      lastAccessDate = sectorArr[entryPos + 19];
+      lastAccessDate = secArr[entPos + 19];
       lastAccessDate <<= 8;
-      lastAccessDate |= sectorArr[entryPos + 18];
+      lastAccessDate |= secArr[entPos + 18];
     }
 
-  if (LAST_MODIFIED & entryFilter)
+  if (LAST_MODIFIED & entFilt)
     {
-      writeTime = sectorArr[entryPos + 23];
+      writeTime = secArr[entPos + 23];
       writeTime <<= 8;
-      writeTime |= sectorArr[entryPos + 22];
+      writeTime |= secArr[entPos + 22];
 
-      writeDate = sectorArr[entryPos + 25];
+      writeDate = secArr[entPos + 25];
       writeDate <<= 8;
-      writeDate |= sectorArr[entryPos + 24];
+      writeDate |= secArr[entPos + 24];
     }
 
-  fileSize = sectorArr[entryPos + 31];
+  fileSize = secArr[entPos + 31];
   fileSize <<= 8;
-  fileSize |= sectorArr[entryPos + 30];
+  fileSize |= secArr[entPos + 30];
   fileSize <<= 8;
-  fileSize |= sectorArr[entryPos + 29];
+  fileSize |= secArr[entPos + 29];
   fileSize <<= 8;
-  fileSize |= sectorArr[entryPos + 28];
+  fileSize |= secArr[entPos + 28];
 
   print_str ("\n\r");
 
   // Print fields 
 
-  if (CREATION & entryFilter)
+  if (CREATION & entFilt)
     {
       print_str ("    ");
       if (((creationDate & 0x01E0) >> 5) < 10) 
@@ -1195,7 +1181,7 @@ pvt_print_entry_fields (uint8_t *sectorArr, uint16_t entryPos, uint8_t entryFilt
       print_dec (2 * (creationTime & 0x001F));
     }
 
-  if (LAST_ACCESS & entryFilter)
+  if (LAST_ACCESS & entFilt)
     {
       print_str ("     ");
       if (((lastAccessDate & 0x01E0) >> 5) < 10)
@@ -1214,7 +1200,7 @@ pvt_print_entry_fields (uint8_t *sectorArr, uint16_t entryPos, uint8_t entryFilt
     }
 
 
-  if (LAST_MODIFIED & entryFilter)
+  if (LAST_MODIFIED & entFilt)
     {
       print_str ("     ");
       if (((writeDate & 0x01E0) >> 5) < 10) 
@@ -1255,9 +1241,9 @@ pvt_print_entry_fields (uint8_t *sectorArr, uint16_t entryPos, uint8_t entryFilt
 
   uint16_t div = 1000;
   print_str ("     ");
-  if ((entryFilter & FILE_SIZE) == FILE_SIZE)
+  if ((entFilt & FILE_SIZE) == FILE_SIZE)
   {
-        if ((fileSize / div) >= 10000000) { print_str(" "); print_dec(fileSize / div); }
+         if ((fileSize / div) >= 10000000) { print_str(" "); print_dec(fileSize / div); }
     else if ((fileSize / div) >= 1000000) { print_str("  "); print_dec(fileSize / div); }
     else if ((fileSize / div) >= 100000) { print_str("   "); print_dec(fileSize / div); }
     else if ((fileSize / div) >= 10000) { print_str("    "); print_dec(fileSize / div); }
@@ -1279,17 +1265,17 @@ pvt_print_entry_fields (uint8_t *sectorArr, uint16_t entryPos, uint8_t entryFilt
  *
  * Description : Used by fat_print_directory to print the short name of a FAT file or directory.
  * 
- * Arguments   : *sectorArr     - Pointer to an array that holds the short name of the entry that is to be printed to
+ * Arguments   : *secArr     - Pointer to an array that holds the short name of the entry that is to be printed to
  *                                the screen.
- *             : entryPos       - Location in *sectorArr of the first byte of the short name entry that is to be
+ *             : entPos       - Location in *secArr of the first byte of the short name entry that is to be
  *                                printed to the screen.
- *             : entryFilter    - Byte specifying the entryFlag settings. This is used to determined here if the TYPE 
+ *             : entFilt    - Byte specifying the entryFlag settings. This is used to determined here if the TYPE 
  *                                flag has been passed
 ***********************************************************************************************************************
 */
 
 void 
-pvt_print_short_name (uint8_t *sectorArr, uint16_t entryPos, uint8_t entryFilter)
+pvt_print_short_name (uint8_t *secArr, uint16_t entPos, uint8_t entFilt)
 {
   char sn[9];
   char ext[5];
@@ -1297,23 +1283,23 @@ pvt_print_short_name (uint8_t *sectorArr, uint16_t entryPos, uint8_t entryFilter
   for (uint8_t k = 0; k < 8; k++) sn[k] = ' ';
   sn[8] = '\0';
 
-  uint8_t attr = sectorArr[entryPos + 11];
+  uint8_t attr = secArr[entPos + 11];
   if (attr & 0x10)
     {
-      if ((entryFilter & TYPE) == TYPE) print_str (" <DIR>   ");
-      for (uint8_t k = 0; k < 8; k++) sn[k] = sectorArr[entryPos + k];
+      if ((entFilt & TYPE) == TYPE) print_str (" <DIR>   ");
+      for (uint8_t k = 0; k < 8; k++) sn[k] = secArr[entPos + k];
       print_str (sn);
       print_str ("    ");
     }
   else 
     {
-      if ((entryFilter & TYPE) == TYPE) print_str (" <FILE>  ");
+      if ((entFilt & TYPE) == TYPE) print_str (" <FILE>  ");
       // initialize extension char array
       strcpy (ext, ".   ");
-      for (uint8_t k = 1; k < 4; k++) ext[k] = sectorArr[entryPos + 7 + k];
+      for (uint8_t k = 1; k < 4; k++) ext[k] = secArr[entPos + 7 + k];
       for (uint8_t k = 0; k < 8; k++) 
         {
-          sn[k] = sectorArr[k + entryPos];
+          sn[k] = secArr[k + entPos];
           if (sn[k] == ' ') 
             { 
               sn[k] = '\0'; 
@@ -1335,17 +1321,17 @@ pvt_print_short_name (uint8_t *sectorArr, uint16_t entryPos, uint8_t entryFilter
  *
  * Description : Used by fat_print_file() to perform that actual print operation.
  * 
- * Arguments   : entryPos       - Integer that points to the location in *fileSector of the first byte of the short 
- *                                name entryPos of the file whose contents will be printed to the screen. This is 
+ * Arguments   : entPos         - Integer that points to the location in *fileSec of the first byte of the short 
+ *                                name entPos of the file whose contents will be printed to the screen. This is 
  *                                required as the first cluster index of the file is located in the short name.
- *             : *fileSector      pointer to an array that holds the short name entryPos of the file to be printed to 
+ *             : *fileSec       - pointer to an array that holds the short name entPos of the file to be printed to 
  *                                the screen.
  *             : *bpb           - Pointer to a valid instance of a BPB struct.
 ***********************************************************************************************************************
 */
 
 uint8_t 
-pvt_print_fat_file (uint16_t entryPos, uint8_t *fileSector, BPB * bpb)
+pvt_print_fat_file (uint16_t entPos, uint8_t *fileSec, BPB * bpb)
   {
     uint32_t currSecNumPhys;
     uint32_t cluster;
@@ -1353,13 +1339,13 @@ pvt_print_fat_file (uint16_t entryPos, uint8_t *fileSector, BPB * bpb)
     uint8_t  eof = 0; // end of file flag
 
     //get FAT index for file's first cluster
-    cluster =  fileSector[entryPos + 21];
+    cluster =  fileSec[entPos + 21];
     cluster <<= 8;
-    cluster |= fileSector[entryPos + 20];
+    cluster |= fileSec[entPos + 20];
     cluster <<= 8;
-    cluster |= fileSector[entryPos + 27];
+    cluster |= fileSec[entPos + 27];
     cluster <<= 8;
-    cluster |= fileSector[entryPos + 26];
+    cluster |= fileSec[entPos + 26];
 
     // read in contents of file starting at relative sector 0 in 'cluster' and print contents to the screen.
     do
@@ -1370,14 +1356,14 @@ pvt_print_fat_file (uint16_t entryPos, uint8_t *fileSector, BPB * bpb)
             currSecNumPhys = currSecNumInClus + bpb->dataRegionFirstSector + ((cluster - 2) * bpb->secPerClus);
 
             // function returns either 0 for success for 1 for failed.
-            err = fat_to_disk_read_single_sector (currSecNumPhys, fileSector);
+            err = fat_to_disk_read_single_sector (currSecNumPhys, fileSec);
             if (err == 1) return FAILED_READ_SECTOR;
 
             for (uint16_t k = 0; k < bpb->bytesPerSec; k++)
               {
                 // for formatting how this shows up on the screen.
-                if (fileSector[k] == '\n') print_str ("\n\r");
-                else if (fileSector[k] != 0) usart_transmit (fileSector[k]);
+                if (fileSec[k] == '\n') print_str ("\n\r");
+                else if (fileSec[k] != 0) usart_transmit (fileSec[k]);
 
                 // checks if end of file by checking to see if remaining bytes in sector are zeros.
                 else 
@@ -1385,7 +1371,7 @@ pvt_print_fat_file (uint16_t entryPos, uint8_t *fileSector, BPB * bpb)
                     eof = 1;
                     for (uint16_t i = k+1; i < bpb->bytesPerSec; i++)
                       {
-                        if (fileSector[i] != 0) 
+                        if (fileSec[i] != 0) 
                           { 
                             eof = 0;
                             break;
@@ -1398,104 +1384,6 @@ pvt_print_fat_file (uint16_t entryPos, uint8_t *fileSector, BPB * bpb)
     while (((cluster = pvt_get_next_cluster_index(cluster,bpb)) != END_CLUSTER));
     return END_OF_FILE;
   }
-
-
-
-/*
-***********************************************************************************************************************
- *                                    (PRIVATE) CORRECTION TO ENTRY POSITON POINTER
- *
- * Description : Used by the FAT functions when searching within a directory. Often a correction to entryPos needs to 
- *               be made to ensure it is pointing at the correct location in the sector array and this function will 
- *               ensure this. If this function determines that the actual correct location of the entry is not in the 
- *               current sector being searched when this function is called, then this function will return a 1 to
- *               signal the calling function to break and get the next sector before proceeding. This function will
- *               then be called again to ensure that entryPos is indicating the correct location in the new sector.
- * 
- * Arguments   : lnFlags            - Byte that is holding the setting of the three long name flags: LN_EXISTS,
- *                                    LN_CROSS_SEC, and LN_LAST_SEC_ENTRY. The long 
- *                                    name flags should be cleared (set to 0) by the calling function after this 
- *                                    function returns with 0.
- *             : *entryPos          - Pointer to an integer that specifies the location in the current sector that will
- *                                    be checked/read-in by the calling function. This value will be updated by this
- *                                    function if a correction to it is required. 
- *             : *snPosCurrSec      - Pointer to an integer that specifies the final value of this variable after
- *                                    the previous entry was checked. Stands for Short Name Position In Current Sector.
- *             : *snPosNextSec      - Pointer to an integer that specifies the final value of this variable after
- *                                    the previous entry was checked. Stands for Short Name Position In Next Sector.
- * 
- * Returns     : 1 if this function determines correct entry is in the next sector when this function is called.
- *             : 0 if the correct entry is in the current sector when this function is called.
-***********************************************************************************************************************
-*/
-
-uint8_t 
-pvt_correct_entry_check (uint8_t lnFlags, uint16_t * entryPos, uint16_t * snPosCurrSec, uint16_t * snPosNextSec)
-{  
-  if (lnFlags & LN_EXISTS)
-    {
-      if ((*snPosCurrSec) >= (SECTOR_LEN - ENTRY_LEN))
-        {
-          if ((*entryPos) != 0) return 1; // need to get the next sector
-          else (*snPosCurrSec) = -ENTRY_LEN;
-        }
-
-      if (lnFlags & (LN_CROSS_SEC | LN_LAST_SEC_ENTRY))
-        {
-          *entryPos = (*snPosNextSec) + ENTRY_LEN; 
-          *snPosNextSec = 0;
-        }
-      else 
-        {
-          *entryPos = (*snPosCurrSec) + ENTRY_LEN;
-          *snPosCurrSec = 0;
-        }
-    }
-  return 0;
-}    
-
-
-
-/*
-***********************************************************************************************************************
- *                                       (PRIVATE) SET THE LONG NAME FLAGS
- *
- * Description : Used by the FAT functions to set the long name flags if it was determined that a long name exists for 
- *               the current entry begin checked/read-in. This also sets the variable snPosCurrSec.
- * 
- * Arguments   : *lnFlags           - Pointer to a byte that will hold the long name flag settings: LN_EXISTS,
- *                                    LN_CROSS_SEC, and LN_LAST_SEC_ENTRY. This function
- *                                    will determine which flags should be set and then set this byte accordingly.
- *             : entryPos           - Integer that specifies the location in the current sector that will be checked 
- *                                    during the subsequent execution.
- *             : *snPosCurrSec      - This value is set by this function. It is an integer pointer that specifies the 
- *                                    position of the short name relative to the position of the first byte of the 
- *                                    current sector. NOTE: If this is greater than 511 then the short name is in the
- *                                    next sector.
- *             : *snPosNextSec      - Integer pointer. This value is set by this function if it is determined that the
- *                                    short name entry is in the next sector compared to the sector where the last 
- *                                    entry of its corresponding long name resides.
- *             : *bpb               - Pointer to a valid instance of a BPB struct.
-***********************************************************************************************************************
-*/
-
-void
-pvt_set_long_name_flags (uint8_t * lnFlags, uint16_t entryPos, uint16_t * snPosCurrSec,
-                         uint8_t * currSecArr, BPB * bpb)
-{
-  *lnFlags |= LN_EXISTS;
-
-  // number of entries required by the long name
-  uint8_t longNameOrder = LN_ORD_MASK & currSecArr[entryPos];                 
-  *snPosCurrSec = entryPos + (ENTRY_LEN * longNameOrder);
-  
-  // If short name position is greater than 511 then the short name is in the next sector.
-  if ((*snPosCurrSec) >= bpb->bytesPerSec)
-    {
-      if ((*snPosCurrSec) > bpb->bytesPerSec) *lnFlags |= LN_CROSS_SEC;
-      else if (*snPosCurrSec == SECTOR_LEN)   *lnFlags |= LN_LAST_SEC_ENTRY;
-    }
-}   
 
 
 
@@ -1538,3 +1426,167 @@ pvt_get_next_sector (uint8_t * nextSecArr, uint32_t currSecNumInClus,
   else 
     return SUCCESS;
 }
+
+
+
+
+
+
+/*
+***********************************************************************************************************************
+ *                           (PRIVATE) SET DIRECTORY TO A CHILD DIRECTORY
+ * 
+ * Description : This function is called by fat_set_directory() if that function has been asked to set an instance of
+ *               FatDir to a child directory and a valid matching entry was found in the directory currently pointed at
+ *               by the FatDir instance. This function will only update the struct's members to that of the matching 
+ *               entry. It does not perform any of the search/compare required to find the matching entry.
+ * 
+ * Argument    : *Dir            - Pointer to an instance of a FatDir whose members will be updated to point to the 
+ *                                 directory whose name matches *childDirStr.
+ *             : *sectorArr      - Pointer to an array that holds the physical sector's contents containing the short
+ *                                 name of the entry whose name matches *childDirStr.
+ *             : snPos           - Integer that specifies the position of the first byte of the 32-byte short name 
+ *                                 entry in *sectorArr.
+ *             : *childDirStr    - Pointer to a C-string whose name matches an entry in the current directory FatDir is
+ *                                 set to. This is the name of the directory FatDir will be set to by this function. 
+ *                                 This is a long name, unless a long name does not exist for a given entry. In that
+ *                                 case the longName and shortName members of the FatDir instance will both be set to 
+ *                                 the short name of the entry.  
+ *             : *bpb            - Pointer to a valid instance of a BPB struct.
+***********************************************************************************************************************
+*/
+/*
+void
+pvt_set_directory_to_child (FatDir * Dir, uint8_t * sectorArr, uint16_t snPos, char * childDirStr, BPB * bpb)
+{
+  uint32_t dirFirstClus;
+  dirFirstClus = sectorArr[snPos + 21];
+  dirFirstClus <<= 8;
+  dirFirstClus |= sectorArr[snPos + 20];
+  dirFirstClus <<= 8;
+  dirFirstClus |= sectorArr[snPos + 27];
+  dirFirstClus <<= 8;
+  dirFirstClus |= sectorArr[snPos + 26];
+
+  Dir->FATFirstCluster = dirFirstClus;
+  
+  uint8_t snLen;
+  if (strlen(childDirStr) < 8) snLen = strlen(childDirStr);
+  else snLen = 8; 
+
+  char sn[9];                                    
+  for (uint8_t k = 0; k < snLen; k++)  
+    sn[k] = sectorArr[snPos + k];
+  sn[snLen] = '\0';
+
+  strcat (Dir->longParentPath,  Dir->longName );
+  strcat (Dir->shortParentPath, Dir->shortName);
+
+  // if current directory is not root then append '/'
+  if (Dir->longName[0] != '/') 
+    strcat(Dir->longParentPath, "/"); 
+  strcpy(Dir->longName, childDirStr);
+  
+  if (Dir->shortName[0] != '/') 
+    strcat(Dir->shortParentPath, "/");
+  strcpy(Dir->shortName, sn);
+}
+*/
+
+
+/*
+***********************************************************************************************************************
+ *                                       (PRIVATE) SET THE LONG NAME FLAGS
+ *
+ * Description : Used by the FAT functions to set the long name flags if it was determined that a long name exists for 
+ *               the current entry begin checked/read-in. This also sets the variable snPosCurrSec.
+ * 
+ * Arguments   : *lnFlags           - Pointer to a byte that will hold the long name flag settings: LN_EXISTS,
+ *                                    LN_CROSS_SEC, and LN_LAST_SEC_ENTRY. This function
+ *                                    will determine which flags should be set and then set this byte accordingly.
+ *             : entryPos           - Integer that specifies the location in the current sector that will be checked 
+ *                                    during the subsequent execution.
+ *             : *snPosCurrSec      - This value is set by this function. It is an integer pointer that specifies the 
+ *                                    position of the short name relative to the position of the first byte of the 
+ *                                    current sector. NOTE: If this is greater than 511 then the short name is in the
+ *                                    next sector.
+ *             : *snPosNextSec      - Integer pointer. This value is set by this function if it is determined that the
+ *                                    short name entry is in the next sector compared to the sector where the last 
+ *                                    entry of its corresponding long name resides.
+ *             : *bpb               - Pointer to a valid instance of a BPB struct.
+***********************************************************************************************************************
+*/
+/*
+void
+pvt_set_long_name_flags (uint8_t * lnFlags, uint16_t entryPos, uint16_t * snPosCurrSec,
+                         uint8_t * currSecArr, BPB * bpb)
+{
+  *lnFlags |= LN_EXISTS;
+
+  // number of entries required by the long name
+  uint8_t longNameOrder = LN_ORD_MASK & currSecArr[entryPos];                 
+  *snPosCurrSec = entryPos + (ENTRY_LEN * longNameOrder);
+  
+  // If short name position is greater than 511 then the short name is in the next sector.
+  if ((*snPosCurrSec) >= bpb->bytesPerSec)
+    {
+      if ((*snPosCurrSec) > bpb->bytesPerSec) *lnFlags |= LN_CROSS_SEC;
+      else if (*snPosCurrSec == SECTOR_LEN)   *lnFlags |= LN_LAST_SEC_ENTRY;
+    }
+}
+*/
+
+
+/*
+***********************************************************************************************************************
+ *                                    (PRIVATE) CORRECTION TO ENTRY POSITON POINTER
+ *
+ * Description : Used by the FAT functions when searching within a directory. Often a correction to entryPos needs to 
+ *               be made to ensure it is pointing at the correct location in the sector array and this function will 
+ *               ensure this. If this function determines that the actual correct location of the entry is not in the 
+ *               current sector being searched when this function is called, then this function will return a 1 to
+ *               signal the calling function to break and get the next sector before proceeding. This function will
+ *               then be called again to ensure that entryPos is indicating the correct location in the new sector.
+ * 
+ * Arguments   : lnFlags            - Byte that is holding the setting of the three long name flags: LN_EXISTS,
+ *                                    LN_CROSS_SEC, and LN_LAST_SEC_ENTRY. The long 
+ *                                    name flags should be cleared (set to 0) by the calling function after this 
+ *                                    function returns with 0.
+ *             : *entryPos          - Pointer to an integer that specifies the location in the current sector that will
+ *                                    be checked/read-in by the calling function. This value will be updated by this
+ *                                    function if a correction to it is required. 
+ *             : *snPosCurrSec      - Pointer to an integer that specifies the final value of this variable after
+ *                                    the previous entry was checked. Stands for Short Name Position In Current Sector.
+ *             : *snPosNextSec      - Pointer to an integer that specifies the final value of this variable after
+ *                                    the previous entry was checked. Stands for Short Name Position In Next Sector.
+ * 
+ * Returns     : 1 if this function determines correct entry is in the next sector when this function is called.
+ *             : 0 if the correct entry is in the current sector when this function is called.
+***********************************************************************************************************************
+*/
+/*
+uint8_t 
+pvt_correct_entry_check (uint8_t lnFlags, uint16_t * entryPos, uint16_t * snPosCurrSec, uint16_t * snPosNextSec)
+{  
+  if (lnFlags & LN_EXISTS)
+    {
+      if ((*snPosCurrSec) >= (SECTOR_LEN - ENTRY_LEN))
+        {
+          if ((*entryPos) != 0) return 1; // need to get the next sector
+          else (*snPosCurrSec) = -ENTRY_LEN;
+        }
+
+      if (lnFlags & (LN_CROSS_SEC | LN_LAST_SEC_ENTRY))
+        {
+          *entryPos = (*snPosNextSec) + ENTRY_LEN; 
+          *snPosNextSec = 0;
+        }
+      else 
+        {
+          *entryPos = (*snPosCurrSec) + ENTRY_LEN;
+          *snPosCurrSec = 0;
+        }
+    }
+  return 0;
+}
+*/

@@ -6,6 +6,7 @@
 * Version : 0.0.0.2
 * Author  : Joshua Fain
 * Target  : ATMega1280
+* License : MIT LICENSE
 * Copyright (c) 2020 Joshua Fain
 *
 *
@@ -14,19 +15,6 @@
 * used for accessing the contents of a FAT32 formatted volume using an AVR microconstroller. The fuctions declared here
 * only provide READ access to the volume's contents (i.e. print file, print directory), no WRITE access is currently 
 * possible. 
-*
-*
-* FUNCTION "PUBLIC":
-*  (1) void     fat_set_directory_to_root (FatDir * Dir, BPB * bpb)
-*  (2) uint8_t  fat_set_directory (FatDir * Dir, char * newDirStr, BPB * bpb)
-*  (3) uint8_t  fat_print_directory (FatDir * Dir, uint8_t entryFilter, BPB * bpb)
-*  (4) uint8_t  fat_print_file (FatDir * Dir, char * file, BPB * bpb)
-*  (5) void     fat_print_error (uint8_t err)
-*
-*
-* STRUCTS USED (defined in FAT.H):
-*  typedef struct FatDirectory FatDir
-*
 ***********************************************************************************************************************
 */
 
