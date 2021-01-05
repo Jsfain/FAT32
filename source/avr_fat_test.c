@@ -433,24 +433,22 @@ uint32_t enterBlockNumber()
 }
 
 
-
 void
 fat_print_fat_entry_members(FatEntry * entry)
 {
   print_str("\n\rentry->longName                   = ");print_str(entry->longName);
   print_str("\n\rentry->shortName                  = ");print_str(entry->shortName);
-  print_str("\n\rentry->shortNameEntry             = { ");
+  print_str("\n\rentry->snEnt                      = { ");
   for (uint8_t i = 0; i < 31; i++)
     { 
-      print_hex(entry->shortNameEntry[i]);
+      print_hex(entry->snEnt[i]);
       print_str(", ");
     }
-  print_hex(entry->shortNameEntry[31]);
+  print_hex(entry->snEnt[31]);
   print_str("} ");
-  //print_str("\n\rentry->longNameEntryCount         = ");print_dec(entry->longNameEntryCount);
-  print_str("\n\rentry->shortNameEntryClusIndex    = ");print_dec(entry->shortNameEntryClusIndex);
-  print_str("\n\rentry->shortNameEntrySecNumInClus = ");print_dec(entry->shortNameEntrySecNumInClus);
-  print_str("\n\rentry->entryPos                   = ");print_dec(entry->entryPos);
+  print_str("\n\rentry->snEntClusIndx              = ");print_dec(entry->snEntClusIndx);
+  print_str("\n\rentry->snEntSecNumInClus          = ");print_dec(entry->snEntSecNumInClus);
+  print_str("\n\rentry->entPos                     = ");print_dec(entry->entPos);
   print_str("\n\rentry->lnFlags                    = ");print_dec(entry->lnFlags);
   print_str("\n\rentry->snPosCurrSec               = ");print_dec(entry->snPosCurrSec);
   print_str("\n\rentry->snPosNextSec               = ");print_dec(entry->snPosNextSec);

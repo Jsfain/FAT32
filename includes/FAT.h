@@ -137,15 +137,15 @@ FatDir;
 // Holds state of an entry in a Fat directory
 typedef struct FatEntry
 {
-  char longName[LN_STRING_LEN_MAX];
-  char shortName[13]; // size 13 for 8+3 entry size, '.' separator and '\0' string termination 
-  uint8_t  shortNameEntry[32]; // Array to hold all of the entry points 
+  char    longName[LN_STRING_LEN_MAX];
+  char    shortName[13]; // size 13 for 8+3 entry size, '.' separator and '\0' string termination 
+  uint8_t snEnt[32]; // Array to hold all of the entry points 
   
   
   // these parameters are used to save the state when using "fat_next_entry()"
-  uint32_t shortNameEntryClusIndex; 
-  uint8_t  shortNameEntrySecNumInClus; 
-  uint16_t entryPos;  
+  uint32_t snEntClusIndx; 
+  uint8_t  snEntSecNumInClus; 
+  uint16_t entPos;  
   uint8_t  lnFlags;
   uint16_t snPosCurrSec;  // need these for the error correction flag check.
   uint16_t snPosNextSec;  // which will also reset these.
