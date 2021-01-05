@@ -447,7 +447,7 @@ fat_print_fat_entry_members(FatEntry * entry)
     }
   print_hex(entry->shortNameEntry[31]);
   print_str("} ");
-  print_str("\n\rentry->longNameEntryCount         = ");print_dec(entry->longNameEntryCount);
+  //print_str("\n\rentry->longNameEntryCount         = ");print_dec(entry->longNameEntryCount);
   print_str("\n\rentry->shortNameEntryClusIndex    = ");print_dec(entry->shortNameEntryClusIndex);
   print_str("\n\rentry->shortNameEntrySecNumInClus = ");print_dec(entry->shortNameEntrySecNumInClus);
   print_str("\n\rentry->entryPos                   = ");print_dec(entry->entryPos);

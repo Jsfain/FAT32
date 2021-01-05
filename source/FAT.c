@@ -111,7 +111,6 @@ fat_init_entry(FatEntry * ent, BPB * bpb)
   for(uint8_t i = 0; i < 32; i++)
     ent->shortNameEntry[i] = 0;
 
-  ent->longNameEntryCount = 0;
   ent->shortNameEntryClusIndex = bpb->rootClus;
   ent->shortNameEntrySecNumInClus = 0;
   ent->entryPos = 0;
@@ -126,12 +125,12 @@ fat_init_entry(FatEntry * ent, BPB * bpb)
 -------------------------------------------------------------------------------
 |                               SET TO NEXT ENTRY 
 |                                        
-| Description : Updates the currEntry, a FatEntry instance, to the next entry
+| Description : Updates the currEnt, a FatEntry instance, to the next entry
 |               in the current directory (currDir).
 |
 | Arguments   : *currDir        - Current directory. Pointer to an instance
 |                                 of FatDir.
-|             : *currEntry      - Current etnry. Pointer to an instance of 
+|             : *currEnt      - Current etnry. Pointer to an instance of 
 |                                 FatEntry
 |             : *bpb            - Pointer to a valid instance of a BPB struct.
 | 
@@ -142,37 +141,44 @@ fat_init_entry(FatEntry * ent, BPB * bpb)
 */
 
 uint8_t 
-fat_next_entry (FatDir * currDir, FatEntry * currEntry, BPB * bpb)
+fat_next_entry (FatDir * currDir, FatEntry * currEnt, BPB * bpb)
 {
   const uint16_t bps  = bpb->bytesPerSec;
   const uint8_t  spc  = bpb->secPerClus;
   const uint32_t drfs = bpb->dataRegionFirstSector;
 
-  uint8_t  currSecArr[bps]; 
-  uint8_t  nextSecArr[bps];
-  uint8_t  attrByte;       // attribute byte
-  uint32_t currSecNumPhys; // physical (disk) sector number
-  char     lnStr[LN_STRING_LEN_MAX];
+  // capture currEnt state in local vars. These will be updated. If successful,
+  // the new (next) state will be stored back in the FatEntry members.
+  uint32_t clusIndx = currEnt->shortNameEntryClusIndex;
+  uint8_t  currSecNumInClus = currEnt->shortNameEntrySecNumInClus;
+  uint16_t entryPos = currEnt->entryPos;
+  uint8_t  lnMask = currEnt->lnFlags;
+  uint16_t snPosCurrSec = currEnt->snPosCurrSec;
+  uint16_t snPosNextSec = currEnt->snPosNextSec;
 
-  uint8_t  lnStrIndx = 0;
-  uint8_t  err;
-
-  uint32_t clusIndx = currEntry->shortNameEntryClusIndex;
-  uint8_t  currSecNumInClus = currEntry->shortNameEntrySecNumInClus;
-  uint16_t entryPos = currEntry->entryPos;
-
-  uint8_t  lnMask = currEntry->lnFlags;
-  uint16_t snPosCurrSec = currEntry->snPosCurrSec;
-  uint16_t snPosNextSec = currEntry->snPosNextSec;
-
+  // flags to signal corresponding vars should not be set to zero on the
+  // first run of the loops where, they are used, when the function is called.
   uint8_t  currSecNumInClusStart = 1;
   uint8_t  entryPosStart = 1;
 
-  uint8_t longNameOrder;
+  // physical (disk) sector numbers
+  uint32_t currSecNumPhys; 
+  uint32_t nextSecNumPhys;
 
-  char sn[13];
-  uint8_t ndx = 0;
+  // other local variable defs
+  uint8_t  currSecArr[bps]; 
+  uint8_t  nextSecArr[bps];
+  uint8_t  attrByte; 
+  char     lnStr[LN_STRING_LEN_MAX];
+  uint8_t  lnStrIndx = 0;
+  uint8_t  longNameOrder;
+  char     sn[13];
+  uint8_t  ndx = 0;
+  uint8_t  err;
 
+  // Loop to search for the next entry. Runs until reaching the end of the last 
+  // cluster of the directory. Returns to calling function if error or the 
+  // next entry in the directory was found.
   do 
     {
       if (currSecNumInClusStart == 0) currSecNumInClus = 0; 
@@ -185,12 +191,12 @@ fat_next_entry (FatDir * currDir, FatEntry * currEntry, BPB * bpb)
           err = fat_to_disk_read_single_sector (currSecNumPhys, currSecArr);
           if (err == 1) return FAILED_READ_SECTOR;
           
-          if (entryPosStart == 0) entryPos = 0; 
+          if (entryPosStart == 0) entryPos = 0;
           for (; entryPos < bps; entryPos = entryPos + ENTRY_LEN)
             {
               entryPosStart = 0;
 
-              // check if adjust entryPos is needed.
+              // adjust entryPos if needed, based on long name flags.
               if (lnMask & LN_EXISTS)
                 {
                   if (snPosCurrSec >= SECTOR_LEN - ENTRY_LEN)
@@ -237,12 +243,12 @@ fat_next_entry (FatDir * currDir, FatEntry * currEntry, BPB * bpb)
 
                       lnMask |= LN_EXISTS;
 
-                      // number of entries required by the long name
+                      // number of entries required by the long name used to 
+                      // locate position of the short name in current sector.
                       longNameOrder = LN_ORD_MASK & currSecArr[entryPos];              
                       snPosCurrSec = entryPos + (ENTRY_LEN * longNameOrder);
                       
-                      // Set long name flags if short
-                      // name is in the next sector.
+                      // Set long name flags if short name is in next sector.
                       if (snPosCurrSec > bps) 
                         lnMask |= LN_CROSS_SEC;
                       else if (snPosCurrSec == SECTOR_LEN) 
@@ -251,11 +257,17 @@ fat_next_entry (FatDir * currDir, FatEntry * currEntry, BPB * bpb)
                       // if short name is in the next sector
                       if (lnMask & (LN_CROSS_SEC | LN_LAST_SEC_ENTRY))
                         {
-                          err = pvt_get_next_sector(
-                                  nextSecArr, currSecNumInClus, 
-                                  currSecNumPhys, clusIndx, bpb);
-
-                          if (err == FAILED_READ_SECTOR) 
+                          // locate and load next sector into nextSecArr 
+                          if (currSecNumInClus >= (spc - 1)) 
+                            nextSecNumPhys = drfs + (
+                             (pvt_get_next_cluster_index (clusIndx, bpb) - 2)
+                             * spc);
+                          else 
+                            nextSecNumPhys = 1 + currSecNumPhys;
+                          
+                          err = fat_to_disk_read_single_sector 
+                                    (nextSecNumPhys, nextSecArr);
+                          if (err == 1)
                             return FAILED_READ_SECTOR;
 
                           snPosNextSec = snPosCurrSec - bps;
@@ -284,24 +296,22 @@ fat_next_entry (FatDir * currDir, FatEntry * currEntry, BPB * bpb)
 
                               for (uint8_t i = 0; i < LN_STRING_LEN_MAX; i++)
                                 {
-                                  currEntry->longName[i] = lnStr[i];
+                                  currEnt->longName[i] = lnStr[i];
                                   if (lnStr == '\0') 
                                     break;
                                 }
 
-                              currEntry->entryPos = entryPos;
-                              currEntry->shortNameEntrySecNumInClus 
+                              currEnt->entryPos = entryPos;
+                              currEnt->shortNameEntrySecNumInClus 
                                             = currSecNumInClus;
-                              currEntry->shortNameEntryClusIndex = clusIndx;
-                              currEntry->snPosCurrSec = snPosCurrSec;
-                              currEntry->snPosNextSec = snPosNextSec;
-                              currEntry->lnFlags = lnMask;
-                              currEntry->longNameEntryCount 
-                                            = currSecArr[entryPos] & 0x3F;
+                              currEnt->shortNameEntryClusIndex = clusIndx;
+                              currEnt->snPosCurrSec = snPosCurrSec;
+                              currEnt->snPosNextSec = snPosNextSec;
+                              currEnt->lnFlags = lnMask;
 
                               for (uint8_t k = 0; k < 32; k++)
                                 {
-                                  currEntry->shortNameEntry[k] 
+                                  currEnt->shortNameEntry[k] 
                                                 = nextSecArr[snPosNextSec + k];
                                 }
 
@@ -332,7 +342,7 @@ fat_next_entry (FatDir * currDir, FatEntry * currEntry, BPB * bpb)
                                     }
                                 }
 
-                              strcpy(currEntry->shortName, sn);
+                              strcpy(currEnt->shortName, sn);
 
                               return SUCCESS;
                             }
@@ -353,23 +363,21 @@ fat_next_entry (FatDir * currDir, FatEntry * currEntry, BPB * bpb)
                               
                               for (uint8_t i = 0; i < LN_STRING_LEN_MAX; i++)
                                 {
-                                  currEntry->longName[i] = lnStr[i];
+                                  currEnt->longName[i] = lnStr[i];
                                   if (lnStr == '\0') break;
                                 }
                               
-                              currEntry->entryPos = entryPos;
-                              currEntry->shortNameEntrySecNumInClus 
+                              currEnt->entryPos = entryPos;
+                              currEnt->shortNameEntrySecNumInClus 
                                           = currSecNumInClus;
-                              currEntry->shortNameEntryClusIndex = clusIndx;
-                              currEntry->snPosCurrSec = snPosCurrSec;
-                              currEntry->snPosNextSec = snPosNextSec;
-                              currEntry->lnFlags = lnMask;
-                              currEntry->longNameEntryCount 
-                                          = currSecArr[entryPos] & 0x3F;
+                              currEnt->shortNameEntryClusIndex = clusIndx;
+                              currEnt->snPosCurrSec = snPosCurrSec;
+                              currEnt->snPosNextSec = snPosNextSec;
+                              currEnt->lnFlags = lnMask;
 
                               for (uint8_t k = 0; k < 32; k++)
                                 {
-                                  currEntry->shortNameEntry[k] 
+                                  currEnt->shortNameEntry[k] 
                                               = nextSecArr[snPosNextSec + k];
                                 }
                               for (uint8_t k = 0; k < 13; k++)
@@ -399,7 +407,7 @@ fat_next_entry (FatDir * currDir, FatEntry * currEntry, BPB * bpb)
                                     }
                                 }
 
-                              strcpy(currEntry->shortName, sn);
+                              strcpy(currEnt->shortName, sn);
 
                               return SUCCESS;
                             }
@@ -429,23 +437,21 @@ fat_next_entry (FatDir * currDir, FatEntry * currEntry, BPB * bpb)
 
                           for (uint8_t i = 0; i < LN_STRING_LEN_MAX; i++)
                             {
-                              currEntry->longName[i] = lnStr[i];
+                              currEnt->longName[i] = lnStr[i];
                               if (lnStr == '\0') break;
                             }
 
-                          currEntry->entryPos = entryPos;
-                          currEntry->shortNameEntrySecNumInClus 
+                          currEnt->entryPos = entryPos;
+                          currEnt->shortNameEntrySecNumInClus 
                                       = currSecNumInClus;
-                          currEntry->shortNameEntryClusIndex = clusIndx;
-                          currEntry->snPosCurrSec = snPosCurrSec;
-                          currEntry->snPosNextSec = snPosNextSec;
-                          currEntry->lnFlags = lnMask;
-                          currEntry->longNameEntryCount
-                                      = currSecArr[entryPos] & 0x3F;
+                          currEnt->shortNameEntryClusIndex = clusIndx;
+                          currEnt->snPosCurrSec = snPosCurrSec;
+                          currEnt->snPosNextSec = snPosNextSec;
+                          currEnt->lnFlags = lnMask;
 
                           for (uint8_t k = 0; k < 32; k++)
                             {
-                              currEntry->shortNameEntry[k] 
+                              currEnt->shortNameEntry[k] 
                                           = currSecArr[snPosCurrSec + k];
                             }
                           
@@ -472,8 +478,7 @@ fat_next_entry (FatDir * currDir, FatEntry * currEntry, BPB * bpb)
                                 }
                             }
 
-                          strcpy(currEntry->shortName, sn);
-
+                          strcpy(currEnt->shortName, sn);
                           return SUCCESS;                                                             
                         }                   
                     }
@@ -486,16 +491,16 @@ fat_next_entry (FatDir * currDir, FatEntry * currEntry, BPB * bpb)
                       attrByte = currSecArr[snPosCurrSec + 11];
                       
                       // must adjust entryPos here by 32.
-                      currEntry->entryPos = snPosCurrSec + ENTRY_LEN; 
-                      currEntry->shortNameEntrySecNumInClus = currSecNumInClus;
-                      currEntry->shortNameEntryClusIndex = clusIndx;
-                      currEntry->snPosCurrSec = snPosCurrSec;
-                      currEntry->snPosNextSec = snPosNextSec;
-                      currEntry->lnFlags = lnMask;
-                      currEntry->longNameEntryCount = 0;
+                      currEnt->entryPos = snPosCurrSec + ENTRY_LEN; 
+                      currEnt->shortNameEntrySecNumInClus = currSecNumInClus;
+                      currEnt->shortNameEntryClusIndex = clusIndx;
+                      currEnt->snPosCurrSec = snPosCurrSec;
+                      currEnt->snPosNextSec = snPosNextSec;
+                      currEnt->lnFlags = lnMask;
+
                       for (uint8_t k = 0; k < 32; k++)
                         {
-                          currEntry->shortNameEntry[k] 
+                          currEnt->shortNameEntry[k] 
                                       = currSecArr[snPosCurrSec + k];
                         }
 
@@ -524,8 +529,8 @@ fat_next_entry (FatDir * currDir, FatEntry * currEntry, BPB * bpb)
                                 }
                             }
                         }
-                      strcpy(currEntry->shortName, sn);
-                      strcpy(currEntry->longName, sn);
+                      strcpy(currEnt->shortName, sn);
+                      strcpy(currEnt->longName, sn);
                       return SUCCESS;  
                     }
                 }
@@ -832,13 +837,16 @@ pvt_check_valid_name (char *nameStr, FatDir *Dir)
 {
   // check that long name and path size are 
   // not too large for current settings.
-  if (strlen (nameStr) > LN_STRING_LEN_MAX) return 1;
-  if (( strlen (nameStr) + strlen (Dir->longParentPath)) > PATH_STRING_LEN_MAX) return 1;
+  if (strlen (nameStr) > LN_STRING_LEN_MAX) 
+    return 1;
+  if (( strlen (nameStr) + strlen (Dir->longParentPath)) > PATH_STRING_LEN_MAX)
+    return 1;
   
-  // nameStr is illegal if it is an empty string or begins with a space character 
-  if ((strcmp (nameStr, "") == 0) || (nameStr[0] == ' ')) return 1;
+  // illegal if empty string or begins with a space char
+  if ((strcmp (nameStr, "") == 0) || (nameStr[0] == ' ')) 
+    return 1;
 
-  // nameStr is illegal if it contains an illegal character
+  // illegal if contains an illegal char
   char illegalCharacters[] = {'\\','/',':','*','?','"','<','>','|'};
   for (uint8_t k = 0; k < strlen (nameStr); k++)
     {       
@@ -849,7 +857,7 @@ pvt_check_valid_name (char *nameStr, FatDir *Dir)
         }
     }
 
-  // nameStr is illegal if it is all space characters.
+  // illegal if all space characters.
   for (uint8_t k = 0; k < strlen (nameStr); k++)  
     {
       if (nameStr[k] != ' ') 
@@ -933,33 +941,6 @@ pvt_set_directory_to_parent (FatDir * Dir, BPB * bpb)
 }
 
 
-
-
-
-
-/*
-***********************************************************************************************************************
- *                                  (PRIVATE) LOAD A LONG NAME ENTRY INTO A C-STRING
- * 
- * Description : This function is called by a FAT function that must read in a long name from a FAT directory into a
- *               C-string. The function is called twice if a long name crosses a sector boundary, and *lnStrIndx will
- *               point to the position in the string to begin loading the next characters
- * 
- * Arguments   : lnFirstEnt          - Integer that points to the position in *secArr that is the lowest order entry
- *                                     of the long name in the sector array.
- *             : lnLastEnt           - Integer that points to the position in *secArr that is the highest order
- *                                     entry of the long name in the sector array.
- *             : *secArr             - Pointer to an array that holds the physical sector's contents containing the 
- *                                     the entries of the long name that will be loaded into the char arry *lnStr.
- *             : *lnStr              - Pointer to a null terminated char array (C-string) that will be loaded with the
- *                                     long name characters from the sector. Usually starts as an array of NULLs.
- *             : *lnStrIndx          - Pointer to an integer that specifies the position in *lnStr where the first
- *                                     character will be loaded when this function is called. This function will update
- *                                     this value as the characters are loaded. If a subsequent call to this function 
- *                                     is made, as required when a single long name crosses a sector boundary, then 
- *                                     this value will be its final value from the previous call.
-***********************************************************************************************************************
-*/
 
 /*
 -------------------------------------------------------------------------------
@@ -1094,167 +1075,146 @@ pvt_get_next_cluster_index (uint32_t currClusIndx, BPB * bpb)
 void 
 pvt_print_entry_fields (uint8_t *secArr, uint16_t entPos, uint8_t entFilt)
 {
-  uint16_t creationTime;
-  uint16_t creationDate;
-  uint16_t lastAccessDate;
+  uint16_t createTime;
+  uint16_t createDate;
+  uint16_t lastAccDate;
   uint16_t writeTime;
   uint16_t writeDate;
   uint32_t fileSize;
 
-  // Load fields with values from secArr
+  print_str ("\n\r");
 
+  // Print creation date and time 
   if (CREATION & entFilt)
     {
-      creationTime = secArr[entPos + 15];
-      creationTime <<= 8;
-      creationTime |= secArr[entPos + 14];
+      createTime = secArr[entPos + 15];
+      createTime <<= 8;
+      createTime |= secArr[entPos + 14];
       
-      creationDate = secArr[entPos + 17];
-      creationDate <<= 8;
-      creationDate |= secArr[entPos + 16];
+      createDate = secArr[entPos + 17];
+      createDate <<= 8;
+      createDate |= secArr[entPos + 16];
+      print_str ("    ");
+
+      if (((createDate & 0x01E0) >> 5) < 10) 
+        print_str ("0");
+
+      print_dec ((createDate & 0x01E0) >> 5);
+      print_str ("/");
+      if ((createDate & 0x001F) < 10)
+        print_str ("0");
+      
+      print_dec (createDate & 0x001F);
+      print_str ("/");
+      print_dec (1980 + ((createDate & 0xFE00) >> 9));
+      print_str ("  ");
+      if (((createTime & 0xF800) >> 11) < 10) 
+        print_str ("0");
+      
+      print_dec (((createTime & 0xF800) >> 11));
+      print_str (":");
+      if (((createTime & 0x07E0) >> 5) < 10)
+        print_str ("0");
+      
+      print_dec ((createTime & 0x07E0) >> 5);
+      print_str (":");
+      if ((2 * (createTime & 0x001F)) < 10) 
+        print_str ("0");
+
+      print_dec (2 * (createTime & 0x001F));
     }
 
+  // Print last access date
   if (LAST_ACCESS & entFilt)
     {
-      lastAccessDate = secArr[entPos + 19];
-      lastAccessDate <<= 8;
-      lastAccessDate |= secArr[entPos + 18];
+      lastAccDate = secArr[entPos + 19];
+      lastAccDate <<= 8;
+      lastAccDate |= secArr[entPos + 18];
+
+      print_str ("     ");
+      if (((lastAccDate & 0x01E0) >> 5) < 10)
+        print_str ("0");
+
+      print_dec ((lastAccDate & 0x01E0) >> 5);
+      print_str ("/");
+      if ((lastAccDate & 0x001F) < 10) 
+        print_str("0");
+
+      print_dec (lastAccDate & 0x001F);
+      print_str ("/");
+      print_dec (1980 + ((lastAccDate & 0xFE00) >> 9));
     }
 
+  // Print last modified date / time
   if (LAST_MODIFIED & entFilt)
     {
-      writeTime = secArr[entPos + 23];
-      writeTime <<= 8;
-      writeTime |= secArr[entPos + 22];
-
+      // Load and Print write date
       writeDate = secArr[entPos + 25];
       writeDate <<= 8;
       writeDate |= secArr[entPos + 24];
-    }
-
-  fileSize = secArr[entPos + 31];
-  fileSize <<= 8;
-  fileSize |= secArr[entPos + 30];
-  fileSize <<= 8;
-  fileSize |= secArr[entPos + 29];
-  fileSize <<= 8;
-  fileSize |= secArr[entPos + 28];
-
-  print_str ("\n\r");
-
-  // Print fields 
-
-  if (CREATION & entFilt)
-    {
-      print_str ("    ");
-      if (((creationDate & 0x01E0) >> 5) < 10) 
-        {
-          print_str ("0");
-        }
-      print_dec ((creationDate & 0x01E0) >> 5);
-      print_str ("/");
-      if ((creationDate & 0x001F) < 10)
-        {
-          print_str ("0");
-        }
-      print_dec (creationDate & 0x001F);
-      print_str ("/");
-      print_dec (1980 + ((creationDate & 0xFE00) >> 9));
-
-      print_str ("  ");
-      if (((creationTime & 0xF800) >> 11) < 10) 
-        {
-          print_str ("0");
-        }
-      print_dec (((creationTime & 0xF800) >> 11));
-      print_str (":");
-      if (((creationTime & 0x07E0) >> 5) < 10)
-        {
-          print_str ("0");
-        }
-      print_dec ((creationTime & 0x07E0) >> 5);
-      print_str (":");
-      if ((2 * (creationTime & 0x001F)) < 10) 
-        {
-          print_str ("0");
-        }
-      print_dec (2 * (creationTime & 0x001F));
-    }
-
-  if (LAST_ACCESS & entFilt)
-    {
-      print_str ("     ");
-      if (((lastAccessDate & 0x01E0) >> 5) < 10)
-        {
-          print_str ("0");
-        }
-      print_dec ((lastAccessDate & 0x01E0) >> 5);
-      print_str ("/");
-      if ((lastAccessDate & 0x001F) < 10) 
-        {
-          print_str("0");
-        }
-      print_dec (lastAccessDate & 0x001F);
-      print_str ("/");
-      print_dec (1980 + ((lastAccessDate & 0xFE00) >> 9));
-    }
-
-
-  if (LAST_MODIFIED & entFilt)
-    {
+   
       print_str ("     ");
       if (((writeDate & 0x01E0) >> 5) < 10) 
-        {
-          print_str ("0");
-        }
+        print_str ("0");
+
       print_dec ((writeDate & 0x01E0) >> 5);
       print_str ("/");
       if ((writeDate & 0x001F) < 10) 
-        {
-          print_str ("0");
-        }
+        print_str ("0");
+
       print_dec (writeDate & 0x001F);
       print_str ("/");
       print_dec (1980 + ((writeDate & 0xFE00) >> 9));
 
-      print_str ("  ");
+      // Load and Print write time
+      writeTime = secArr[entPos + 23];
+      writeTime <<= 8;
+      writeTime |= secArr[entPos + 22];
 
+      print_str ("  ");
       if (((writeTime & 0xF800) >> 11) < 10)
-       {
-         print_str ("0");
-       }
+        print_str ("0");
+
       print_dec (((writeTime & 0xF800) >> 11));
-      print_str (":");
-      
+      print_str (":");      
       if (((writeTime & 0x07E0) >> 5) < 10) 
-        {
-          print_str ("0");
-        }
+        print_str ("0");
+
       print_dec ((writeTime & 0x07E0) >> 5);
       print_str (":");
       if ((2 * (writeTime & 0x001F)) < 10) 
-        {
-          print_str ("0");
-        }
+        print_str ("0");
+
       print_dec (2 * (writeTime & 0x001F));
     }
-
-  uint16_t div = 1000;
-  print_str ("     ");
-  if ((entFilt & FILE_SIZE) == FILE_SIZE)
-  {
-         if ((fileSize / div) >= 10000000) { print_str(" "); print_dec(fileSize / div); }
-    else if ((fileSize / div) >= 1000000) { print_str("  "); print_dec(fileSize / div); }
-    else if ((fileSize / div) >= 100000) { print_str("   "); print_dec(fileSize / div); }
-    else if ((fileSize / div) >= 10000) { print_str("    "); print_dec(fileSize / div); }
-    else if ((fileSize / div) >= 1000) { print_str("     "); print_dec(fileSize / div); }
-    else if ((fileSize / div) >= 100) { print_str("      "); print_dec(fileSize / div); }
-    else if ((fileSize / div) >= 10) { print_str("       "); print_dec(fileSize / div); }
-    else                             { print_str("        ");print_dec(fileSize / div);}        
   
-  print_str("kB  ");
-  }
+  print_str ("     ");
 
+  // Print file size in KB
+  if (entFilt & FILE_SIZE)
+    {
+      uint16_t div = 10000;
+      
+      fileSize = secArr[entPos + 31];
+      fileSize <<= 8;
+      fileSize |= secArr[entPos + 30];
+      fileSize <<= 8;
+      fileSize |= secArr[entPos + 29];
+      fileSize <<= 8;
+      fileSize |= secArr[entPos + 28];
+
+          if ((fileSize / div) >= 10000000) print_str(" ");
+      else if ((fileSize / div) >= 1000000) print_str("  ");
+      else if ((fileSize / div) >= 100000) print_str("   ");
+      else if ((fileSize / div) >= 10000) print_str("    ");
+      else if ((fileSize / div) >= 1000) print_str("     ");
+      else if ((fileSize / div) >= 100) print_str("      ");
+      else if ((fileSize / div) >= 10) print_str("       "); 
+      else                            print_str("        ");
+      
+      print_dec(fileSize / div);
+      print_str("kB  ");
+    }
 }
 
 
@@ -1384,209 +1344,3 @@ pvt_print_fat_file (uint16_t entPos, uint8_t *fileSec, BPB * bpb)
     while (((cluster = pvt_get_next_cluster_index(cluster,bpb)) != END_CLUSTER));
     return END_OF_FILE;
   }
-
-
-
-/*
-***********************************************************************************************************************
- *                             (PRIVATE) LOAD THE CONTENTS OF THE NEXT SECTOR INTO AN ARRAY
- *
- * Description : Used by the FAT functions to load the contents of the next file or directory sector into the 
- *               *nextSecArr array if it is found that a long/short name combo crosses the sector boundary.
- * 
- * Arguments   : *nextSecArr             - Pointer to an array that will be loaded with the contents of the next sector
- *                                         of a file or directory.
- *             : currSecNumInClus        - Integer that specifies the current sector number relative to the current 
- *                                         cluster. This value is used to determine if the next sector is in the 
- *                                         current or the next cluster.
- *             : currSecNumPhys          - Integer specifying the current sector's physical sector number on the disk 
- *                                         hosting the FAT volume.
- *             : clusIndx                - Integer specifying the current cluster's FAT index. This is required if it
- *                                         is determined that the next sector is in the next cluster.
- *             : *bpb                    - Pointer to a valid instance of a BPB struct.
-***********************************************************************************************************************
-*/
-
-uint8_t
-pvt_get_next_sector (uint8_t * nextSecArr, uint32_t currSecNumInClus, 
-                     uint32_t currSecNumPhys, uint32_t clusIndx, BPB * bpb)
-{
-  uint32_t nextSecNumPhys;
-  uint8_t  err = 0;
-  
-  if (currSecNumInClus >= (bpb->secPerClus - 1)) 
-    nextSecNumPhys = bpb->dataRegionFirstSector + ((pvt_get_next_cluster_index (clusIndx, bpb) - 2) * bpb->secPerClus);
-  else 
-    nextSecNumPhys = 1 + currSecNumPhys;
-
-  // function returns either 0 for success or 1 for failed.
-  err = fat_to_disk_read_single_sector (nextSecNumPhys, nextSecArr);
-  if (err == 1) 
-    return FAILED_READ_SECTOR;
-  else 
-    return SUCCESS;
-}
-
-
-
-
-
-
-/*
-***********************************************************************************************************************
- *                           (PRIVATE) SET DIRECTORY TO A CHILD DIRECTORY
- * 
- * Description : This function is called by fat_set_directory() if that function has been asked to set an instance of
- *               FatDir to a child directory and a valid matching entry was found in the directory currently pointed at
- *               by the FatDir instance. This function will only update the struct's members to that of the matching 
- *               entry. It does not perform any of the search/compare required to find the matching entry.
- * 
- * Argument    : *Dir            - Pointer to an instance of a FatDir whose members will be updated to point to the 
- *                                 directory whose name matches *childDirStr.
- *             : *sectorArr      - Pointer to an array that holds the physical sector's contents containing the short
- *                                 name of the entry whose name matches *childDirStr.
- *             : snPos           - Integer that specifies the position of the first byte of the 32-byte short name 
- *                                 entry in *sectorArr.
- *             : *childDirStr    - Pointer to a C-string whose name matches an entry in the current directory FatDir is
- *                                 set to. This is the name of the directory FatDir will be set to by this function. 
- *                                 This is a long name, unless a long name does not exist for a given entry. In that
- *                                 case the longName and shortName members of the FatDir instance will both be set to 
- *                                 the short name of the entry.  
- *             : *bpb            - Pointer to a valid instance of a BPB struct.
-***********************************************************************************************************************
-*/
-/*
-void
-pvt_set_directory_to_child (FatDir * Dir, uint8_t * sectorArr, uint16_t snPos, char * childDirStr, BPB * bpb)
-{
-  uint32_t dirFirstClus;
-  dirFirstClus = sectorArr[snPos + 21];
-  dirFirstClus <<= 8;
-  dirFirstClus |= sectorArr[snPos + 20];
-  dirFirstClus <<= 8;
-  dirFirstClus |= sectorArr[snPos + 27];
-  dirFirstClus <<= 8;
-  dirFirstClus |= sectorArr[snPos + 26];
-
-  Dir->FATFirstCluster = dirFirstClus;
-  
-  uint8_t snLen;
-  if (strlen(childDirStr) < 8) snLen = strlen(childDirStr);
-  else snLen = 8; 
-
-  char sn[9];                                    
-  for (uint8_t k = 0; k < snLen; k++)  
-    sn[k] = sectorArr[snPos + k];
-  sn[snLen] = '\0';
-
-  strcat (Dir->longParentPath,  Dir->longName );
-  strcat (Dir->shortParentPath, Dir->shortName);
-
-  // if current directory is not root then append '/'
-  if (Dir->longName[0] != '/') 
-    strcat(Dir->longParentPath, "/"); 
-  strcpy(Dir->longName, childDirStr);
-  
-  if (Dir->shortName[0] != '/') 
-    strcat(Dir->shortParentPath, "/");
-  strcpy(Dir->shortName, sn);
-}
-*/
-
-
-/*
-***********************************************************************************************************************
- *                                       (PRIVATE) SET THE LONG NAME FLAGS
- *
- * Description : Used by the FAT functions to set the long name flags if it was determined that a long name exists for 
- *               the current entry begin checked/read-in. This also sets the variable snPosCurrSec.
- * 
- * Arguments   : *lnFlags           - Pointer to a byte that will hold the long name flag settings: LN_EXISTS,
- *                                    LN_CROSS_SEC, and LN_LAST_SEC_ENTRY. This function
- *                                    will determine which flags should be set and then set this byte accordingly.
- *             : entryPos           - Integer that specifies the location in the current sector that will be checked 
- *                                    during the subsequent execution.
- *             : *snPosCurrSec      - This value is set by this function. It is an integer pointer that specifies the 
- *                                    position of the short name relative to the position of the first byte of the 
- *                                    current sector. NOTE: If this is greater than 511 then the short name is in the
- *                                    next sector.
- *             : *snPosNextSec      - Integer pointer. This value is set by this function if it is determined that the
- *                                    short name entry is in the next sector compared to the sector where the last 
- *                                    entry of its corresponding long name resides.
- *             : *bpb               - Pointer to a valid instance of a BPB struct.
-***********************************************************************************************************************
-*/
-/*
-void
-pvt_set_long_name_flags (uint8_t * lnFlags, uint16_t entryPos, uint16_t * snPosCurrSec,
-                         uint8_t * currSecArr, BPB * bpb)
-{
-  *lnFlags |= LN_EXISTS;
-
-  // number of entries required by the long name
-  uint8_t longNameOrder = LN_ORD_MASK & currSecArr[entryPos];                 
-  *snPosCurrSec = entryPos + (ENTRY_LEN * longNameOrder);
-  
-  // If short name position is greater than 511 then the short name is in the next sector.
-  if ((*snPosCurrSec) >= bpb->bytesPerSec)
-    {
-      if ((*snPosCurrSec) > bpb->bytesPerSec) *lnFlags |= LN_CROSS_SEC;
-      else if (*snPosCurrSec == SECTOR_LEN)   *lnFlags |= LN_LAST_SEC_ENTRY;
-    }
-}
-*/
-
-
-/*
-***********************************************************************************************************************
- *                                    (PRIVATE) CORRECTION TO ENTRY POSITON POINTER
- *
- * Description : Used by the FAT functions when searching within a directory. Often a correction to entryPos needs to 
- *               be made to ensure it is pointing at the correct location in the sector array and this function will 
- *               ensure this. If this function determines that the actual correct location of the entry is not in the 
- *               current sector being searched when this function is called, then this function will return a 1 to
- *               signal the calling function to break and get the next sector before proceeding. This function will
- *               then be called again to ensure that entryPos is indicating the correct location in the new sector.
- * 
- * Arguments   : lnFlags            - Byte that is holding the setting of the three long name flags: LN_EXISTS,
- *                                    LN_CROSS_SEC, and LN_LAST_SEC_ENTRY. The long 
- *                                    name flags should be cleared (set to 0) by the calling function after this 
- *                                    function returns with 0.
- *             : *entryPos          - Pointer to an integer that specifies the location in the current sector that will
- *                                    be checked/read-in by the calling function. This value will be updated by this
- *                                    function if a correction to it is required. 
- *             : *snPosCurrSec      - Pointer to an integer that specifies the final value of this variable after
- *                                    the previous entry was checked. Stands for Short Name Position In Current Sector.
- *             : *snPosNextSec      - Pointer to an integer that specifies the final value of this variable after
- *                                    the previous entry was checked. Stands for Short Name Position In Next Sector.
- * 
- * Returns     : 1 if this function determines correct entry is in the next sector when this function is called.
- *             : 0 if the correct entry is in the current sector when this function is called.
-***********************************************************************************************************************
-*/
-/*
-uint8_t 
-pvt_correct_entry_check (uint8_t lnFlags, uint16_t * entryPos, uint16_t * snPosCurrSec, uint16_t * snPosNextSec)
-{  
-  if (lnFlags & LN_EXISTS)
-    {
-      if ((*snPosCurrSec) >= (SECTOR_LEN - ENTRY_LEN))
-        {
-          if ((*entryPos) != 0) return 1; // need to get the next sector
-          else (*snPosCurrSec) = -ENTRY_LEN;
-        }
-
-      if (lnFlags & (LN_CROSS_SEC | LN_LAST_SEC_ENTRY))
-        {
-          *entryPos = (*snPosNextSec) + ENTRY_LEN; 
-          *snPosNextSec = 0;
-        }
-      else 
-        {
-          *entryPos = (*snPosCurrSec) + ENTRY_LEN;
-          *snPosCurrSec = 0;
-        }
-    }
-  return 0;
-}
-*/

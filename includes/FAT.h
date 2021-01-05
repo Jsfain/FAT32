@@ -143,7 +143,6 @@ typedef struct FatEntry
   
   
   // these parameters are used to save the state when using "fat_next_entry()"
-  uint8_t  longNameEntryCount; 
   uint32_t shortNameEntryClusIndex; 
   uint8_t  shortNameEntrySecNumInClus; 
   uint16_t entryPos;  
