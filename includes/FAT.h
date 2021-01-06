@@ -70,7 +70,7 @@
 #define LN_LAST_SEC_ENTRY    0x04
 
 
-// ******** Entry Filter Flags
+// ******** Entry Field Flags
 
 // Pass any combination of these flags as the entryFilter argument
 // in fat_print_directory() to indicate which entries and their
