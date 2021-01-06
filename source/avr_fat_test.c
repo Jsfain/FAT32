@@ -7,7 +7,8 @@
 * File   : AVR_FAT_TEST.C
 * Author : Joshua Fain
 * Target : ATMega1280
-*
+* License : MIT LICENSE
+* Copyright (c) 2020 Joshua Fain
 *
 * DESCRIPTION: 
 * This file currently implements a simple command-line like interface to navigate a FAT volume using the functions 
@@ -46,23 +47,7 @@
 * (9) To exit the command line portion of this testing module, enter 'q'.  After exiting, access to the raw data of the
 *     physical disk is provided using the functionality of the AVR-SD Card module. Prompts are provided there as 
 *     instructions, but again, this functionality is not considered part of the AVR-FAT but only specific to how it is
-*     implemented here. 
-*   
-*
-*                                                       MIT LICENSE
-*
-* Copyright (c) 2020 Joshua Fain
-*
-* Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated 
-* documentation files (the "Software"), to deal in the Software without restriction, including without limitation the 
-* rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to 
-* permit ersons to whom the Software is furnished to do so, subject to the following conditions: The above copyright 
-* notice and this permission notice shall be included in all copies or substantial portions of the Software.
-* 
-* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE 
-* WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
-* COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR 
-* OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+*     implemented here.
 ***********************************************************************************************************************
 */
 
@@ -164,15 +149,15 @@ int main(void)
     
 
       // Holds parameters/state of an entry in a FAT directory.
-      // Initialize by passing it to fat_init_entry();
+      // Initialize by passing it to fat_initEntry();
       FatEntry ent;
-      fat_init_entry(&ent, &bpb);
+      fat_initEntry(&ent, &bpb);
 
 
       // Holds parameters to reference a FAT directory.
       // Must be initialized to the root directory.
       FatDir cwd;
-      fat_set_directory_to_root(&cwd, &bpb);
+      fat_setDirToRoot(&cwd, &bpb);
       
 
       // This section implements a command-line like interface for navigating
@@ -187,7 +172,7 @@ int main(void)
       uint8_t lastArgFlag = 0;
       char    *spacePtr;
       uint8_t numOfChars = 0;
-      uint8_t filter = 0; // used with fat_print_directory()
+      uint8_t filter = 0; // used with fat_printDir()
       uint8_t quit = 0;
 
       print_str("\n\n\n\r");
@@ -246,8 +231,8 @@ int main(void)
               // Command: change directory
               if ( !strcmp (cmdStr, "cd"))
                 {   
-                  err = fat_set_directory (&cwd, argStr, &bpb);
-                  if (err != SUCCESS) fat_print_error (err);
+                  err = fat_setDir (&cwd, argStr, &bpb);
+                  if (err != SUCCESS) fat_printError (err);
                 }
                 
               // Command: list directory contents
@@ -280,15 +265,15 @@ int main(void)
                   // Send LONG_NAME as default argument.
                   if ((filter & SHORT_NAME) != SHORT_NAME) filter |= LONG_NAME; 
                   
-                  err = fat_print_directory (&cwd, filter, &bpb);
-                  if (err != END_OF_DIRECTORY) fat_print_error (err);
+                  err = fat_printDir (&cwd, filter, &bpb);
+                  if (err != END_OF_DIRECTORY) fat_printError (err);
                 }
               
               // Command: open file and print it to screen
               else if (!strcmp(cmdStr, "open")) 
                 { 
-                  err = fat_print_file (&cwd, argStr, &bpb);
-                  if (err != END_OF_FILE) fat_print_error (err);
+                  err = fat_printFile (&cwd, argStr, &bpb);
+                  if (err != END_OF_FILE) fat_printError (err);
                 }
 
               // Command: print FatDir members

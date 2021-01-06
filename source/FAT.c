@@ -3,7 +3,7 @@
 *                              AVR-FAT MODULE
 *
 * File    : FAT.C
-* Version : 0.0.0.2 (Previous version commit - Sat Dec 5 22:26:05 2020)
+* Version : 0.0.0.2
 * Author  : Joshua Fain
 * Target  : ATMega1280
 * License : MIT LICENSE
@@ -11,10 +11,9 @@
 * 
 *
 * DESCRIPTION: 
-* Defines functions declared in FAT.H for accessing contents of a FAT32 
-* formatted volume using an AVR microconstroller. The fuctions defined here 
-* only provide READ access to the volume's contents (i.e. print file, print 
-* directory), no WRITE access is currently possible.
+* Functions for navigating and accessing contents of a FAT32 formatted volume
+* using an AVR microconstroller. Note, these only provide READ access to the 
+* volume's contents. No WRITE/ERASE access is currently implemented.
 *******************************************************************************
 */
 
@@ -54,7 +53,7 @@ void     pvt_loadLongName (int lnFirstEnt, int lnLastEnt, uint8_t *secArr,
 void     pvt_updateFatEntryState (char *lnStr, uint16_t entPos, 
                             uint8_t snEntSecNumInClus, uint32_t snEntClusIndx,
                             uint16_t snPosCurrSec, uint16_t snPosNextSec, 
-                            uint8_t lnMask, uint8_t *secArr, FatEntry *ent);
+                            uint8_t lnFlags, uint8_t *secArr, FatEntry *ent);
 
 
 
@@ -83,7 +82,7 @@ void     pvt_updateFatEntryState (char *lnStr, uint16_t entPos,
 */
 
 void
-fat_set_directory_to_root(FatDir * Dir, BPB * bpb)
+fat_setDirToRoot (FatDir * Dir, BPB * bpb)
 {
   for (uint8_t i = 0; i < LN_STRING_LEN_MAX; i++)
     Dir->longName[i] = '\0';
@@ -113,7 +112,7 @@ fat_set_directory_to_root(FatDir * Dir, BPB * bpb)
 */
 
 void
-fat_init_entry(FatEntry * ent, BPB * bpb)
+fat_initEntry (FatEntry *ent, BPB *bpb)
 {
   for(uint8_t i = 0; i < LN_STRING_LEN_MAX; i++)
     ent->longName[i] = '\0';
@@ -149,12 +148,12 @@ fat_init_entry(FatEntry * ent, BPB * bpb)
 | 
 | Return      : FAT Error Flag  - If any value other than SUCCESS is returned 
 |                                 the function was unable to update the
-|                                 FatEntry. To read, pass to fat_print_error()
+|                                 FatEntry. To read, pass to fat_printError()
 -------------------------------------------------------------------------------
 */
 
 uint8_t 
-fat_next_entry (FatDir * currDir, FatEntry * currEnt, BPB * bpb)
+fat_setNextEntry (FatDir * currDir, FatEntry * currEnt, BPB * bpb)
 {
   const uint16_t bps  = bpb->bytesPerSec;
   const uint8_t  spc  = bpb->secPerClus;
@@ -165,7 +164,7 @@ fat_next_entry (FatDir * currDir, FatEntry * currEnt, BPB * bpb)
   uint32_t clusIndx = currEnt->snEntClusIndx;
   uint8_t  currSecNumInClus = currEnt->snEntSecNumInClus;
   uint16_t entPos = currEnt->entPos;
-  uint8_t  lnMask = currEnt->lnFlags;
+  uint8_t  lnFlags = currEnt->lnFlags;
   uint16_t snPosCurrSec = currEnt->snPosCurrSec;
   uint16_t snPosNextSec = currEnt->snPosNextSec;
 
@@ -210,7 +209,7 @@ fat_next_entry (FatDir * currDir, FatEntry * currEnt, BPB * bpb)
               entryPosStart = 0;
 
               // adjust entPos if needed, based on long name flags
-              if (lnMask & LN_EXISTS)
+              if (lnFlags & LN_EXISTS)
                 {
                   if (snPosCurrSec >= SECTOR_LEN - ENTRY_LEN)
                     {
@@ -220,7 +219,7 @@ fat_next_entry (FatDir * currDir, FatEntry * currEnt, BPB * bpb)
                         snPosCurrSec = -ENTRY_LEN;
                     }
 
-                  if (lnMask & (LN_CROSS_SEC | LN_LAST_SEC_ENTRY))
+                  if (lnFlags & (LN_CROSS_SEC | LN_LAST_SEC_ENTRY))
                     {
                       entPos = snPosNextSec + ENTRY_LEN; 
                       snPosNextSec = 0;
@@ -233,7 +232,7 @@ fat_next_entry (FatDir * currDir, FatEntry * currEnt, BPB * bpb)
                 }
 
               // reset long name flags
-              lnMask = 0;
+              lnFlags = 0;
 
               // If first value of entry is 0, rest of entries are empty
               if (currSecArr[entPos] == 0) 
@@ -264,14 +263,14 @@ fat_next_entry (FatDir * currDir, FatEntry * currEnt, BPB * bpb)
                         + (ENTRY_LEN * (LN_ORD_MASK & currSecArr[entPos]));
                       
                       // Set long name flags
-                      lnMask |= LN_EXISTS;
+                      lnFlags |= LN_EXISTS;
                       if (snPosCurrSec > bps) 
-                        lnMask |= LN_CROSS_SEC;
+                        lnFlags |= LN_CROSS_SEC;
                       else if (snPosCurrSec == SECTOR_LEN) 
-                        lnMask |= LN_LAST_SEC_ENTRY;
+                        lnFlags |= LN_LAST_SEC_ENTRY;
 
                       // Check if short name is in the next sector
-                      if (lnMask & (LN_CROSS_SEC | LN_LAST_SEC_ENTRY))
+                      if (lnFlags & (LN_CROSS_SEC | LN_LAST_SEC_ENTRY))
                         {
                           // locate and load next sector into nextSecArr 
                           if (currSecNumInClus >= (spc - 1))
@@ -297,7 +296,7 @@ fat_next_entry (FatDir * currDir, FatEntry * currEnt, BPB * bpb)
                           
                           // Long name crosses sector boundary.
                           // Short name is in the next sector.
-                          if (lnMask & LN_CROSS_SEC)
+                          if (lnFlags & LN_CROSS_SEC)
                             {
                               // Entry preceeding short name must
                               // be first entry of the long name.
@@ -316,14 +315,14 @@ fat_next_entry (FatDir * currDir, FatEntry * currEnt, BPB * bpb)
                               
                               pvt_updateFatEntryState (lnStr, entPos,
                                 currSecNumInClus, clusIndx, snPosCurrSec, 
-                                snPosNextSec, lnMask, nextSecArr, currEnt);
+                                snPosNextSec, lnFlags, nextSecArr, currEnt);
                               
                               return SUCCESS;
                             }
 
                           // long name is in the current sector. 
                           // Short name is in the next sector.
-                          else if (lnMask & LN_LAST_SEC_ENTRY)
+                          else if (lnFlags & LN_LAST_SEC_ENTRY)
                             {
                               // Same as above
                               if ((currSecArr[SECTOR_LEN - ENTRY_LEN] 
@@ -337,7 +336,7 @@ fat_next_entry (FatDir * currDir, FatEntry * currEnt, BPB * bpb)
                               
                               pvt_updateFatEntryState (lnStr, entPos,
                                 currSecNumInClus, clusIndx, snPosCurrSec, 
-                                snPosNextSec, lnMask, nextSecArr, currEnt);
+                                snPosNextSec, lnFlags, nextSecArr, currEnt);
                               
                               return SUCCESS;
                             }
@@ -365,7 +364,7 @@ fat_next_entry (FatDir * currDir, FatEntry * currEnt, BPB * bpb)
 
                           pvt_updateFatEntryState (lnStr, entPos,
                               currSecNumInClus, clusIndx, snPosCurrSec, 
-                              snPosNextSec, lnMask, currSecArr, currEnt);
+                              snPosNextSec, lnFlags, currSecArr, currEnt);
 
                           return SUCCESS;                                                             
                         }                   
@@ -377,7 +376,7 @@ fat_next_entry (FatDir * currDir, FatEntry * currEnt, BPB * bpb)
                       attrByte = currSecArr[entPos + 11];
                       pvt_updateFatEntryState (lnStr, entPos,
                               currSecNumInClus, clusIndx, entPos, 
-                              snPosNextSec, lnMask, currSecArr, currEnt);
+                              snPosNextSec, lnFlags, currSecArr, currEnt);
         
                       return SUCCESS;  
                     }
@@ -406,7 +405,7 @@ fat_next_entry (FatDir * currDir, FatEntry * currEnt, BPB * bpb)
 | 
 | Return      : FAT Error Flag  - If any value other than SUCCESS is returned 
 |                                 the function was unable to update the
-|                                 FatEntry. To read, pass to fat_print_error().
+|                                 FatEntry. To read, pass to fat_printError().
 |  
 | Notes       : - Can only set the directory to a child or parent of the  
 |                 current FatDir directory when the function is called.
@@ -416,7 +415,7 @@ fat_next_entry (FatDir * currDir, FatEntry * currEnt, BPB * bpb)
 */
 
 uint8_t 
-fat_set_directory (FatDir * Dir, char * newDirStr, BPB * bpb)
+fat_setDir (FatDir * Dir, char * newDirStr, BPB * bpb)
 {
   if (pvt_checkName (newDirStr))
     return INVALID_DIR_NAME;
@@ -433,13 +432,13 @@ fat_set_directory (FatDir * Dir, char * newDirStr, BPB * bpb)
   }
 
   FatEntry * ent = malloc(sizeof * ent);
-  fat_init_entry(ent, bpb);
+  fat_initEntry(ent, bpb);
   ent->snEntClusIndx = Dir->FATFirstCluster;
 
   uint8_t err = 0;
   do 
     {
-      err = fat_next_entry(Dir, ent, bpb);
+      err = fat_setNextEntry(Dir, ent, bpb);
       if (err != SUCCESS) return err;
       
       if (!strcmp(ent->longName, newDirStr) 
@@ -500,7 +499,7 @@ fat_set_directory (FatDir * Dir, char * newDirStr, BPB * bpb)
 | Return      : FAT Error Flag   - Returns END_OF_DIRECTORY if the function 
 |                                  completes without issue. Any other value
 |                                  indicates an error. To read, pass the value
-|                                  to fat_print_error().
+|                                  to fat_printError().
 | 
 | Notes       : If neither LONG_NAME or SHORT_NAME are passed to entFilt
 |               then no entries will be printed to the screen.   
@@ -508,7 +507,7 @@ fat_set_directory (FatDir * Dir, char * newDirStr, BPB * bpb)
 */
 
 uint8_t 
-fat_print_directory (FatDir * dir, uint8_t entFilt, BPB * bpb)
+fat_printDir (FatDir * dir, uint8_t entFilt, BPB * bpb)
 {
   // Prints column headers according to entFilt
   print_str("\n\n\r");
@@ -522,10 +521,10 @@ fat_print_directory (FatDir * dir, uint8_t entFilt, BPB * bpb)
   print_str("\n\r");
 
   FatEntry * ent = malloc(sizeof * ent);
-  fat_init_entry(ent, bpb);
+  fat_initEntry(ent, bpb);
   ent->snEntClusIndx = dir->FATFirstCluster;
 
-  while ( fat_next_entry(dir, ent, bpb) != END_OF_DIRECTORY)
+  while ( fat_setNextEntry(dir, ent, bpb) != END_OF_DIRECTORY)
     { 
       if ((  !(ent->snEnt[11] & HIDDEN_ATTR)) 
           || ((ent->snEnt[11] & HIDDEN_ATTR) 
@@ -574,7 +573,7 @@ fat_print_directory (FatDir * dir, uint8_t entFilt, BPB * bpb)
 | Return      : FAT Error Flag   - Returns END_OF_FILE if the function 
 |                                  completes without issue. Any other value 
 |                                  indicates an error. To read, pass the value
-|                                  to fat_print_error().
+|                                  to fat_printError().
 |                               
 | Notes       : fileNameStr must be a long name unless a long name for a given
 |               entry does not exist, in which case it must be a short name.
@@ -582,19 +581,19 @@ fat_print_directory (FatDir * dir, uint8_t entFilt, BPB * bpb)
 */
 
 uint8_t 
-fat_print_file(FatDir * Dir, char * fileNameStr, BPB * bpb)
+fat_printFile (FatDir *Dir, char *fileNameStr, BPB *bpb)
 {
   if (pvt_checkName (fileNameStr))
     return INVALID_DIR_NAME;
 
   FatEntry * ent = malloc(sizeof * ent);
-  fat_init_entry(ent, bpb);
+  fat_initEntry(ent, bpb);
   ent->snEntClusIndx = Dir->FATFirstCluster;
 
   uint8_t err = 0;
   do 
     {
-      err = fat_next_entry(Dir, ent, bpb);
+      err = fat_setNextEntry(Dir, ent, bpb);
       if (err != SUCCESS) return err;
 
       if (!strcmp(ent->longName, fileNameStr)
@@ -622,7 +621,7 @@ fat_print_file(FatDir * Dir, char * fileNameStr, BPB * bpb)
 */
 
 void
-fat_print_error (uint8_t err)
+fat_printError (uint8_t err)
 {  
   switch(err)
   {
@@ -686,18 +685,18 @@ void
 pvt_updateFatEntryState (char *lnStr, uint16_t entPos, 
                          uint8_t snEntSecNumInClus, uint32_t snEntClusIndx,
                          uint16_t snPosCurrSec, uint16_t snPosNextSec, 
-                         uint8_t lnMask, uint8_t *secArr, FatEntry *ent)
+                         uint8_t lnFlags, uint8_t *secArr, FatEntry *ent)
 {
   char sn[13];
   uint8_t ndx = 0;
 
   uint16_t snPos;
-  if (lnMask & (LN_CROSS_SEC | LN_LAST_SEC_ENTRY))
+  if (lnFlags & (LN_CROSS_SEC | LN_LAST_SEC_ENTRY))
     snPos = snPosNextSec;
   else
     snPos = snPosCurrSec;
 
-  if (lnMask & LN_EXISTS) 
+  if (lnFlags & LN_EXISTS) 
     ent->entPos = entPos;
   else 
     ent->entPos = entPos + ENTRY_LEN;
@@ -706,7 +705,7 @@ pvt_updateFatEntryState (char *lnStr, uint16_t entPos,
   ent->snEntClusIndx = snEntClusIndx;
   ent->snPosCurrSec = snPosCurrSec;
   ent->snPosNextSec = snPosNextSec;
-  ent->lnFlags = lnMask;
+  ent->lnFlags = lnFlags;
 
   for (uint8_t k = 0; k < 32; k++)
     ent->snEnt[k] = secArr[snPos + k];
@@ -739,7 +738,7 @@ pvt_updateFatEntryState (char *lnStr, uint16_t entPos,
 
   strcpy(ent->shortName, sn);
   
-  if ( !(lnMask & LN_EXISTS) )
+  if ( !(lnFlags & LN_EXISTS) )
     strcpy(ent->longName, sn);
   
   else
