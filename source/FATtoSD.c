@@ -1,39 +1,22 @@
 /*
-***********************************************************************************************************************
-*                                         INTERFACE FOR AVR-FAT to AVR-SD CARD MODULE
-* 
-* File   : FATtoSD.C
-* Author : Joshua Fain
-* Target : ATMega1280
+*******************************************************************************
+*                   INTERFACE FOR AVR-FAT to AVR-SD CARD MODULE
 *
-* 
-* DESCRIPTION:
-* This file implements the required disk interface functions declared in FATtoDISK_INTERFACE.H. These have been 
-* implemented here for accessing raw data on a FAT32-formatted SD Card using the AVR-SD Card module. The required 
-* source files from the AVR-SD Card module are included in the repo, though they are technically part of the AVR-FAT
-* module as the the AVR-FAT module, is intended to be independent of disk-type.
-* 
-* FUNCTIONS:
-* (1) uint32_t fat_to_disk_find_boot_sector (void)                                               
-* (2) uint8_t  fat_to_disk_read_single_sector (uint32_t address, uint8_t *sectorByteArry)
-*
-*
-*                                                      MIT LICENSE
-*
+* File    : FATtoSD.C
+* Version : 0.0.0.2
+* Author  : Joshua Fain
+* Target  : ATMega1280
+* License : MIT
 * Copyright (c) 2020 Joshua Fain
-*
-* Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated 
-* documentation files (the "Software"), to deal in the Software without restriction, including without limitation the 
-* rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to 
-* permit ersons to whom the Software is furnished to do so, subject to the following conditions: The above copyright 
-* notice and this permission notice shall be included in all copies or substantial portions of the Software.
 * 
-* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE 
-* WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
-* COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR 
-* OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-***********************************************************************************************************************
+*
+* DESCRIPTION: 
+* Implements required interface functions declared in FATtoDISK_INTERFACE.H. 
+* These have been implemented here for accessing raw data on a FAT32-formatted
+* SD Card using the AVR-SD Card module.
+*******************************************************************************
 */
+
 
 
 #include <avr/io.h>
@@ -47,24 +30,47 @@
 
 
 
-// Declaring "private" function.
+
+
+/*
+*******************************************************************************
+*******************************************************************************
+ *                     
+ *                      "PRIVATE" FUNCTION DECLARATIONS      
+ *  
+*******************************************************************************
+*******************************************************************************
+*/
+
 uint8_t 
-pvt_get_card_type (void);
+pvt_getCardType (void);
 
 
 
 /*
-***********************************************************************************************************************
-*                                          REQUIRED "PUBLIC" FUNCTIONS
-***********************************************************************************************************************
+*******************************************************************************
+*******************************************************************************
+ *                     
+ *                           FUNCTION DEFINITIONS       
+ *  
+*******************************************************************************
+*******************************************************************************
 */
 
+/* 
+------------------------------------------------------------------------------
+|                              FIND BOOT SECTOR
+|                                        
+| Description : This function must be implemented to find address of the the 
+|               boot sector on a FAT32-formatted disk. This function is used
+|               by fat_setBPB();
+|
+| Returns     : address of the boot sector on the physical disk.
+-------------------------------------------------------------------------------
+*/
 
-// This function is required to interface with the physical disk hosting the FAT volume. It returns
-// a value corresponding to the addressed location of the Boot Sector / Bios Parameter Block on the
-// physical disk. This function is used by FAT_SetBiosParameterBlock().
 uint32_t 
-fat_to_disk_find_boot_sector (void)
+FATtoDisk_findBootSector (void)
 {
     uint8_t  block[512];
     uint16_t timeout = 0;
@@ -76,7 +82,7 @@ fat_to_disk_find_boot_sector (void)
     uint8_t  cardType;
     uint16_t addressMultiplier = 0;
 
-    cardType = pvt_get_card_type();
+    cardType = pvt_getCardType();
     // SDHC is block addressable
     // SDSC byte addressable
     if (cardType == SDHC) addressMultiplier = 1;
@@ -144,19 +150,33 @@ fat_to_disk_find_boot_sector (void)
 
 
 
-// This function is required to interface with the physical disk hosting the FAT volume. This function
-// should load the contents of the sector at the physical address specified in the address argument into
-// the array pointed at by *sectorByteArray. This function is used by all FAT functions requiring access
-// to the physical disk. The function ill return 1 if there is a read failure and 0 if it is successful. 
-uint8_t fat_to_disk_read_single_sector ( uint32_t address, uint8_t *sectorByteArray)
+/* 
+------------------------------------------------------------------------------
+|                       READ SINGLE SECTOR FROM DISK
+|                                        
+| Description : This function must be implemented to load the contents of the
+|               sector at a specified address on the physical address to an 
+|               array.
+|
+| Arguments   : addr   - address of the sector on the physical disk that should
+|                        be read into the array, *arr.
+|             : *arr   - ptr to the array that will be loaded with the contents
+|                        of the disk sector at the specified address.
+|
+| Returns     : 0 if successful, 1 if there is a read failure.
+-------------------------------------------------------------------------------
+*/
+
+uint8_t
+FATtoDisk_readSingleSector (uint32_t addr, uint8_t *arr)
 {
     uint8_t  cardType;
     uint16_t err;
     uint8_t  db[512];
-    uint32_t blockNumber = address;
+    uint32_t blockNumber = addr;
 
     // determine if card is SDSC or SDHC/SDXC
-    cardType = pvt_get_card_type();
+    cardType = pvt_getCardType();
 
     // SDHC is block addressable SDSC byte addressable
     if (cardType == SDHC)
@@ -168,22 +188,35 @@ uint8_t fat_to_disk_read_single_sector ( uint32_t address, uint8_t *sectorByteAr
       return 1; // failed
     
     for (int k = 0; k < 512; k++)
-      sectorByteArray[k] = db[k];
-    
+      //sectorByteArray[k] = db[k];
+        arr[k] = db[k];    
     return 0; // successful
 };
 
 
 
 /*
-***********************************************************************************************************************
-*                                                  "PRIVATE" FUNCTION
-***********************************************************************************************************************
+*******************************************************************************
+*******************************************************************************
+ *                     
+ *                        "PRIVATE" FUNCTION DEFINITIONS        
+ *  
+*******************************************************************************
+*******************************************************************************
 */
 
-// Used here by the two required "public" functions to get the SD card's type. The type 
-// of the SD card determines how a card is addressed, i.e. byte or block addressable. 
-uint8_t pvt_get_card_type()
+/* 
+------------------------------------------------------------------------------
+|                              GET SD CARD TYPE
+|                                        
+| Description : Determines and returns the SD card type. The card type 
+|               determines if it is block or byte addressable.
+|
+| Returns     : SD card type - SDSC or SDHC.
+-------------------------------------------------------------------------------
+*/
+
+uint8_t pvt_getCardType()
 {
     uint8_t r1 = 0;
     uint8_t cardType;

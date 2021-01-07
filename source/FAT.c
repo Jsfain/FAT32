@@ -6,7 +6,7 @@
 * Version : 0.0.0.2
 * Author  : Joshua Fain
 * Target  : ATMega1280
-* License : MIT LICENSE
+* License : MIT
 * Copyright (c) 2020 Joshua Fain
 * 
 *
@@ -63,7 +63,7 @@ void     pvt_updateFatEntryState (char *lnStr, uint16_t entPos,
 *******************************************************************************
 *******************************************************************************
  *                     
- *                           FUNCTION DECLARATIONS       
+ *                           FUNCTION DEFINITIONS       
  *  
 *******************************************************************************
 *******************************************************************************
@@ -200,7 +200,7 @@ fat_setNextEntry (FatDir * currDir, FatEntry * currEnt, BPB * bpb)
 
           // load sector into currSecArr[]
           currSecNumPhys = currSecNumInClus + drfs + ((clusIndx - 2) * spc);
-          err = fat_to_disk_read_single_sector (currSecNumPhys, currSecArr);
+          err = FATtoDisk_readSingleSector (currSecNumPhys, currSecArr);
           if (err == 1) return FAILED_READ_SECTOR;
           
           if (entryPosStart == 0) entPos = 0;
@@ -282,7 +282,7 @@ fat_setNextEntry (FatDir * currDir, FatEntry * currEnt, BPB * bpb)
                           else 
                             nextSecNumPhys = 1 + currSecNumPhys;
                           
-                          err = fat_to_disk_read_single_sector (
+                          err = FATtoDisk_readSingleSector (
                                             nextSecNumPhys, nextSecArr);
                           if (err == 1)
                             return FAILED_READ_SECTOR;
@@ -823,7 +823,7 @@ pvt_setDirToParent (FatDir *Dir, BPB *bpb)
                    + ((Dir->FATFirstCluster - 2) * bpb->secPerClus);
 
   // function returns either 0 for success for 1 for failed.
-  err = fat_to_disk_read_single_sector (currSecNumPhys, currSecArr);
+  err = FATtoDisk_readSingleSector (currSecNumPhys, currSecArr);
   if (err != 0) return FAILED_READ_SECTOR;
 
   parentDirFirstClus = currSecArr[53];
@@ -965,7 +965,7 @@ pvt_getNextClusIndex (uint32_t currClusIndx, BPB * bpb)
   uint32_t fatSectorToRead = clusIndx + bpb->rsvdSecCnt;
   uint8_t  sectorArr[bpb->bytesPerSec];
   
-  fat_to_disk_read_single_sector (fatSectorToRead, sectorArr);
+  FATtoDisk_readSingleSector (fatSectorToRead, sectorArr);
 
   clusIndx = 0;
   clusIndx = sectorArr[clusIndxStartByte+3];
@@ -1237,7 +1237,7 @@ pvt_printFile (uint8_t *fileSec, BPB * bpb)
                              + ((clus - 2) * bpb->secPerClus);
 
             // function returns either 0 for success for 1 for failed.
-            err = fat_to_disk_read_single_sector (currSecNumPhys, fileSec);
+            err = FATtoDisk_readSingleSector (currSecNumPhys, fileSec);
             if (err == 1) 
               return FAILED_READ_SECTOR;
 

@@ -1,8 +1,8 @@
 /*
-***********************************************************************************************************************
-*                                                  TEST for AVR-FAT MODULE
+*******************************************************************************
+*                                 TEST for AVR-FAT MODULE
 *
-*                      Contains main(). Used to test the functionality of the the AVR-FAT module.
+*   Contains main(). Used to test the functionality of the the AVR-FAT module.
 * 
 * File   : AVR_FAT_TEST.C
 * Author : Joshua Fain
@@ -11,44 +11,47 @@
 * Copyright (c) 2020 Joshua Fain
 *
 * DESCRIPTION: 
-* This file currently implements a simple command-line like interface to navigate a FAT volume using the functions 
-* available in the AVR-FAT module (i.e. FAT.C / FAT.H). This particular 'test' implementation uses the AVR-SD Card 
-* module as a physical disk driver to access the raw data contents of a FAT32-formatted SD card. This driver is 
-* included in the repo, but the AVR-SD Card module should not be considered part of this AVR-FAT module.
+* Implements a simple command line-like interface to navigate and read a FAT 
+* volume. This particular 'test' implementation uses the AVR-SD Card module as
+* a physical disk driver to access the raw data contents of a FAT32-formatted 
+* SD card. This SD card driver is included in the repo, but is not considered 
+* part of the AVR-FAT module.
 *
 *
 * COMMANDS:
-*  (1) cd <DIR>                       :    Change directory to the directory specified by <DIR>.
-*  (2) ls <FILTER_1> ... <FILTER_n>   :    List directory contents based on <FILTER>'s.
-*  (3) open <FILE>                    :    Print contents of <FILE> to a screen.
-*  (4) pwd                            :    Print the current working directory to screen. This actually prints the
-*                                          values of the FatDir instances members at the time it is called.
+*  (1) cd <DIR>      : Change directory to the directory specified by <DIR>.
+*  (2) ls FILTERs>   : List directory contents based on specified <FILTERs>.
+*  (3) open <FILE>   : Print contents of <FILE> to a screen.
+*  (4) pwd           : Print the current working directory to screen. This 
+*                      actually prints the values of the FatDir instances 
+*                      members at the time it is called.
 *
 * NOTES: 
-* (1) This only has READ capabilities. No file or directories can be created with the module, and nothing in the FAT
-*     volume can be modified.
-* (2) The 'cd' command can only change the directory to a child or the parent of the current directory.
-* (3) 'open' will only work for files that are in the current directory. 
-* (4) Pass ".." (without quotes) as the argument to cd to change to the parent directory.
-* (5) Quotation marks should NOT be used in specifying a directory or file, even if spaces are in the name. 
+* (1) The module only has READ capabilities.
+* (2) 'cd' cmd can only change the dir to a child/parent of the cwd.
+* (3) 'open' will only work for files that are in the cwd. 
+* (4) Pass ".." (without quotes) as the argument to 'cd' for parent dir.
+* (5) Quotation marks should NOT be used in specifying a directory or file. 
 * (6) Directory and file arguments are all case sensitive.
-* (7) If no argument is given to 'ls' then the long name of non-hidden entries is printed to the screen.
-* (8) The following options are available as "filters" for the 'ls' command. Pass any combination of these:
-*      /LN : Print long name of each entry if it exists, else its short name is printed.
-*      /SN : Print short name of the entry.
-*      /H  : Print hidden entries.
-*      /T  : Print the entry type (file or directory). 
-*      /FS : Print the file size of the entry. Currently rounded down to the nearest KB.
-*      /C  : Print entries creation date and time.
-*      /LM : Print last modified date and time.
-*      /LA : Print last access date.
-*      /A  :  = /C /LM /LA
+* (7) If no arg is given to 'ls', then the long name of entries are printed. 
+* (8) The following options are available as "filters" for the 'ls' command. 
+*     Pass any combination of these:
+*       /LN : Print long name of each entry if it exists.
+*       /SN : Print short name of each entry.
+*       /H  : Print hidden entries.
+*       /T  : Print the entry type (file or dir). 
+*       /FS : Print the file size of the entry.
+*       /C  : Print entry creation date and time.
+*       /LM : Print last modified date and time.
+*       /LA : Print last access date.
+*       /A  :  = /C /LM /LA
 *
-* (9) To exit the command line portion of this testing module, enter 'q'.  After exiting, access to the raw data of the
-*     physical disk is provided using the functionality of the AVR-SD Card module. Prompts are provided there as 
-*     instructions, but again, this functionality is not considered part of the AVR-FAT but only specific to how it is
-*     implemented here.
-***********************************************************************************************************************
+* (9) Enter 'q' to exit the command line portion of this testing module. After
+*     exiting, access to the raw data of the physical disk is provided using 
+*     the functionality of the AVR-SD Card module. Prompts are provided there 
+*     as instructions. This raw data functionality is not considered part of 
+*     the AVR-FAT module.
+*******************************************************************************
 */
 
 
@@ -79,7 +82,7 @@ enterBlockNumber();
 
 
 
-// ********************************************************************
+// ****************************************************************************
 //                                 MAIN()
 
 int main(void)
@@ -88,7 +91,7 @@ int main(void)
   spi_master_init();
 
 
-  // ***********************************************************************
+  // **************************************************************************
   //                            SD Card Initialization 
   
   // ctv is a type used specifically by some sd card-specific routines. This
@@ -121,7 +124,7 @@ int main(void)
     }
 
   //                           END SD Card Initialization
-  // ************************************************************************
+  // **************************************************************************
 
 
 
@@ -129,7 +132,7 @@ int main(void)
   // if SD card initialization is successful
   if (initResponse == 0)
     {          
-      // ********************************************************************
+      // **********************************************************************
       //                       FAT "Command-Line" Section 
       
       // error variable for errors returned by any of the FAT functions.
@@ -140,11 +143,11 @@ int main(void)
       // assist in pointing to region locations in the FAT volume. This only 
       // needs to be called set once.
       BPB bpb;
-      err = fat_set_bios_parameter_block(&bpb);
+      err = fat_setBPB (&bpb);
       if (err != BOOT_SECTOR_VALID)
         {
-          print_str("\n\r fat_set_bios_parameter_block() returned ");
-          fat_print_boot_sector_error(err);
+          print_str("\n\r fat_setBPB() returned ");
+          fat_printBootSectorError(err);
         }
     
 
@@ -247,15 +250,24 @@ int main(void)
                       if (spacePtr == NULL) lastArgFlag = 1;
                       *spacePtr = '\0';
                       
-                           if (strcmp ( argStr, "/LN") == 0) filter |= LONG_NAME;
-                      else if (strcmp ( argStr, "/SN") == 0) filter |= SHORT_NAME;
-                      else if (strcmp ( argStr, "/A" ) == 0) filter |= ALL;
-                      else if (strcmp ( argStr, "/H" ) == 0) filter |= HIDDEN;
-                      else if (strcmp ( argStr, "/C" ) == 0) filter |= CREATION;
-                      else if (strcmp ( argStr, "/LA") == 0) filter |= LAST_ACCESS;
-                      else if (strcmp ( argStr, "/LM") == 0) filter |= LAST_MODIFIED;
-                      else if (strcmp ( argStr, "/FS") == 0) filter |= FILE_SIZE;
-                      else if (strcmp ( argStr, "/T" ) == 0) filter |= TYPE;
+                      if (strcmp (argStr, "/LN") == 0) 
+                            filter |= LONG_NAME;
+                      else if (strcmp (argStr, "/SN") == 0) 
+                            filter |= SHORT_NAME;
+                      else if (strcmp (argStr, "/A" ) == 0) 
+                            filter |= ALL;
+                      else if (strcmp (argStr, "/H" ) == 0) 
+                            filter |= HIDDEN;
+                      else if (strcmp (argStr, "/C" ) == 0) 
+                            filter |= CREATION;
+                      else if (strcmp (argStr, "/LA") == 0) 
+                            filter |= LAST_ACCESS;
+                      else if (strcmp (argStr, "/LM") == 0) 
+                            filter |= LAST_MODIFIED;
+                      else if (strcmp (argStr, "/FS") == 0) 
+                            filter |= FILE_SIZE;
+                      else if (strcmp (argStr, "/T" ) == 0) 
+                            filter |= TYPE;
                      
                       if (lastArgFlag) break;
                       strcpy (argStr, spacePtr + 1);
@@ -263,7 +275,8 @@ int main(void)
                   while (argCnt++ < 10);
   
                   // Send LONG_NAME as default argument.
-                  if ((filter & SHORT_NAME) != SHORT_NAME) filter |= LONG_NAME; 
+                  if ((filter & SHORT_NAME) != SHORT_NAME) 
+                    filter |= LONG_NAME;
                   
                   err = fat_printDir (&cwd, filter, &bpb);
                   if (err != END_OF_DIRECTORY) fat_printError (err);
@@ -279,21 +292,30 @@ int main(void)
               // Command: print FatDir members
               else if (!strcmp(cmdStr, "pwd"))
                 {
-                  print_str ("\n\rshortName = "); print_str (cwd.shortName);
-                  print_str ("\n\rshortParentPath = "); print_str (cwd.shortParentPath);
-                  print_str ("\n\rlongName = "); print_str (cwd.longName);
-                  print_str ("\n\rlongParentPath = "); print_str (cwd.longParentPath);
-                  print_str ("\n\rFATFirstCluster = "); print_dec (cwd.FATFirstCluster);
+                  print_str ("\n\rshortName = "); 
+                  print_str (cwd.shortName);
+                  print_str ("\n\rshortParentPath = "); 
+                  print_str (cwd.shortParentPath);
+                  print_str ("\n\rlongName = "); 
+                  print_str (cwd.longName);
+                  print_str ("\n\rlongParentPath = "); 
+                  print_str (cwd.longParentPath);
+                  print_str ("\n\rFATFirstCluster = "); 
+                  print_dec (cwd.FATFirstCluster);
                 }
               
               // quit the cmdStr line interface.
-              else if (cmdStr[0] == 'q') { print_str ("\n\rquit\n\r"); quit = 1; }
-              
-              else  print_str ("\n\rInvalid command\n\r");
+              else if (cmdStr[0] == 'q') 
+                { 
+                  print_str ("\n\rquit\n\r"); 
+                  quit = 1; 
+                }
+              else  
+                print_str ("\n\rInvalid command\n\r");
             }
           print_str ("\n\r");
 
-          // ensure USART Data Register is cleared of any remaining garbage bytes.
+          // ensure USART Data Register is cleared.
           for (int k = 0; k < 10; k++) UDR0; 
         }
       while (quit == 0);   
@@ -332,9 +354,13 @@ int main(void)
           // Print blocks
 
           // SDHC is block addressable
-          if (ctv.type == SDHC) sdErr = sd_spi_print_multiple_blocks (startBlockNum, numOfBlocks);
+          if (ctv.type == SDHC) 
+            sdErr = sd_spi_print_multiple_blocks (
+                      startBlockNum, numOfBlocks);
           // SDSC is byte addressable
-          else sdErr = sd_spi_print_multiple_blocks (startBlockNum * BLOCK_LEN, numOfBlocks);
+          else 
+            sdErr = sd_spi_print_multiple_blocks (
+                      startBlockNum * BLOCK_LEN, numOfBlocks);
           
           if (sdErr != READ_SUCCESS)
             { 
@@ -368,14 +394,14 @@ int main(void)
   return 0;
 }
 //                               END MAIN()                      
-// **********************************************************************
+// ****************************************************************************
 
 
 
                        
-// **********************************************************************
+// ****************************************************************************
 //                             LOCAL FUNCTIONS
-// **********************************************************************
+// ****************************************************************************
 
 
 

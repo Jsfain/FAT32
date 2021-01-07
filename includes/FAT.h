@@ -37,7 +37,10 @@
 *******************************************************************************
 */
 
+#ifndef SECTOR_LEN
 #define SECTOR_LEN                                512
+#endif // SECTOR_LEN
+
 #define ENTRY_LEN                                 32
 #define END_CLUSTER                               0x0FFFFFFF
 
