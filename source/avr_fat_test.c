@@ -88,41 +88,37 @@ enterBlockNumber();
 int main(void)
 {
   usart_init();
-  spi_master_init();
+  spi_masterInit();
 
 
   // **************************************************************************
   //                            SD Card Initialization 
   
-  // ctv is a type used specifically by some sd card-specific routines. This
-  // is not explicitely used in the FAT module, but the SD card initializing
-  // routine requires it to be passed as an argument. The results will
-  // specify whether the card is type SDHC or SDSC, which is used by the
-  // SD Card routines to determines how it is shoudl be addressed.
+  // Initialize SD card and set ctv instance using the intialization routine.
+
   CTV ctv;
 
   uint32_t initResponse;
 
-  // Attempt, up to 10 times, to initialize the SD card.
-  for (int i = 0; i < 10; i++)
+  // Attempt, up to 5 times, to initialize the SD card.
+  for (uint8_t i = 0; i < 5; i++)
     {
-      print_str("\n\n\r SD Card Initialization Attempt # "); print_dec(i);
-      initResponse = sd_spi_mode_init (&ctv);
+      print_str ("\n\n\r SD Card Initialization Attempt # "); print_dec(i);
+      initResponse = sd_spiModeInit (&ctv);
+
       if (((initResponse & 0xFF) != 0) && ((initResponse & 0xFFF00) != 0))
         {    
-          print_str("\n\n\r FAILED INITIALIZING SD CARD");
-          print_str("\n\r Initialization Error Response: "); 
-          sd_spi_print_init_error(initResponse);
-          print_str ("\n\r R1 Response: "); 
-          sd_spi_print_r1 (initResponse);
+          print_str ("\n\n\r FAILED INITIALIZING SD CARD");
+          print_str ("\n\r Initialization Error Response: "); 
+          sd_printInitError (initResponse);
+          print_str ("\n\r R1 Response: "); sd_printR1 (initResponse);
         }
       else
         {   
-          print_str("\n\r SUCCESSFULLY INITIALIZED SD CARD");
+          print_str ("\n\r SUCCESSFULLY INITIALIZED SD CARD");
           break;
         }
     }
-
   //                           END SD Card Initialization
   // **************************************************************************
 
@@ -355,25 +351,25 @@ int main(void)
 
           // SDHC is block addressable
           if (ctv.type == SDHC) 
-            sdErr = sd_spi_print_multiple_blocks (
+            sdErr = sd_printMultipleBlocks (
                       startBlockNum, numOfBlocks);
           // SDSC is byte addressable
           else 
-            sdErr = sd_spi_print_multiple_blocks (
+            sdErr = sd_printMultipleBlocks (
                       startBlockNum * BLOCK_LEN, numOfBlocks);
           
           if (sdErr != READ_SUCCESS)
             { 
-              print_str ("\n\r >> sd_spi_print_multiple_blocks () returned ");
+              print_str ("\n\r >> sd_printMultipleBlocks() returned ");
               if (sdErr & R1_ERROR)
                 {
                   print_str ("R1 error: ");
-                  sd_spi_print_r1 (sdErr);
+                  sd_printR1 (sdErr);
                 }
               else 
                 { 
                   print_str (" error "); 
-                  sd_spi_print_read_error (sdErr);
+                  sd_printReadError (sdErr);
                 }
             }
           print_str ("\n\rPress 'q' to quit: ");

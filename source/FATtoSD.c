@@ -76,45 +76,47 @@ FATtoDisk_findBootSector (void)
     uint16_t timeout = 0;
     uint8_t  r1;
     uint8_t  bsflag = 0;
-    uint32_t startBlockNumber = 0;
-    uint32_t maxNumberOfBlocksToCheck = 10;
-    uint32_t blockNumber = 0;
+    uint32_t startBlckNum = 0;
+    uint32_t maxNumOfBlcksToChck = 10;
+    uint32_t blckNum = 0;
     uint8_t  cardType;
-    uint16_t addressMultiplier = 0;
+    uint16_t addrMult = 0; // address multiplier
 
     cardType = pvt_getCardType();
     // SDHC is block addressable
     // SDSC byte addressable
-    if (cardType == SDHC) addressMultiplier = 1;
-    else addressMultiplier =  BLOCK_LEN;
+    if (cardType == SDHC) addrMult = 1;
+    else addrMult =  BLOCK_LEN;
     
     CS_SD_LOW;
-    sd_spi_send_command (READ_MULTIPLE_BLOCK, startBlockNumber * addressMultiplier); // CMD18
-    r1 = sd_spi_get_r1();
+    sd_sendCommand (READ_MULTIPLE_BLOCK, 
+                    startBlckNum * addrMult); // CMD18
+    r1 = sd_getR1();
     if (r1 > 0)
       {
         CS_SD_HIGH
-        print_str("\n\r R1 ERROR = "); sd_spi_print_r1 (r1);
+        print_str("\n\r R1 ERROR = "); sd_printR1(r1);
       }
 
     if (r1 == 0)
       {
-        blockNumber = startBlockNumber * addressMultiplier;
+        blckNum = startBlckNum * addrMult;
         do
           {   
             timeout = 0;
-            while (sd_spi_receive_byte() != 0xFE) // wait for start block token.
+            while (sd_receiveByteSPI() != 0xFE) // wait for start block token.
               {
                 timeout++;
                 if (timeout > 0x511) print_str ("\n\rSTART_TOKEN_TIMEOUT");
               }
 
-            block[0] = sd_spi_receive_byte();
+            block[0] = sd_receiveByteSPI();
             if ((block[0] == 0xEB) || (block[0] == 0xE9))
               {
                 for(uint16_t k = 1; k < BLOCK_LEN; k++) 
-                  block[k] = sd_spi_receive_byte();
-                if (((block[0] == 0xEB) && (block[2] == 0x90)) || block[0] == 0xE9)
+                  block[k] = sd_receiveByteSPI();
+                if (((block[0] == 0xEB) && (block[2] == 0x90))
+                      || block[0] == 0xE9)
                   {
                     if ((block[510] == 0x55) && (block[511] == 0xAA)) 
                       { 
@@ -127,23 +129,24 @@ FATtoDisk_findBootSector (void)
             else
               {
                 for (uint16_t k = 1; k < BLOCK_LEN; k++) 
-                  sd_spi_receive_byte();
+                  sd_receiveByteSPI();
               }
 
             for (uint8_t k = 0; k < 2; k++) 
-              sd_spi_receive_byte(); // CRC
+              sd_receiveByteSPI(); // CRC
             
-            blockNumber++;
+            blckNum++;
           }
-        while ((blockNumber * addressMultiplier) < ((startBlockNumber + maxNumberOfBlocksToCheck) * addressMultiplier));
+        while ((blckNum * addrMult) < (
+               (startBlckNum + maxNumOfBlcksToChck) * addrMult));
         
-        sd_spi_send_command (STOP_TRANSMISSION, 0);
-        sd_spi_receive_byte(); // R1b response. Don't care.
+        sd_sendCommand (STOP_TRANSMISSION, 0);
+        sd_receiveByteSPI(); // R1b response. Don't care.
       }
     CS_SD_HIGH;
 
     if (bsflag == 1) 
-      return blockNumber;
+      return blckNum;
     else 
       return 0xFFFFFFFF; // failed token
 }
@@ -173,23 +176,22 @@ FATtoDisk_readSingleSector (uint32_t addr, uint8_t *arr)
     uint8_t  cardType;
     uint16_t err;
     uint8_t  db[512];
-    uint32_t blockNumber = addr;
+    uint32_t blckNum = addr;
 
     // determine if card is SDSC or SDHC/SDXC
     cardType = pvt_getCardType();
 
     // SDHC is block addressable SDSC byte addressable
     if (cardType == SDHC)
-      err = sd_spi_read_single_block (blockNumber, db);
+      err = sd_readSingleBlock (blckNum, db);
     else // SDSC
-      err = sd_spi_read_single_block (blockNumber * BLOCK_LEN, db);
+      err = sd_readSingleBlock (blckNum * BLOCK_LEN, db);
 
     if (err != READ_SUCCESS)
       return 1; // failed
     
     for (int k = 0; k < 512; k++)
-      //sectorByteArray[k] = db[k];
-        arr[k] = db[k];    
+      arr[k] = db[k];    
     return 0; // successful
 };
 
@@ -225,8 +227,8 @@ uint8_t pvt_getCardType()
 
     // Get CSD version to determine if card is SDHC or SDSC
     CS_SD_LOW;
-    sd_spi_send_command (SEND_CSD,0);
-    r1 = sd_spi_get_r1();
+    sd_sendCommand (SEND_CSD,0);
+    r1 = sd_getR1();
     if (r1 > 0) 
       { 
         CS_SD_HIGH; 
@@ -235,7 +237,7 @@ uint8_t pvt_getCardType()
 
     do
       {
-        resp = sd_spi_receive_byte();
+        resp = sd_receiveByteSPI();
         if ((resp >> 6) == 0) 
           { 
             cardType = SDSC; 
@@ -251,7 +253,7 @@ uint8_t pvt_getCardType()
           { 
             // Ensure any portion of CSD sent is read in.
             for(int k = 0; k < 20; k++) 
-              sd_spi_receive_byte();
+              sd_receiveByteSPI();
             CS_SD_HIGH; 
             return 0xFF; 
           }
@@ -260,7 +262,7 @@ uint8_t pvt_getCardType()
 
     // Not used, but must read in rest of CSD.
     for(int k = 0; k < 20; k++) 
-      sd_spi_receive_byte();
+      sd_receiveByteSPI();
     
     CS_SD_HIGH;
 
