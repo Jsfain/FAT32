@@ -1,23 +1,13 @@
 /*
-*******************************************************************************
-*                              AVR-FAT MODULE
-*
-* File    : FAT.C
-* Version : 0.0.0.2
-* Author  : Joshua Fain
-* Target  : ATMega1280
-* License : MIT
-* Copyright (c) 2020 Joshua Fain
-* 
-*
-* DESCRIPTION: 
-* Functions for navigating and accessing contents of a FAT32 formatted volume
-* using an AVR microconstroller. Note, these only provide READ access to the 
-* volume's contents. No WRITE/ERASE access is currently implemented.
-*******************************************************************************
-*/
-
-
+ * File    : FAT.C
+ * Version : 0.0.0.2
+ * Author  : Joshua Fain
+ * Target  : ATMega1280
+ * License : MIT
+ * Copyright (c) 2020 Joshua Fain
+ * 
+ * Implementation of FAT.H
+ */
 
 #include <string.h>
 #include <stdlib.h>
@@ -29,90 +19,79 @@
 #include "fattodisk_interface.h"
 
 
-
-
-
 /*
-*******************************************************************************
-*******************************************************************************
- *                     
- *                      "PRIVATE" FUNCTION DECLARATIONS      
- *  
-*******************************************************************************
-*******************************************************************************
-*/
+ ******************************************************************************
+ *                      "PRIVATE" FUNCTION PROTOTYPES    
+ ******************************************************************************
+ */
 
 uint8_t  pvt_checkName (char *nameStr);
-uint8_t  pvt_setDirToParent (FatDir *Dir, BPB *bpb);
+uint8_t  pvt_setDirToParent (FatDir *dir, BPB *bpb);
 uint32_t pvt_getNextClusIndex (uint32_t currClusIndx, BPB *bpb);
 void     pvt_printEntFields (uint8_t *byte, uint8_t flags);
 void     pvt_printShortName (uint8_t *byte, uint8_t flags);
-uint8_t  pvt_printFile (uint8_t * fileSec, BPB *bpb);
+uint8_t  pvt_printFile (uint8_t *fileSec, BPB *bpb);
 void     pvt_loadLongName (int lnFirstEnt, int lnLastEnt, uint8_t *secArr, 
-                         char *lnStr, uint8_t *lnStrIndx);
+                           char *lnStr, uint8_t *lnStrIndx);
 void     pvt_updateFatEntryState (char *lnStr, uint16_t entPos, 
                             uint8_t snEntSecNumInClus, uint32_t snEntClusIndx,
-                            uint16_t snPosCurrSec, uint16_t snPosNextSec, 
-                            uint8_t lnFlags, uint8_t *secArr, FatEntry *ent);
-
-
-
+                            uint16_t snPosCurrSec, uint16_t snPosNextSec,
+                            uint8_t lnFlags, uint8_t  *secArr, FatEntry *ent);
 
 
 /*
-*******************************************************************************
-*******************************************************************************
- *                     
- *                           FUNCTION DEFINITIONS       
- *  
-*******************************************************************************
-*******************************************************************************
-*/
+ ******************************************************************************
+ *                                FUNCTIONS
+ ******************************************************************************
+ */
 
 /* 
-------------------------------------------------------------------------------
-|                              SET ROOT DIRECTORY
-|                                        
-| Description : Sets an instance of FatDir to the root direcotry.
-|
-| Arguments   : *Dir    - Pointer to the instance of FatDir that will be set to
-|                         the root directory.
-|             : *bpb    - Pointer to a valid instance of a BPB struct.
--------------------------------------------------------------------------------
-*/
+ * ----------------------------------------------------------------------------
+ *                                                           SET ROOT DIRECTORY
+ *                                        
+ * Description : Sets an instance of FatDir to the root direcotry.
+ *
+ * Arguments   : dir     Pointer to the FatDir instance to be set to the root
+ *                       directory.
+ *
+ *               bpb     Pointer to a valid instance of a BPB struct.
+ *
+ * Returns     : void
+ * ----------------------------------------------------------------------------
+ */
 
-void
-fat_setDirToRoot (FatDir * Dir, BPB * bpb)
+void fat_setDirToRoot (FatDir * dir, BPB * bpb)
 {
   for (uint8_t i = 0; i < LN_STRING_LEN_MAX; i++)
-    Dir->longName[i] = '\0';
+    dir->longName[i] = '\0';
   for (uint8_t i = 0; i < PATH_STRING_LEN_MAX; i++)
-    Dir->longParentPath[i] = '\0';
+    dir->longParentPath[i] = '\0';
   for (uint8_t i = 0; i < 9; i++)
-    Dir->shortName[i] = '\0';
+    dir->shortName[i] = '\0';
   for (uint8_t i = 0; i < PATH_STRING_LEN_MAX; i++)
-    Dir->shortParentPath[i] = '\0';
+    dir->shortParentPath[i] = '\0';
   
-  Dir->longName[0] = '/';
-  Dir->shortName[0] = '/';
-  Dir->FATFirstCluster = bpb->rootClus;
+  dir->longName[0] = '/';
+  dir->shortName[0] = '/';
+  dir->FATFirstCluster = bpb->rootClus;
 }
 
 
-
 /*
--------------------------------------------------------------------------------
-|                       INITIALIZE ENTRY STRUCT INSTANCE
-|                                        
-| Description : Initializes an entry of FatEntry.
-|
-| Arguments   : *ent   - Pointer to FatEntry instance that will be initialized.
-|             : *bpb   - Pointer to a valid instance of a BPB struct.
--------------------------------------------------------------------------------
-*/
+ * ----------------------------------------------------------------------------
+ *                                                         INITIALIZE FAT ENTRY
+ *                                      
+ * Description : Initializes an entry of FatEntry.
+ * 
+ * Arguments   : ent     Pointer to the FatEntry instance to be initialized.
+ *            
+ *               bpb     Pointer to a valid instance of a BPB struct.
+ * 
+ * Returns     : void
+ * ----------------------------------------------------------------------------
+ */
 
-void
-fat_initEntry (FatEntry *ent, BPB *bpb)
+void fat_initEntry (FatEntry *ent, BPB *bpb)
 {
   for(uint8_t i = 0; i < LN_STRING_LEN_MAX; i++)
     ent->longName[i] = '\0';
@@ -132,28 +111,25 @@ fat_initEntry (FatEntry *ent, BPB *bpb)
 }
 
 
-
 /*
--------------------------------------------------------------------------------
-|                               SET TO NEXT ENTRY 
-|                                        
-| Description : Updates the currEnt, a FatEntry instance, to the next entry
-|               in the current directory (currDir).
-|
-| Arguments   : *currDir        - Current directory. Pointer to an instance
-|                                 of FatDir.
-|             : *currEnt      - Current etnry. Pointer to an instance of 
-|                                 FatEntry
-|             : *bpb            - Pointer to a valid instance of a BPB struct.
-| 
-| Return      : FAT Error Flag  - If any value other than SUCCESS is returned 
-|                                 the function was unable to update the
-|                                 FatEntry. To read, pass to fat_printError()
--------------------------------------------------------------------------------
-*/
+ * ----------------------------------------------------------------------------
+ *                                                  SET FAT ENTRY TO NEXT ENTRY 
+ *                                      
+ * Description : Updates the FatEntry instance, currEnt, to the next entry in 
+ *               the current directory (currDir).
+ * 
+ * Arguments   : currDir     Current directory. Pointer to a FatDir instance.
+ * 
+ *               currEnt     Current entry. Pointer to a FatEntry instance.
+ * 
+ *               bpb         Pointer to a valid instance of a BPB struct.
+ *
+ * Returns     : A FAT Error Flag. If any value other than SUCCESS is returned 
+ *               then the function was unable to update the FatEntry.
+ * -----------------------------------------------------------------------------
+ */
 
-uint8_t 
-fat_setNextEntry (FatDir * currDir, FatEntry * currEnt, BPB * bpb)
+uint8_t fat_setNextEntry (FatDir *currDir, FatEntry *currEnt, BPB *bpb)
 {
   const uint16_t bps  = bpb->bytesPerSec;
   const uint8_t  spc  = bpb->secPerClus;
@@ -390,32 +366,45 @@ fat_setNextEntry (FatDir * currDir, FatEntry * currEnt, BPB * bpb)
 }
 
 
-
 /*
--------------------------------------------------------------------------------
-|                              SET FAT DIRECTORY
-|                                        
-| Description : Set Dir (FatDir instance) to directory specified by newDirStr.
-|
-| Arguments   : *Dir            - Pointer to the FatDir instance that will be
-|                                 set to the new directory.
-|             : *newDirStr      - Pointer to a string that specifies the name 
-|                                 of the new directory.
-|             : *bpb            - Pointer to a valid instance of a BPB struct.
-| 
-| Return      : FAT Error Flag  - If any value other than SUCCESS is returned 
-|                                 the function was unable to update the
-|                                 FatEntry. To read, pass to fat_printError().
-|  
-| Notes       : - Can only set the directory to a child or parent of the  
-|                 current FatDir directory when the function is called.
-|               - newDirStr must be a directory name. Will not work with paths.  
-|               - newDirStr is case-sensitive.
--------------------------------------------------------------------------------
-*/
+ * ----------------------------------------------------------------------------
+ *                                                            SET FAT DIRECTORY
+ *                                       
+ * Description : Set a FatDir instance, dir, to the directory specified by 
+ *               newDirStr.
+ * 
+ * Arguments   : dir           Pointer to the FatDir instance to be set to the
+ *                             new directory.
+ *             
+ *               newDirStr     Pointer to a string that specifies the name of 
+ *                             the new directory.
+ * 
+ *               bpb           Pointer to a valid instance of a BPB struct.
+ *
+ * Returns     : A FAT Error Flag. If any value other than SUCCESS is returned 
+ *               then the function was unable to update the FatEntry.
+ *  
+ * Notes       : 1) This function can only set the directory to a child, or
+ *                  the parent of the current instance of FatDir when the 
+ *                  function is called.
+ * 
+ *               2) Do not include any paths (relative or absolute) in the 
+ *                  newDirStr. newDirStr must be only be a directory name which
+ *                  must be the name of a child directoy, or the parent, in the
+ *                  current directory.
+ * 
+ *               3) If "." is passed as the newDirStr then the new directory
+ *                  will be set to the parent of the current directory.
+ *               
+ *               4) newDirStr is case-sensitive.
+ * 
+ *               5) newDirStr must be a long name, unless a long name does not
+ *                  exist for a directory. Only in this case can it be a short
+ *                  name.
+ * ----------------------------------------------------------------------------
+ */
 
-uint8_t 
-fat_setDir (FatDir * Dir, char * newDirStr, BPB * bpb)
+uint8_t fat_setDir (FatDir *dir, char *newDirStr, BPB *bpb)
 {
   if (pvt_checkName (newDirStr))
     return INVALID_DIR_NAME;
@@ -428,29 +417,29 @@ fat_setDir (FatDir * Dir, char * newDirStr, BPB * bpb)
   if (!strcmp (newDirStr, ".."))
   {
     // returns either FAILED_READ_SECTOR or SUCCESS
-    return pvt_setDirToParent (Dir, bpb);
+    return pvt_setDirToParent (dir, bpb);
   }
 
   FatEntry * ent = malloc(sizeof * ent);
   fat_initEntry(ent, bpb);
-  ent->snEntClusIndx = Dir->FATFirstCluster;
+  ent->snEntClusIndx = dir->FATFirstCluster;
 
   uint8_t err = 0;
   do 
     {
-      err = fat_setNextEntry(Dir, ent, bpb);
+      err = fat_setNextEntry(dir, ent, bpb);
       if (err != SUCCESS) return err;
       
       if (!strcmp(ent->longName, newDirStr) 
            && (ent->snEnt[11] & DIR_ENTRY_ATTR))
         {                                                        
-          Dir->FATFirstCluster = ent->snEnt[21];
-          Dir->FATFirstCluster <<= 8;
-          Dir->FATFirstCluster |= ent->snEnt[20];
-          Dir->FATFirstCluster <<= 8;
-          Dir->FATFirstCluster |= ent->snEnt[27];
-          Dir->FATFirstCluster <<= 8;
-          Dir->FATFirstCluster |= ent->snEnt[26];
+          dir->FATFirstCluster = ent->snEnt[21];
+          dir->FATFirstCluster <<= 8;
+          dir->FATFirstCluster |= ent->snEnt[20];
+          dir->FATFirstCluster <<= 8;
+          dir->FATFirstCluster |= ent->snEnt[27];
+          dir->FATFirstCluster <<= 8;
+          dir->FATFirstCluster |= ent->snEnt[26];
           
           uint8_t snLen;
           if (strlen(newDirStr) < 8) snLen = strlen(newDirStr);
@@ -461,17 +450,17 @@ fat_setDir (FatDir * Dir, char * newDirStr, BPB * bpb)
             sn[k] = ent->snEnt[k];
           sn[snLen] = '\0';
 
-          strcat (Dir->longParentPath,  Dir->longName );
-          strcat (Dir->shortParentPath, Dir->shortName);
+          strcat (dir->longParentPath,  dir->longName );
+          strcat (dir->shortParentPath, dir->shortName);
 
           // if current directory is not root then append '/'
-          if (Dir->longName[0] != '/') 
-            strcat(Dir->longParentPath, "/"); 
-          strcpy(Dir->longName, newDirStr);
+          if (dir->longName[0] != '/') 
+            strcat(dir->longParentPath, "/"); 
+          strcpy(dir->longName, newDirStr);
           
-          if (Dir->shortName[0] != '/') 
-            strcat(Dir->shortParentPath, "/");
-          strcpy(Dir->shortName, sn);
+          if (dir->shortName[0] != '/') 
+            strcat(dir->shortParentPath, "/");
+          strcpy(dir->shortName, sn);
           
           return SUCCESS;
         }
@@ -482,32 +471,31 @@ fat_setDir (FatDir * Dir, char * newDirStr, BPB * bpb)
 }
 
 
-
 /*
--------------------------------------------------------------------------------
-|                  PRINT ENTRIES IN A DIRECTORY TO A SCREEN
-|
-| 
-| Description : Prints the entries (files / dirs) in the FatDir directory. 
-|  
-| Arguments   : *Dir         - Pointer to a FatDir struct. This directory's
-|                              entries will be printed to the screen.
-|             : entFilt      - Byte of Entry Filter Flags. This specifies which
-|                              entries and fields will be printed.
-|             : *bpb         - Pointer to a valid instance of a BPB struct.
-| 
-| Return      : FAT Error Flag   - Returns END_OF_DIRECTORY if the function 
-|                                  completes without issue. Any other value
-|                                  indicates an error. To read, pass the value
-|                                  to fat_printError().
-| 
-| Notes       : If neither LONG_NAME or SHORT_NAME are passed to entFilt
-|               then no entries will be printed to the screen.   
--------------------------------------------------------------------------------
-*/
+ * ----------------------------------------------------------------------------
+ *                                          PRINT DIRECTORY ENTRIES TO A SCREEN
+ *                                       
+ * Description : Prints the contents of a directory, i.e. lists the file and
+ *               directory entries of a FatDir instance.
+ * 
+ * Arguments   : dir         Pointer to a FatDir instance. This directory's
+ *                           entries will be printed to the screen.
+ *             
+ *               entFld      Any combination of the Entry Field Flags. These
+ *                           will specify which entry types, and which of their 
+ *                           fields, will be printed to the screen.
+ *               
+ *               bpb         Pointer to a valid instance of a BPB struct.
+ *
+ * Returns     : A FAT Error Flag. If any value other than END_OF_DIRECTORY is
+ *               returned then there was an issue.
+ *  
+ * Notes       : LONG_NAME and/or SHORT_NAME must be passed in the entFld
+ *               argument. If not, then no entries will be printed.
+ * ----------------------------------------------------------------------------
+ */
 
-uint8_t 
-fat_printDir (FatDir * dir, uint8_t entFilt, BPB * bpb)
+uint8_t fat_printDir (FatDir *dir, uint8_t entFilt, BPB *bpb)
 {
   // Prints column headers according to entFilt
   print_str("\n\n\r");
@@ -524,7 +512,7 @@ fat_printDir (FatDir * dir, uint8_t entFilt, BPB * bpb)
   fat_initEntry(ent, bpb);
   ent->snEntClusIndx = dir->FATFirstCluster;
 
-  while ( fat_setNextEntry(dir, ent, bpb) != END_OF_DIRECTORY)
+  while (fat_setNextEntry(dir, ent, bpb) != END_OF_DIRECTORY)
     { 
       if ((  !(ent->snEnt[11] & HIDDEN_ATTR)) 
           || ((ent->snEnt[11] & HIDDEN_ATTR) 
@@ -557,43 +545,43 @@ fat_printDir (FatDir * dir, uint8_t entFilt, BPB * bpb)
 }
 
 
-
 /*
--------------------------------------------------------------------------------
-|                            PRINT FILE TO SCREEN
-| 
-| Description : Prints the contents of a file to the screen.
-| 
-| Arguments   : *Dir           - Pointer to a FatDir instance. This directory
-|                                must contain the file to be printed.
-|             : *fileNameStr   - Pointer to string. This is the name of the 
-|                                file who's contents will be printed.
-|             : *bpb           - Pointer to a valid instance of a BPB struct.
-| 
-| Return      : FAT Error Flag   - Returns END_OF_FILE if the function 
-|                                  completes without issue. Any other value 
-|                                  indicates an error. To read, pass the value
-|                                  to fat_printError().
-|                               
-| Notes       : fileNameStr must be a long name unless a long name for a given
-|               entry does not exist, in which case it must be a short name.
--------------------------------------------------------------------------------
-*/
+ * ----------------------------------------------------------------------------
+ *                                                         PRINT FILE TO SCREEN
+ *                                       
+ * Description : Prints the contents of a file to the screen.
+ * 
+ * Arguments   : dir             Pointer to a FatDir instance. This directory
+ *                               must contain the entry for the file that will
+ *                               be printed.
+ *             
+ *               fileNameStr     Pointer to a string. This is the name of the 
+ *                               file who's contents will be printed.
+ *               
+ *               bpb             Pointer to a valid instance of a BPB struct.
+ *
+ * Returns     : A FAT Error Flag. If any value other than END_OF_FILE is 
+ *               returned, then an issue occurred.
+ *  
+ * Notes       : fileNameStr must be a long name unless a long name for a given
+ *               entry does not exist, in which case it must be a short name.
+ * ----------------------------------------------------------------------------
+ */
 
 uint8_t 
-fat_printFile (FatDir *Dir, char *fileNameStr, BPB *bpb)
+fat_printFile (FatDir *dir, char *fileNameStr, BPB *bpb)
 {
   if (pvt_checkName (fileNameStr))
     return INVALID_DIR_NAME;
 
   FatEntry * ent = malloc(sizeof * ent);
   fat_initEntry(ent, bpb);
-  ent->snEntClusIndx = Dir->FATFirstCluster;
+  ent->snEntClusIndx = dir->FATFirstCluster;
 
   uint8_t err = 0;
   do 
     {
-      err = fat_setNextEntry(Dir, ent, bpb);
+      err = fat_setNextEntry(dir, ent, bpb);
       if (err != SUCCESS) return err;
 
       if (!strcmp(ent->longName, fileNameStr)
@@ -609,19 +597,19 @@ fat_printFile (FatDir *Dir, char *fileNameStr, BPB *bpb)
 }
 
 
-
 /*
--------------------------------------------------------------------------------
-|                               PRINT FAT ERROR FLAG
-| 
-| Description : Prints the FAT Error Flag passed as the arguement. 
-| 
-| Arguments   : err      - An error flag returned by one of the FAT functions.
--------------------------------------------------------------------------------
-*/
+ *-----------------------------------------------------------------------------
+ *                                                         PRINT FAT ERROR FLAG
+ * 
+ * Description : Prints the FAT Error Flag passed as the arguement. 
+ *
+ * Arguments   : err     An error flag returned by one of the FAT functions.
+ * 
+ * Returns     : void
+ * ----------------------------------------------------------------------------
+ */
 
-void
-fat_printError (uint8_t err)
+void fat_printError (uint8_t err)
 {  
   switch(err)
   {
@@ -658,31 +646,26 @@ fat_printError (uint8_t err)
   }
 }
 
-
-
-
+/*
+ ******************************************************************************
+ *                           "PRIVATE" FUNCTIONS    
+ ******************************************************************************
+ */
 
 /*
-*******************************************************************************
-*******************************************************************************
- *                     
- *                        "PRIVATE" FUNCTION DEFINITIONS        
- *  
-*******************************************************************************
-*******************************************************************************
-*/
+ * ----------------------------------------------------------------------------
+ *                                                (PRIVATE) SET FAT ENTRY STATE
+ * 
+ * Description : Sets the state of a FatEntry instance based on the parameters
+ *               passed in.
+ * 
+ * Arguments   : see below.
+ * 
+ * Returns     : void
+ * ----------------------------------------------------------------------------
+ */
 
-/*
--------------------------------------------------------------------------------
-|                      (PRIVATE) SET FAT ENTRY STATE
-| 
-| Description : Sets the state of a FatEntry instance based on the parameters
-|               passed in.
--------------------------------------------------------------------------------
-*/
-
-void
-pvt_updateFatEntryState (char *lnStr, uint16_t entPos, 
+void pvt_updateFatEntryState (char *lnStr, uint16_t entPos, 
                          uint8_t snEntSecNumInClus, uint32_t snEntClusIndx,
                          uint16_t snPosCurrSec, uint16_t snPosNextSec, 
                          uint8_t lnFlags, uint8_t *secArr, FatEntry *ent)
@@ -753,19 +736,21 @@ pvt_updateFatEntryState (char *lnStr, uint16_t entPos,
 }
 
 
-
 /*
--------------------------------------------------------------------------------
-|                       (PRIVATE) CHECK FOR LEGAL NAME
-| 
-| Description : Checks if a string is a valid FAT entry name (short or long). 
-| Arguments   : *nameStr - string to be verified as a legal FAT name.
-| Return      : 0 if name is LEGAL, 1 if name is ILLEGAL.
--------------------------------------------------------------------------------
-*/
+ * ----------------------------------------------------------------------------
+ *                                               (PRIVATE) CHECK FOR LEGAL NAME
+ *  
+ * Description : Checks whether a string is a valid/legal FAT entry name. 
+ * 
+ * Arguments   : nameStr     Pointer to the string to be verified as a legal 
+ *                           FAT entry name.
+ * 
+ * Returns     : 0 if LEGAL.
+ *               1 if ILLEGAL.
+ * -----------------------------------------------------------------------------
+ */
 
-uint8_t
-pvt_checkName (char *nameStr)
+uint8_t pvt_checkName (char *nameStr)
 {
   // check that long name is not too large for current settings.
   if (strlen (nameStr) > LN_STRING_LEN_MAX) 
@@ -796,23 +781,22 @@ pvt_checkName (char *nameStr)
 }
 
 
-
 /*
--------------------------------------------------------------------------------
-|               (PRIVATE) SET CURRENT DIRECTORY TO ITS PARENT
-| 
-| Description : Sets a FatDir instance to its parent directory. 
-|
-| Argument    : *Dir  - Ptr to FatDir instance. The members of this instance
-|                       will be set to its parent directory.
-|             : *bpb  - Ptr to a valid instance of a BPB struct.
-|
-| Return      : SUCCESS or FAILED_READ_SECTOR.
--------------------------------------------------------------------------------
-*/
+ * ----------------------------------------------------------------------------
+ *                                (PRIVATE) SET CURRENT DIRECTORY TO ITS PARENT
+ *  
+ *  Description : Sets a FatDir instance to its parent directory. 
+ * 
+ *  Arguments   : dir     Pointer to a FatDir instance. The members of this
+ *                        instance will be set to its parent directory.
+ *              
+ *                bpb     Pointer to a valid instance of a BPB struct.
+ * 
+ *  Returns     : SUCCESS or FAILED_READ_SECTOR.
+ * ----------------------------------------------------------------------------
+ */
 
-uint8_t
-pvt_setDirToParent (FatDir *Dir, BPB *bpb)
+uint8_t pvt_setDirToParent (FatDir *dir, BPB *bpb)
 {
   uint32_t parentDirFirstClus;
   uint32_t currSecNumPhys;
@@ -820,11 +804,12 @@ pvt_setDirToParent (FatDir *Dir, BPB *bpb)
   uint8_t  err;
 
   currSecNumPhys = bpb->dataRegionFirstSector 
-                   + ((Dir->FATFirstCluster - 2) * bpb->secPerClus);
+                   + ((dir->FATFirstCluster - 2) * bpb->secPerClus);
 
   // function returns either 0 for success for 1 for failed.
   err = FATtoDisk_readSingleSector (currSecNumPhys, currSecArr);
-  if (err != 0) return FAILED_READ_SECTOR;
+  if (err != 0) 
+   return FAILED_READ_SECTOR;
 
   parentDirFirstClus = currSecArr[53];
   parentDirFirstClus <<= 8;
@@ -834,17 +819,17 @@ pvt_setDirToParent (FatDir *Dir, BPB *bpb)
   parentDirFirstClus <<= 8;
   parentDirFirstClus |= currSecArr[58];
 
-  // If Dir is pointing to the root directory, do nothing.
-  if (Dir->FATFirstCluster == bpb->rootClus); 
+  // If dir is pointing to the root directory, do nothing.
+  if (dir->FATFirstCluster == bpb->rootClus); 
 
-  // If parent of Dir is root directory
+  // If parent of dir is root directory
   else if (parentDirFirstClus == 0)
     {
-      strcpy (Dir->shortName, "/");
-      strcpy (Dir->shortParentPath, "");
-      strcpy (Dir->longName, "/");
-      strcpy (Dir->longParentPath, "");
-      Dir->FATFirstCluster = bpb->rootClus;
+      strcpy (dir->shortName, "/");
+      strcpy (dir->shortParentPath, "");
+      strcpy (dir->longName, "/");
+      strcpy (dir->longParentPath, "");
+      dir->FATFirstCluster = bpb->rootClus;
     }
 
   // parent directory is not root directory
@@ -853,54 +838,59 @@ pvt_setDirToParent (FatDir *Dir, BPB *bpb)
       char tmpShortNamePath[PATH_STRING_LEN_MAX];
       char tmpLongNamePath[PATH_STRING_LEN_MAX];
 
-      strlcpy (tmpShortNamePath, Dir->shortParentPath, 
-               strlen (Dir->shortParentPath));
-      strlcpy (tmpLongNamePath, Dir->longParentPath,
-               strlen (Dir->longParentPath ));
+      strlcpy (tmpShortNamePath, dir->shortParentPath, 
+               strlen (dir->shortParentPath));
+      strlcpy (tmpLongNamePath, dir->longParentPath,
+               strlen (dir->longParentPath ));
       
       char *shortNameLastDirInPath = strrchr (tmpShortNamePath, '/');
       char *longNameLastDirInPath  = strrchr (tmpLongNamePath , '/');
       
-      strcpy (Dir->shortName, shortNameLastDirInPath + 1);
-      strcpy (Dir->longName , longNameLastDirInPath  + 1);
+      strcpy (dir->shortName, shortNameLastDirInPath + 1);
+      strcpy (dir->longName , longNameLastDirInPath  + 1);
 
-      strlcpy (Dir->shortParentPath, tmpShortNamePath, 
+      strlcpy (dir->shortParentPath, tmpShortNamePath, 
               (shortNameLastDirInPath + 2) - tmpShortNamePath);
-      strlcpy (Dir->longParentPath,  tmpLongNamePath,  
+      strlcpy (dir->longParentPath,  tmpLongNamePath,  
               (longNameLastDirInPath  + 2) -  tmpLongNamePath);
 
-      Dir->FATFirstCluster = parentDirFirstClus;
+      dir->FATFirstCluster = parentDirFirstClus;
     }
     return SUCCESS;
 }
 
 
-
 /*
--------------------------------------------------------------------------------
-|             (PRIVATE) LOAD A LONG NAME ENTRY INTO A STRING 
-| 
-| Description : Loads the characters of a long name into a string char array.  
-|
-| Arguments   : lnFirstEnt   - position of the lowest order entry of the long 
-|                              name in *secArr.
-|             : lnLastEnt    - position of the highest order entry of the long 
-|                              name in *secArr.
-|             : *secArr      - ptr to array holding the contents of a single
-|                              sector of a directory from a FAT-formatted disk.
-|             : *lnStr       - ptr to a string array that will be loaded with
-|                              the long name chars.
-|             : *lnStrIndx   - ptr updated by this function. Initial value
-|                              is the position in *lnStr where chars should 
-|                              begin loading.
-|
-| Notes       : Must called twice if long name crosses sector boundary.
--------------------------------------------------------------------------------
-*/
+ * ----------------------------------------------------------------------------
+ *                               (PRIVATE) LOAD A LONG NAME ENTRY INTO A STRING 
+ * 
+ * Description : Loads characters of a long name into a string (char array).  
+ * 
+ * Arguments   : lnFirstEnt     Position of the lowest order entry of the long 
+ *                              name in *secArr.
+ * 
+ *               lnLastEnt      Position of the highest order entry of the long 
+ *                              name in *secArr.
+ * 
+ *               secArr         Pointer to the array holding the contents of a 
+ *                              single sector of a directory from a 
+ *                              FAT-formatted disk.
+ * 
+ *               lnStr          Pointer to a string array that will be loaded
+ *                              with the long name characters.
+ * 
+ *               lnStrIndx      Pointer updated by this function. Initial value
+ *                              is the position in *lnStr where chars should 
+ *                              begin loading.
+ * 
+ * Returns     : void 
+ * 
+ * Notes      : Must called twice if long name crosses sector boundary.
+ * ----------------------------------------------------------------------------
+ */
 
-void
-pvt_loadLongName (int lnFirstEnt, int lnLastEnt, uint8_t *secArr, char *lnStr, 
-                  uint8_t *lnStrIndx)
+void pvt_loadLongName (int lnFirstEnt, int lnLastEnt, uint8_t *secArr, 
+                       char *lnStr, uint8_t *lnStrIndx)
 {
   for (int i = lnFirstEnt; i >= lnLastEnt; i = i - ENTRY_LEN)
     {                                              
@@ -937,26 +927,26 @@ pvt_loadLongName (int lnFirstEnt, int lnLastEnt, uint8_t *secArr, char *lnStr,
 }
 
 
-
 /*
--------------------------------------------------------------------------------
-|                (PRIVATE) GET THE FAT INDEX OF THE NEXT CLUSTER 
-|
-| Description : Finds and returns the next FAT cluster index based.
-| 
-| Arguments   : currClusIndx  - the current cluster's FAT index.
-|             : *bpb          - ptr to a valid instance of a BPB struct.
-| 
-| Returns     : A file or dir's next FAT cluster index. If 0x0FFFFFFF is 
-|               returned, the current cluster is the last of the file or dir.
-|
-| Note        : The returned value locates the index in the FAT. The value must
-|               be offset by -2 when locating the cluster in the data region.
--------------------------------------------------------------------------------
-*/
+ * ----------------------------------------------------------------------------
+ *                              (PRIVATE) GET THE FAT INDEX OF THE NEXT CLUSTER
+ * 
+ * Description : Finds and returns the next FAT cluster index.
+ * 
+ * Arguments   : currClusIndx     The current cluster's FAT index.
+ *               
+ *               bpb              Pointer to a valid instance of a BPB struct.
+ * 
+ * Returns     : A file or dir's next FAT cluster index. If END_CLUSTER is 
+ *               returned, the current cluster is the last of the file or dir.
+ * 
+ * Notes       : The returned value locates the index in the FAT. The value
+ *               must be offset by -2 when locating the cluster in the FAT's
+ *               data region.
+ * ----------------------------------------------------------------------------
+ */
 
-uint32_t 
-pvt_getNextClusIndex (uint32_t currClusIndx, BPB * bpb)
+uint32_t pvt_getNextClusIndex (uint32_t currClusIndx, BPB *bpb)
 {
   uint8_t  bytesPerClusIndx = 4; // for FAT32
   uint16_t numIndxdClusPerSecOfFat = bpb->bytesPerSec / bytesPerClusIndx;//128
@@ -980,22 +970,22 @@ pvt_getNextClusIndex (uint32_t currClusIndx, BPB * bpb)
 }
 
 
-
 /*
--------------------------------------------------------------------------------
-|                   (PRIVATE) PRINT THE FIELDS OF FAT ENTRY
-|
-| Description : Prints a FatEntry instance's fields according to flags.
-| 
-| Arguments   : *secArr  - ptr to an array holding the short name entry, where
-|                          the field values are located, to be printed.
-|             : flags    - byte specifying the combo of Entry Field Flags that 
-|                          used to determined which fields will be printed.
--------------------------------------------------------------------------------
-*/
+ * ----------------------------------------------------------------------------
+ *                                      (PRIVATE) PRINT THE FIELDS OF FAT ENTRY
+ * 
+ * Description : Prints a FatEntry instance's fields according to flags.
+ *
+ * Arguments   : secArr     Pointer to an array holding the short name entry,
+ *                          where the field values are located, to be printed.
+ * 
+ *               flags      Entry Field Flags specifying which fields to print.
+ * 
+ * Returns     : void 
+ * ----------------------------------------------------------------------------
+ */
 
-void 
-pvt_printEntFields (uint8_t *secArr, uint8_t flags)
+void pvt_printEntFields (uint8_t *secArr, uint8_t flags)
 {
   print_str ("\n\r");
 
@@ -1142,20 +1132,22 @@ pvt_printEntFields (uint8_t *secArr, uint8_t flags)
 }
 
 
-
 /*
--------------------------------------------------------------------------------
-|                            (PRIVATE) PRINT SHORT NAME
-|
-| Description : Print the short name (8.3) name of a FAT file or dir entry.
-| 
-| Arguments   : *secArr  - ptr to an array holding the full short name entry.
-|             : flags    - determines if entry TYPE field will be printed.
--------------------------------------------------------------------------------
-*/
+ * ----------------------------------------------------------------------------
+ *                                                   (PRIVATE) PRINT SHORT NAME
+ * 
+ * Description : Print the short name (8.3) of a FAT file or directory entry.
+ * 
+ * Arguments   : secArr     Pointer to an array holding the contents of the FAT
+ *                          sector where the short name entry is found.
+ *               
+ *               flags      Determines if entry TYPE field will be printed.
+ * 
+ * Returns     : void
+ * ----------------------------------------------------------------------------
+ */
 
-void 
-pvt_printShortName (uint8_t *secArr, uint8_t flags)
+void pvt_printShortName (uint8_t *secArr, uint8_t flags)
 {
   char sn[9];
   char ext[5];
@@ -1194,22 +1186,23 @@ pvt_printShortName (uint8_t *secArr, uint8_t flags)
 }
 
 
-
 /*
--------------------------------------------------------------------------------                                              
-|                            (PRIVATE) PRINT A FAT FILE
-|
-| Description : performs the print file operation.
-| 
-| Arguments   : *fileSec   - ptr to array with the file's dir short name entry.
-|             : *bpb       - prt to a valid instance of a BPB struct.
-|
-| Returns     : END_OF_FILE (success) or FAILED_READ_SECTOR fat error flag.
--------------------------------------------------------------------------------
-*/
+ * ----------------------------------------------------------------------------
+ *                                                   (PRIVATE) PRINT A FAT FILE
+ * 
+ * Description : performs the print file operation.
+ * 
+ * Arguments   : fileSec     Pointer to array holding the contents of the FAT 
+ *                           sector where the file-to-be-printed's short name 
+ *                           entry is located.
+ *               
+ *               bpb         Pointer to a valid instance of a BPB struct.
+ * 
+ * Returns     : END_OF_FILE (success) or FAILED_READ_SECTOR fat error flag.
+ * ----------------------------------------------------------------------------
+ */
 
-uint8_t 
-pvt_printFile (uint8_t *fileSec, BPB * bpb)
+uint8_t pvt_printFile (uint8_t *fileSec, BPB *bpb)
   {
     uint32_t currSecNumPhys;
     uint32_t clus;

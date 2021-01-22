@@ -26,94 +26,143 @@
  ******************************************************************************
  */
 
+//
+// The first two sets of MACROS below (FAT ENTRY ATTRIBUTE and
+// LONG NAME POSITIONS) are flags and masks that directly correspond to 
+// bit and byte settings within a FAT entry.
+//
+
 /* 
  * ----------------------------------------------------------------------------
- *                                                                SECTOR LENGTH
+ *                                                         FAT ENTRY ATTRIBUTES
  *
- * Description : The expected value of a FAT32 sector length, in bytes. 
- *       
- * Notes       : This value should match the boot sector's / bios parameter
- *               block's 'bytes per sector' field. 
+ * Description : These flags correspond to the attribute byte (byte 11) set in 
+ *               a single 32 byte FAT entry. These settings are used to
+ *               describe the entry type and any permissions / restrictions. 
  * 
- * Warning     : Currently this value should be set to 512 for the current 
- *               implementation to work. If this does not match the bps field
- *               then this may produce unexpected results.
+ * Notes       : If the 4 lowest bits/flags are set in the Attribute Byte of a 
+ *               FAT entry, then the entry is part of a long name. To check,
+ *               use LN_ATTR_MASK.
  * ----------------------------------------------------------------------------
  */
 
+#define READ_ONLY_ATTR         0x01
+#define HIDDEN_ATTR            0x02
+#define SYSTEM_ATTR            0x04
+#define VOLUME_ID_ATTR         0x08
+#define DIR_ENTRY_ATTR         0x10
+#define ARCHIVE_ATTR           0x20
+#define LN_ATTR_MASK           0x0F
+
+
+/* 
+ * ----------------------------------------------------------------------------
+ *                                                          LONG NAME POSITIONS
+ *
+ * Description : These are specific to long name entries, i.e. LN_ATTR_MASK is 
+ *               set above, and should be used against byte 1 of a long name 
+ *               entry. They are used to determine how many entries the full 
+ *               long name requires and where a particular entry lies in the 
+ *               long name entry order. 
+ * 
+ * Notes       : 1) If LN_LAST_ENTRY is set in the first byte of a long name 
+ *                  entry then this entry is the last entry of the long name.
+ * 
+ *               2) Use the LN_ORD_MASK on the first byte of a long name entry
+ *                  to determine this entries number (i.e. where it lies in 
+ *                  sequence of long name entries).
+ * ----------------------------------------------------------------------------
+ */
+
+#define LN_LAST_ENTRY          0x40  
+#define LN_ORD_MASK            0x3F
+
+
+/* 
+ * ----------------------------------------------------------------------------
+ *                                                ENTRY and SECTOR BYTE LENGTHS
+ *
+ * Description : Defines the byte lengths of a FAT32 sector and an entry in a
+ *               FAT32 directory. 
+ *       
+ * Notes       : 1) ENTRY_LEN must always be 32. 
+ * 
+ *               2) SECTOR_LEN should match the bios parameter block's 'bytes 
+ *                  per sector' (BPS) field. 
+ * 
+ * Warning     : Although the BPS field value can be different than 512, in 
+ *               the current implementation if it is anything other than 512
+ *               then this will cause unexpected results in any program built
+ *               using this module. 
+ * ----------------------------------------------------------------------------
+ */
+#define ENTRY_LEN              32                /* FAT entry byte length */
+
 #ifndef SECTOR_LEN
-#define SECTOR_LEN                512
-#endif // SECTOR_LEN
+#define SECTOR_LEN             512               /* must always be 512 here */
+#endif
+
+// Value at the FAT index location of the last cluster in a FAT dir or file.
+#define END_CLUSTER            0x0FFFFFFF
 
 
+/* 
+ * ----------------------------------------------------------------------------
+ *                                          LONG NAME SECTOR DISTRIBUTION FLAGS
+ *
+ * Description : Flags used by FAT functions to indicate if a long name exists
+ *               and how it, and its short name entry, are distributed between
+ *               adjacent sectors.
+ * ----------------------------------------------------------------------------
+ */
 
-#define ENTRY_LEN                 32         /* byte length of a short entry */
-#define END_CLUSTER               0x0FFFFFFF /* indicates last cluster */
-
-
-// set these to any reasonable value.
-#define PATH_STRING_LEN_MAX       100       /* max leng of path string */
-#define LN_STRING_LEN_MAX         100       /* max leng of long name string */
-
-
-
-// ******* Fat Error Flags
-#define SUCCESS                   0x00
-#define INVALID_FILE_NAME         0x01
-#define INVALID_DIR_NAME          0x02
-#define FILE_NOT_FOUND            0x04
-#define DIR_NOT_FOUND             0x08
-#define END_OF_FILE               0x10
-#define END_OF_DIRECTORY          0x20
-#define CORRUPT_FAT_ENTRY         0x40
-#define FAILED_READ_SECTOR        0x80
+#define LN_EXISTS              0x01
+#define LN_CROSS_SEC           0x02
+#define LN_LAST_SEC_ENTRY      0x04
 
 
+/* 
+ * ----------------------------------------------------------------------------
+ *                                                              FAT ERROR FLAGS
+ *
+ * Description : Error Flags returned by various FAT functions.
+ * ----------------------------------------------------------------------------
+ */
 
-// ******* Long Name Flags
-
-// Used to indicate if a long name exists and how it and
-// its shor name are distributed between adjacent sectors.
-#define LN_EXISTS                 0x01
-#define LN_CROSS_SEC              0x02
-#define LN_LAST_SEC_ENTRY         0x04
-
-
-
-// ******** Entry Field Flags
-
-// Flags to specify which entry fields should be printed.
-#define SHORT_NAME               0x01
-#define LONG_NAME                0x02
-#define HIDDEN                   0x04
-#define CREATION                 0x08
-#define LAST_ACCESS              0x10
-#define LAST_MODIFIED            0x20
-#define TYPE                     0x40 
-#define FILE_SIZE                0x80
-#define ALL          (CREATION | LAST_ACCESS | LAST_MODIFIED)
+#define SUCCESS                0x00
+#define INVALID_FILE_NAME      0x01
+#define INVALID_DIR_NAME       0x02
+#define FILE_NOT_FOUND         0x04
+#define DIR_NOT_FOUND          0x08
+#define END_OF_FILE            0x10
+#define END_OF_DIRECTORY       0x20
+#define CORRUPT_FAT_ENTRY      0x40
+#define FAILED_READ_SECTOR     0x80
 
 
+/* 
+ * ----------------------------------------------------------------------------
+ *                                                        FAT ENTRY FIELD FLAGS
+ *
+ * Description : Flags to specify which entries should be printed by any FAT 
+ *               function that prints directory entries to a screen.
+ * ----------------------------------------------------------------------------
+ */
 
-//********* FAT Entry Flags.
-
-// Flags 0x01 to 0x20 are the attribute flags that can be set in the 
-// attribute byte (byte 11) of a short name entry. If the lowest four
-// bytes are set then this indicates the entry is part of a long name.
-#define READ_ONLY_ATTR            0x01
-#define HIDDEN_ATTR               0x02
-#define SYSTEM_ATTR               0x04
-#define VOLUME_ID_ATTR            0x08
-#define DIR_ENTRY_ATTR            0x10
-#define ARCHIVE_ATTR              0x20
-#define LN_ATTR_MASK              0x0F
-
-// Other FAT specific flags / tokens.
-#define LN_LAST_ENTRY             0x40  
-#define LN_ORD_MASK               0x3F
+#define SHORT_NAME             0x01
+#define LONG_NAME              0x02
+#define HIDDEN                 0x04
+#define CREATION               0x08
+#define LAST_ACCESS            0x10
+#define LAST_MODIFIED          0x20
+#define TYPE                   0x40 
+#define FILE_SIZE              0x80
+#define ALL                    0xFF
 
 
-
+// set to any value < 256.
+#define PATH_STRING_LEN_MAX    100         /* max length of path string */
+#define LN_STRING_LEN_MAX      100         /* max length of long name string */
 
 
 /*
@@ -122,30 +171,62 @@
  ******************************************************************************
  */
 
-// ****** FAT Directory Struct
+/* 
+ * ----------------------------------------------------------------------------
+ *                                                         FAT DIRECTORY STRUCT
+ *
+ * Description : Struct used to hold some parameters corresponding to a FAT
+ *               directory.
+ *       
+ * Notes       : 1) Any instance of this struct must first be initialized by 
+ *                  passing it to fat_setDirToRoot(), which will set it to the
+ *                  root directory.
+ * 
+ *               2) Most of the FAT functions require an instance of this
+ *                  struct to be previously set and passed to it.
+ * 
+ *               3) This is primarily used as a 'Current Working Directory'.
+ * 
+ * Warnings    : 1) All members of an instance of this struct must correspond 
+ *                  to the same valid FAT directory. If not then unexpected 
+ *                  results will occur when trying to navigate and/or print
+ *                  directory names, contents, entries, and files.
+ * 
+ *               2) Members of an instance of this struct should never be set
+ *                  manually, but only by passing it to FAT functions.
+ * ----------------------------------------------------------------------------
+ */
 
-// Instance members should correspond to a FAT directory. Use this to specify
-// a current working directory. Members should not be set directly, but rather
-// by calling the specific FAT functions below. Any instance must first be 
-// initialized by passing it to fat_setDirToRoot() before it can be used.
-typedef struct FatDirectory
+typedef struct
 {
-  char longName[LN_STRING_LEN_MAX];
-  char longParentPath[PATH_STRING_LEN_MAX];
-  char shortName[9];
-  char shortParentPath[PATH_STRING_LEN_MAX];
+  char     longName[LN_STRING_LEN_MAX];          
+  char     longParentPath[PATH_STRING_LEN_MAX];
+  char     shortName[9];
+  char     shortParentPath[PATH_STRING_LEN_MAX];
   uint32_t FATFirstCluster;
 } 
 FatDir;
 
 
+/* 
+ * ----------------------------------------------------------------------------
+ *                                                         FAT DIRECTORY STRUCT
+ *
+ * Description : Instances of this struct are used to locate entries within a 
+ *               FAT directory.
+ *       
+ * Notes       : 1) Any instance of this struct should first be initialized by
+ *                  passing it to fat_initEntry().
+ * 
+ *               2) Most of the FAT functions require an instance of this
+ *                  struct to passed to it.
+ * 
+ * Warnings    : Members of an instance of this struct should never be set
+ *               manually, but only by passing it to the FAT functions.
+ * ----------------------------------------------------------------------------
+ */
 
-// ****** FAT Entry Struct
-
-// Instance members should correspond to a FAT file or directory entry. Members
-// should not be set directly, but rather by calling specific FAT functions. 
-// Any instance must first be initialized by calling fat_initEntry();
-typedef struct FatEntry
+typedef struct
 {
   char    longName[LN_STRING_LEN_MAX];
   char    shortName[13];
@@ -157,172 +238,180 @@ typedef struct FatEntry
   uint8_t  snEntSecNumInClus; 
   uint16_t entPos;  
   uint8_t  lnFlags;
-  uint16_t snPosCurrSec;  // need these for the error correction flag check.
-  uint16_t snPosNextSec;  // which will also reset these.
+  uint16_t snPosCurrSec;
+  uint16_t snPosNextSec;           
 }
 FatEntry;
 
 
-
-
-
 /*
  ******************************************************************************
- *                           FUNCTION DECLARATIONS       
+ *                           FUNCTION PROTOTYPES
  ******************************************************************************
  */
 
 /* 
-------------------------------------------------------------------------------
-|                              SET ROOT DIRECTORY
-|                                        
-| Description : Sets an instance of FatDir to the root direcotry.
-|
-| Arguments   : *Dir    - Pointer to the instance of FatDir that will be set to
-|                         the root directory.
-|             : *bpb    - Pointer to a valid instance of a BPB struct.
--------------------------------------------------------------------------------
-*/
+ * ----------------------------------------------------------------------------
+ *                                                           SET ROOT DIRECTORY
+ *                                        
+ * Description : Sets an instance of FatDir to the root direcotry.
+ *
+ * Arguments   : dir     Pointer to the FatDir instance to be set to the root
+ *                       directory.
+ *
+ *               bpb     Pointer to a valid instance of a BPB struct.
+ *
+ * Returns     : void
+ * ----------------------------------------------------------------------------
+ */
 
-void
-fat_setDirToRoot(FatDir * Dir, BPB * bpb);
-
-
-
-/*
--------------------------------------------------------------------------------
-|                       INITIALIZE ENTRY STRUCT INSTANCE
-|                                        
-| Description : Initializes an entry of FatEntry.
-|
-| Arguments   : *ent   - Pointer to FatEntry instance that will be initialized.
-|             : *bpb   - Pointer to a valid instance of a BPB struct.
--------------------------------------------------------------------------------
-*/
-
-void
-fat_initEntry(FatEntry * ent, BPB * bpb);
-
+void fat_setDirToRoot(FatDir * dir, BPB * bpb);
 
 
 /*
--------------------------------------------------------------------------------
-|                               SET TO NEXT ENTRY 
-|                                        
-| Description : Updates the currEnt, a FatEntry instance, to the next entry
-|               in the current directory (currDir).
-|
-| Arguments   : *currDir        - Current directory. Pointer to an instance
-|                                 of FatDir.
-|             : *currEnt      - Current etnry. Pointer to an instance of 
-|                                 FatEntry
-|             : *bpb            - Pointer to a valid instance of a BPB struct.
-| 
-| Return      : FAT Error Flag  - If any value other than SUCCESS is returned 
-|                                 the function was unable to update the
-|                                 FatEntry. To read, pass to fat_printError()
--------------------------------------------------------------------------------
-*/
+ * ----------------------------------------------------------------------------
+ *                                                         INITIALIZE FAT ENTRY
+ *                                      
+ * Description : Initializes an entry of FatEntry.
+ * 
+ * Arguments   : ent     Pointer to the FatEntry instance to be initialized.
+ *            
+ *               bpb     Pointer to a valid instance of a BPB struct.
+ * 
+ * Returns     : void
+ * ----------------------------------------------------------------------------
+ */
 
-uint8_t 
-fat_setNextEntry (FatDir * currDir, FatEntry * currEntry, BPB * bpb);
-
-/*
--------------------------------------------------------------------------------
-|                              SET FAT DIRECTORY
-|                                        
-| Description : Set Dir (FatDir instance) to directory specified by newDirStr.
-|
-| Arguments   : *Dir            - Pointer to the FatDir instance that will be
-|                                 set to the new directory.
-|             : *newDirStr      - Pointer to a string that specifies the name 
-|                                 of the new directory.
-|             : *bpb            - Pointer to a valid instance of a BPB struct.
-| 
-| Return      : FAT Error Flag  - If any value other than SUCCESS is returned 
-|                                 the function was unable to update the
-|                                 FatEntry. To read, pass to fat_printError().
-|  
-| Notes       : - Can only set the directory to a child or parent of the  
-|                 current FatDir directory when the function is called.
-|               - newDirStr must be a directory name. Will not work with paths.  
-|               - newDirStr is case-sensitive.
--------------------------------------------------------------------------------
-*/
-
-uint8_t 
-fat_setDir (FatDir * Dir, char * newDirStr, BPB * bpb);
-
+void fat_initEntry(FatEntry * ent, BPB * bpb);
 
 
 /*
--------------------------------------------------------------------------------
-|                  PRINT ENTRIES IN A DIRECTORY TO A SCREEN
-|
-| 
-| Description : Prints the entries (files / dirs) in the FatDir directory. 
-|  
-| Arguments   : *Dir         - Pointer to a FatDir struct. This directory's
-|                              entries will be printed to the screen.
-|             : entFilt      - Byte of Entry Filter Flags. This specifies which
-|                              entries and fields will be printed.
-|             : *bpb         - Pointer to a valid instance of a BPB struct.
-| 
-| Return      : FAT Error Flag   - Returns END_OF_DIRECTORY if the function 
-|                                  completes without issue. Any other value
-|                                  indicates an error. To read, pass the value
-|                                  to fat_printError().
-| 
-| Notes       : If neither LONG_NAME or SHORT_NAME are passed to entFilt
-|               then no entries will be printed to the screen.   
--------------------------------------------------------------------------------
-*/
+ * ----------------------------------------------------------------------------
+ *                                                  SET FAT ENTRY TO NEXT ENTRY 
+ *                                      
+ * Description : Updates the FatEntry instance, currEnt, to the next entry in 
+ *               the current directory (currDir).
+ * 
+ * Arguments   : currDir     Current directory. Pointer to a FatDir instance.
+ * 
+ *               currEnt     Current entry. Pointer to a FatEntry instance.
+ * 
+ *               bpb         Pointer to a valid instance of a BPB struct.
+ *
+ * Returns     : A FAT Error Flag. If any value other than SUCCESS is returned 
+ *               then the function was unable to update the FatEntry.
+ * -----------------------------------------------------------------------------
+ */
 
-uint8_t 
-fat_printDir (FatDir * Dir, uint8_t entryFilter, BPB * bpb);
-
+uint8_t fat_setNextEntry (FatDir * currDir, FatEntry * currEntry, BPB * bpb);
 
 
 /*
--------------------------------------------------------------------------------
-|                            PRINT FILE TO SCREEN
-| 
-| Description : Prints the contents of a file to the screen.
-| 
-| Arguments   : *Dir           - Pointer to a FatDir instance. This directory
-|                                must contain the file to be printed.
-|             : *fileNameStr   - Pointer to string. This is the name of the 
-|                                file who's contents will be printed.
-|             : *bpb           - Pointer to a valid instance of a BPB struct.
-| 
-| Return      : FAT Error Flag   - Returns END_OF_FILE if the function 
-|                                  completes without issue. Any other value 
-|                                  indicates an error. To read, pass the value
-|                                  to fat_printError().
-|                               
-| Notes       : fileNameStr must be a long name unless a long name for a given
-|               entry does not exist, in which case it must be a short name.
--------------------------------------------------------------------------------
-*/
+ * ----------------------------------------------------------------------------
+ *                                                            SET FAT DIRECTORY
+ *                                       
+ * Description : Set a FatDir instance, dir, to the directory specified by 
+ *               newDirStr.
+ * 
+ * Arguments   : dir           Pointer to the FatDir instance to be set to the
+ *                             new directory.
+ *             
+ *               newDirStr     Pointer to a string that specifies the name of 
+ *                             the new directory.
+ * 
+ *               bpb           Pointer to a valid instance of a BPB struct.
+ *
+ * Returns     : A FAT Error Flag. If any value other than SUCCESS is returned 
+ *               then the function was unable to update the FatEntry.
+ *  
+ * Notes       : 1) This function can only set the directory to a child, or
+ *                  the parent of the current instance of FatDir when the 
+ *                  function is called.
+ * 
+ *               2) Do not include any paths (relative or absolute) in the 
+ *                  newDirStr. newDirStr must be only be a directory name which
+ *                  must be the name of a child directoy, or the parent, in the
+ *                  current directory.
+ * 
+ *               3) If "." is passed as the newDirStr then the new directory
+ *                  will be set to the parent of the current directory.
+ *               
+ *               4) newDirStr is case-sensitive.
+ * 
+ *               5) newDirStr must be a long name, unless a long name does not
+ *                  exist for a directory. Only in this case can it be a short
+ *                  name.
+ * ----------------------------------------------------------------------------
+ */
 
-uint8_t 
-fat_printFile (FatDir * Dir, char * file, BPB * bpb);
-
+uint8_t fat_setDir (FatDir * dir, char * newDirStr, BPB * bpb);
 
 
 /*
--------------------------------------------------------------------------------
-|                               PRINT FAT ERROR FLAG
-| 
-| Description : Prints the FAT Error Flag passed as the arguement. 
-| 
-| Arguments   : err      - An error flag returned by one of the FAT functions.
--------------------------------------------------------------------------------
-*/
+ * ----------------------------------------------------------------------------
+ *                                          PRINT DIRECTORY ENTRIES TO A SCREEN
+ *                                       
+ * Description : Prints the contents of a directory, i.e. lists the file and
+ *               directory entries of a FatDir instance.
+ * 
+ * Arguments   : dir         Pointer to a FatDir instance. This directory's
+ *                           entries will be printed to the screen.
+ *             
+ *               entFld      Any combination of the Entry Field Flags. These
+ *                           will specify which entry types, and which of their 
+ *                           fields, will be printed to the screen.
+ *               
+ *               bpb         Pointer to a valid instance of a BPB struct.
+ *
+ * Returns     : A FAT Error Flag. If any value other than END_OF_DIRECTORY is
+ *               returned then there was an issue.
+ *  
+ * Notes       : LONG_NAME and/or SHORT_NAME must be passed in the entFld
+ *               argument. If not, then no entries will be printed.
+ * ----------------------------------------------------------------------------
+ */
 
-void 
-fat_printError(uint8_t err);
+uint8_t fat_printDir (FatDir * dir, uint8_t entFld, BPB * bpb);
 
 
+/*
+ * ----------------------------------------------------------------------------
+ *                                                         PRINT FILE TO SCREEN
+ *                                       
+ * Description : Prints the contents of a file to the screen.
+ * 
+ * Arguments   : dir             Pointer to a FatDir instance. This directory
+ *                               must contain the entry for the file that will
+ *                               be printed.
+ *             
+ *               fileNameStr     Pointer to a string. This is the name of the 
+ *                               file who's contents will be printed.
+ *               
+ *               bpb             Pointer to a valid instance of a BPB struct.
+ *
+ * Returns     : A FAT Error Flag. If any value other than END_OF_FILE is 
+ *               returned, then an issue occurred.
+ *  
+ * Notes       : fileNameStr must be a long name unless a long name for a given
+ *               entry does not exist, in which case it must be a short name.
+ * ----------------------------------------------------------------------------
+ */
+
+uint8_t fat_printFile (FatDir * dir, char * fileNameStr, BPB * bpb);
+
+
+/*
+ *-----------------------------------------------------------------------------
+ *                                                         PRINT FAT ERROR FLAG
+ * 
+ * Description : Prints the FAT Error Flag passed as the arguement. 
+ *
+ * Arguments   : err     An error flag returned by one of the FAT functions.
+ * 
+ * Returns     : void
+ * ----------------------------------------------------------------------------
+ */
+
+void fat_printError(uint8_t err);
 
 #endif //FAT_H
