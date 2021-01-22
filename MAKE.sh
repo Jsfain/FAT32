@@ -3,8 +3,20 @@ clear
 #directory to store build/compiled files
 buildDir=../untracked/build
 
+#directory for avr-fat source files
+fatDir=source/fat
+
+#directory for avr-sdcard source files
+sdDir=source/sd
+
+#directory for avr-general source files
+genDir=source/gen
+
 #directory for source files
 sourceDir=source
+
+#directory for test files
+testDir=test
 
 #make build directory if it doesn't exist
 mkdir -p -v $buildDir
@@ -12,13 +24,13 @@ mkdir -p -v $buildDir
 
 t=0.25
 # -g = debug, -Os = Optimize Size
-Compile=(avr-gcc -Wall -g -Os -I "includes/" -mmcu=atmega1280 -c -o)
+Compile=(avr-gcc -Wall -g -Os -I "includes/fat" -I "includes/sd" -I "includes/gen" -mmcu=atmega1280 -c -o)
 Link=(avr-gcc -Wall -g -mmcu=atmega1280 -o)
 IHex=(avr-objcopy -j .text -j .data -O ihex)
 
 
-echo -e ">> COMPILE: "${Compile[@]}" "$buildDir"/avr_fat_test.o " $sourceDir"/avr_fat_test.c"
-"${Compile[@]}" $buildDir/avr_fat_test.o $sourceDir/avr_fat_test.c
+echo -e ">> COMPILE: "${Compile[@]}" "$buildDir"/avr_fat_test.o " $testDir"/avr_fat_test.c"
+"${Compile[@]}" $buildDir/avr_fat_test.o $testDir/avr_fat_test.c
 status=$?
 sleep $t
 if [ $status -gt 0 ]
@@ -31,8 +43,8 @@ else
 fi
 
 
-echo -e "\n\r>> COMPILE: "${Compile[@]}" "$buildDir"/fat.o "$sourceDir"/fat.c"
-"${Compile[@]}" $buildDir/fat.o $sourceDir/fat.c
+echo -e "\n\r>> COMPILE: "${Compile[@]}" "$buildDir"/fat.o "$fatDir"/fat.c"
+"${Compile[@]}" $buildDir/fat.o $fatDir/fat.c
 status=$?
 sleep $t
 if [ $status -gt 0 ]
@@ -45,8 +57,8 @@ else
 fi
 
 
-echo -e "\n\r>> COMPILE: "${Compile[@]}" "$buildDir"/fat_bpb.o "$sourceDir"/fat_bpb.c"
-"${Compile[@]}" $buildDir/fat_bpb.o $sourceDir/fat_bpb.c
+echo -e "\n\r>> COMPILE: "${Compile[@]}" "$buildDir"/fat_bpb.o "$fatDir"/fat_bpb.c"
+"${Compile[@]}" $buildDir/fat_bpb.o $fatDir/fat_bpb.c
 status=$?
 sleep $t
 if [ $status -gt 0 ]
@@ -59,8 +71,8 @@ else
 fi
 
 
-echo -e "\n\r>> COMPILE: "${Compile[@]}" "$buildDir"/fat_to_sd.o "$sourceDir"/fat_to_sd.c"
-"${Compile[@]}" $buildDir/fat_to_sd.o $sourceDir/fat_to_sd.c
+echo -e "\n\r>> COMPILE: "${Compile[@]}" "$buildDir"/fat_to_sd.o "$fatDir"/fat_to_sd.c"
+"${Compile[@]}" $buildDir/fat_to_sd.o $fatDir/fat_to_sd.c
 status=$?
 sleep $t
 if [ $status -gt 0 ]
@@ -73,8 +85,8 @@ else
 fi
 
 
-echo -e "\n\r>> COMPILE: "${Compile[@]}" "$buildDir"/spi.o "$sourceDir"/spi.c"
-"${Compile[@]}" $buildDir/spi.o $sourceDir/spi.c
+echo -e "\n\r>> COMPILE: "${Compile[@]}" "$buildDir"/spi.o "$genDir"/spi.c"
+"${Compile[@]}" $buildDir/spi.o $genDir/spi.c
 status=$?
 sleep $t
 if [ $status -gt 0 ]
@@ -87,8 +99,8 @@ else
 fi
 
 
-echo -e "\n\r>> COMPILE: "${Compile[@]}" "$buildDir"/prints.o "$sourceDir"/prints.c"
-"${Compile[@]}" $buildDir/prints.o $sourceDir/prints.c
+echo -e "\n\r>> COMPILE: "${Compile[@]}" "$buildDir"/prints.o "$genDir"/prints.c"
+"${Compile[@]}" $buildDir/prints.o $genDir/prints.c
 status=$?
 sleep $t
 if [ $status -gt 0 ]
@@ -101,8 +113,8 @@ else
 fi
 
 
-echo -e "\n\r>> COMPILE: "${Compile[@]}" "$buildDir"/usart0.o "$sourceDir"/usart0.c"
-"${Compile[@]}" $buildDir/usart0.o $sourceDir/usart0.c
+echo -e "\n\r>> COMPILE: "${Compile[@]}" "$buildDir"/usart0.o "$genDir"/usart0.c"
+"${Compile[@]}" $buildDir/usart0.o $genDir/usart0.c
 status=$?
 sleep $t
 if [ $status -gt 0 ]
@@ -115,8 +127,8 @@ else
 fi
 
 
-echo -e "\n\r>> COMPILE: "${Compile[@]}" "$buildDir"/sd_spi_base.o "$sourceDir"/sd_spi_base.c"
-"${Compile[@]}" $buildDir/sd_spi_base.o $sourceDir/sd_spi_base.c
+echo -e "\n\r>> COMPILE: "${Compile[@]}" "$buildDir"/sd_spi_base.o "$sdDir"/sd_spi_base.c"
+"${Compile[@]}" $buildDir/sd_spi_base.o $sdDir/sd_spi_base.c
 status=$?
 sleep $t
 if [ $status -gt 0 ]
@@ -129,8 +141,8 @@ else
 fi
 
 
-echo -e "\n\r>> COMPILE: "${Compile[@]}" "$buildDir"/sd_spi_rwe.o "$sourceDir"/sd_spi_rwe.c"
-"${Compile[@]}" $buildDir/sd_spi_rwe.o $sourceDir/sd_spi_rwe.c
+echo -e "\n\r>> COMPILE: "${Compile[@]}" "$buildDir"/sd_spi_rwe.o "$sdDir"/sd_spi_rwe.c"
+"${Compile[@]}" $buildDir/sd_spi_rwe.o $sdDir/sd_spi_rwe.c
 status=$?
 sleep $t
 if [ $status -gt 0 ]
