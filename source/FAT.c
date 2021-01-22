@@ -22,11 +22,11 @@
 #include <string.h>
 #include <stdlib.h>
 #include <avr/io.h>
-#include "../includes/fat_bpb.h"
-#include "../includes/fat.h"
-#include "../includes/prints.h"
-#include "../includes/usart.h"
-#include "../includes/fattodisk_interface.h"
+#include "fat_bpb.h"
+#include "fat.h"
+#include "prints.h"
+#include "usart0.h"
+#include "fattodisk_interface.h"
 
 
 

@@ -20,13 +20,13 @@
 
 
 #include <avr/io.h>
-#include "../includes/spi.h"
-#include "../includes/prints.h"
-#include "../includes/sd_spi_base.h"
-#include "../includes/sd_spi_data_access.h"
-#include "../includes/fat_bpb.h"
-#include "../includes/fat.h"
-#include "../includes/fattodisk_interface.h"
+#include "spi.h"
+#include "prints.h"
+#include "sd_spi_base.h"
+#include "sd_spi_data_access.h"
+#include "fat_bpb.h"
+#include "fat.h"
+#include "fattodisk_interface.h"
 
 
 

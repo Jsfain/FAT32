@@ -1,21 +1,17 @@
 /*
-*******************************************************************************
-*                              AVR-FAT MODULE
-*
-* File    : FAT.H
-* Version : 0.0.0.2
-* Author  : Joshua Fain
-* Target  : ATMega1280
-* License : MIT LICENSE
-* Copyright (c) 2020
-* 
-*
-* DESCRIPTION: 
-* Interface for navigating / accessing contents of a FAT32 formatted volume
-* using an AVR microconstroller. Note, these only provide READ access to the 
-* volume's contents. No WRITE/ERASE access is currently implemented.
-*******************************************************************************
-*/
+ * File    : FAT.H
+ * Version : 0.0.0.2
+ * Author  : Joshua Fain
+ * Target  : ATMega1280
+ * License : MIT LICENSE 
+ * Copyright (c) 2020
+ * 
+ * Interface for navigating / accessing contents of a FAT32 formatted volume
+ * using an AVR microconstroller. 
+ * 
+ * NOTES: These only provide READ access to the volume's contents. No 
+ *        WRITE/ERASE access is currently implemented.
+ */
 
 #ifndef FAT_H
 #define FAT_H
@@ -24,46 +20,53 @@
 #include <avr/io.h>
 
 
-
-
-
 /*
-*******************************************************************************
-*******************************************************************************
- *                     
+ ******************************************************************************
  *                                    MACROS      
- *  
-*******************************************************************************
-*******************************************************************************
-*/
+ ******************************************************************************
+ */
+
+/* 
+ * ----------------------------------------------------------------------------
+ *                                                                SECTOR LENGTH
+ *
+ * Description : The expected value of a FAT32 sector length, in bytes. 
+ *       
+ * Notes       : This value should match the boot sector's / bios parameter
+ *               block's 'bytes per sector' field. 
+ * 
+ * Warning     : Currently this value should be set to 512 for the current 
+ *               implementation to work. If this does not match the bps field
+ *               then this may produce unexpected results.
+ * ----------------------------------------------------------------------------
+ */
 
 #ifndef SECTOR_LEN
-#define SECTOR_LEN                                512
+#define SECTOR_LEN                512
 #endif // SECTOR_LEN
 
-#define ENTRY_LEN                                 32
-#define END_CLUSTER                               0x0FFFFFFF
 
 
+#define ENTRY_LEN                 32         /* byte length of a short entry */
+#define END_CLUSTER               0x0FFFFFFF /* indicates last cluster */
 
-// ******* Maximum FAT String Length Flags
 
-// Specify the max string length for long names and paths.  
-#define PATH_STRING_LEN_MAX                       100
-#define LN_STRING_LEN_MAX                         100
+// set these to any reasonable value.
+#define PATH_STRING_LEN_MAX       100       /* max leng of path string */
+#define LN_STRING_LEN_MAX         100       /* max leng of long name string */
 
 
 
 // ******* Fat Error Flags
-#define SUCCESS                                   0x00
-#define INVALID_FILE_NAME                         0x01
-#define INVALID_DIR_NAME                          0x02
-#define FILE_NOT_FOUND                            0x04
-#define DIR_NOT_FOUND                             0x08
-#define END_OF_FILE                               0x10
-#define END_OF_DIRECTORY                          0x20
-#define CORRUPT_FAT_ENTRY                         0x40
-#define FAILED_READ_SECTOR                        0x80
+#define SUCCESS                   0x00
+#define INVALID_FILE_NAME         0x01
+#define INVALID_DIR_NAME          0x02
+#define FILE_NOT_FOUND            0x04
+#define DIR_NOT_FOUND             0x08
+#define END_OF_FILE               0x10
+#define END_OF_DIRECTORY          0x20
+#define CORRUPT_FAT_ENTRY         0x40
+#define FAILED_READ_SECTOR        0x80
 
 
 
@@ -71,24 +74,24 @@
 
 // Used to indicate if a long name exists and how it and
 // its shor name are distributed between adjacent sectors.
-#define LN_EXISTS                                 0x01
-#define LN_CROSS_SEC                              0x02
-#define LN_LAST_SEC_ENTRY                         0x04
+#define LN_EXISTS                 0x01
+#define LN_CROSS_SEC              0x02
+#define LN_LAST_SEC_ENTRY         0x04
 
 
 
 // ******** Entry Field Flags
 
 // Flags to specify which entry fields should be printed.
-#define SHORT_NAME                                0x01
-#define LONG_NAME                                 0x02
-#define HIDDEN                                    0x04
-#define CREATION                                  0x08
-#define LAST_ACCESS                               0x10
-#define LAST_MODIFIED                             0x20
-#define TYPE                                      0x40 
-#define FILE_SIZE                                 0x80
-#define ALL                       (CREATION | LAST_ACCESS | LAST_MODIFIED)
+#define SHORT_NAME               0x01
+#define LONG_NAME                0x02
+#define HIDDEN                   0x04
+#define CREATION                 0x08
+#define LAST_ACCESS              0x10
+#define LAST_MODIFIED            0x20
+#define TYPE                     0x40 
+#define FILE_SIZE                0x80
+#define ALL          (CREATION | LAST_ACCESS | LAST_MODIFIED)
 
 
 
@@ -97,31 +100,27 @@
 // Flags 0x01 to 0x20 are the attribute flags that can be set in the 
 // attribute byte (byte 11) of a short name entry. If the lowest four
 // bytes are set then this indicates the entry is part of a long name.
-#define READ_ONLY_ATTR                            0x01
-#define HIDDEN_ATTR                               0x02
-#define SYSTEM_ATTR                               0x04
-#define VOLUME_ID_ATTR                            0x08
-#define DIR_ENTRY_ATTR                            0x10
-#define ARCHIVE_ATTR                              0x20
-#define LN_ATTR_MASK                              0x0F
+#define READ_ONLY_ATTR            0x01
+#define HIDDEN_ATTR               0x02
+#define SYSTEM_ATTR               0x04
+#define VOLUME_ID_ATTR            0x08
+#define DIR_ENTRY_ATTR            0x10
+#define ARCHIVE_ATTR              0x20
+#define LN_ATTR_MASK              0x0F
 
 // Other FAT specific flags / tokens.
-#define LN_LAST_ENTRY                             0x40  
-#define LN_ORD_MASK                               0x3F
+#define LN_LAST_ENTRY             0x40  
+#define LN_ORD_MASK               0x3F
 
 
 
 
 
 /*
-*******************************************************************************
-*******************************************************************************
- *                     
+ ******************************************************************************     
  *                                 STRUCTS      
- *  
-*******************************************************************************
-*******************************************************************************
-*/
+ ******************************************************************************
+ */
 
 // ****** FAT Directory Struct
 
@@ -168,14 +167,10 @@ FatEntry;
 
 
 /*
-*******************************************************************************
-*******************************************************************************
- *                     
+ ******************************************************************************
  *                           FUNCTION DECLARATIONS       
- *  
-*******************************************************************************
-*******************************************************************************
-*/
+ ******************************************************************************
+ */
 
 /* 
 ------------------------------------------------------------------------------

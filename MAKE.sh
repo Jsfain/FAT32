@@ -12,7 +12,7 @@ mkdir -p -v $buildDir
 
 t=0.25
 # -g = debug, -Os = Optimize Size
-Compile=(avr-gcc -Wall -g -Os -mmcu=atmega1280 -c -o)
+Compile=(avr-gcc -Wall -g -Os -I "includes/" -mmcu=atmega1280 -c -o)
 Link=(avr-gcc -Wall -g -mmcu=atmega1280 -o)
 IHex=(avr-objcopy -j .text -j .data -O ihex)
 
@@ -101,17 +101,17 @@ else
 fi
 
 
-echo -e "\n\r>> COMPILE: "${Compile[@]}" "$buildDir"/usart.o "$sourceDir"/usart.c"
-"${Compile[@]}" $buildDir/usart.o $sourceDir/usart.c
+echo -e "\n\r>> COMPILE: "${Compile[@]}" "$buildDir"/usart0.o "$sourceDir"/usart0.c"
+"${Compile[@]}" $buildDir/usart0.o $sourceDir/usart0.c
 status=$?
 sleep $t
 if [ $status -gt 0 ]
 then
-    echo -e "error compiling USART.C"
+    echo -e "error compiling USART0.C"
     echo -e "program exiting with code $status"
     exit $status
 else
-    echo -e "Compiling USART.C successful"
+    echo -e "Compiling USART0.C successful"
 fi
 
 
@@ -143,8 +143,8 @@ else
 fi
 
 
-echo -e "\n\r>> LINK: "${Link[@]}" "$buildDir"/avr_fat_test.elf "$buildDir"/avr_fat_test.o  "$buildDir"/spi.o "$buildDir"/sd_spi_base.o "$buildDir"/sd_spi_data_access.o "$buildDir"/usart.o "$buildDir"/prints.o "$buildDir"/fat_bpb.o "$buildDir"/fat.o "$buildDir"/fattosd.o"
-"${Link[@]}" $buildDir/avr_fat_test.elf $buildDir/avr_fat_test.o $buildDir/spi.o $buildDir/sd_spi_base.o $buildDir/sd_spi_data_access.o $buildDir/usart.o $buildDir/prints.o $buildDir/fat.o $buildDir/fat_bpb.o $buildDir/fattosd.o
+echo -e "\n\r>> LINK: "${Link[@]}" "$buildDir"/avr_fat_test.elf "$buildDir"/avr_fat_test.o  "$buildDir"/spi.o "$buildDir"/sd_spi_base.o "$buildDir"/sd_spi_data_access.o "$buildDir"/usart0.o "$buildDir"/prints.o "$buildDir"/fat_bpb.o "$buildDir"/fat.o "$buildDir"/fattosd.o"
+"${Link[@]}" $buildDir/avr_fat_test.elf $buildDir/avr_fat_test.o $buildDir/spi.o $buildDir/sd_spi_base.o $buildDir/sd_spi_data_access.o $buildDir/usart0.o $buildDir/prints.o $buildDir/fat.o $buildDir/fat_bpb.o $buildDir/fattosd.o
 status=$?
 sleep $t
 if [ $status -gt 0 ]
