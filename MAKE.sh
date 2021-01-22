@@ -129,22 +129,22 @@ else
 fi
 
 
-echo -e "\n\r>> COMPILE: "${Compile[@]}" "$buildDir"/sd_spi_data_access.o "$sourceDir"/sd_spi_data_access.c"
-"${Compile[@]}" $buildDir/sd_spi_data_access.o $sourceDir/sd_spi_data_access.c
+echo -e "\n\r>> COMPILE: "${Compile[@]}" "$buildDir"/sd_spi_rwe.o "$sourceDir"/sd_spi_rwe.c"
+"${Compile[@]}" $buildDir/sd_spi_rwe.o $sourceDir/sd_spi_rwe.c
 status=$?
 sleep $t
 if [ $status -gt 0 ]
 then
-    echo -e "error compiling SD_SPI_DATA_ACCESS.C"
+    echo -e "error compiling SD_SPI_RWE.C"
     echo -e "program exiting with code $status"
     exit $status
 else
-    echo -e "Compiling SD_SPI_DATA_ACCESS.C successful"
+    echo -e "Compiling SD_SPI_RWE.C successful"
 fi
 
 
-echo -e "\n\r>> LINK: "${Link[@]}" "$buildDir"/avr_fat_test.elf "$buildDir"/avr_fat_test.o  "$buildDir"/spi.o "$buildDir"/sd_spi_base.o "$buildDir"/sd_spi_data_access.o "$buildDir"/usart0.o "$buildDir"/prints.o "$buildDir"/fat_bpb.o "$buildDir"/fat.o "$buildDir"/fattosd.o"
-"${Link[@]}" $buildDir/avr_fat_test.elf $buildDir/avr_fat_test.o $buildDir/spi.o $buildDir/sd_spi_base.o $buildDir/sd_spi_data_access.o $buildDir/usart0.o $buildDir/prints.o $buildDir/fat.o $buildDir/fat_bpb.o $buildDir/fattosd.o
+echo -e "\n\r>> LINK: "${Link[@]}" "$buildDir"/avr_fat_test.elf "$buildDir"/avr_fat_test.o  "$buildDir"/spi.o "$buildDir"/sd_spi_base.o "$buildDir"/sd_spi_rwe.o "$buildDir"/usart0.o "$buildDir"/prints.o "$buildDir"/fat_bpb.o "$buildDir"/fat.o "$buildDir"/fattosd.o"
+"${Link[@]}" $buildDir/avr_fat_test.elf $buildDir/avr_fat_test.o $buildDir/spi.o $buildDir/sd_spi_base.o $buildDir/sd_spi_rwe.o $buildDir/usart0.o $buildDir/prints.o $buildDir/fat.o $buildDir/fat_bpb.o $buildDir/fattosd.o
 status=$?
 sleep $t
 if [ $status -gt 0 ]

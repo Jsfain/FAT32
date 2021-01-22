@@ -23,7 +23,7 @@
 #include "spi.h"
 #include "prints.h"
 #include "sd_spi_base.h"
-#include "sd_spi_data_access.h"
+#include "sd_spi_rwe.h"
 #include "fat_bpb.h"
 #include "fat.h"
 #include "fattodisk_interface.h"

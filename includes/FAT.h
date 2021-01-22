@@ -7,10 +7,8 @@
  * Copyright (c) 2020
  * 
  * Interface for navigating / accessing contents of a FAT32 formatted volume
- * using an AVR microconstroller. 
- * 
- * NOTES: These only provide READ access to the volume's contents. No 
- *        WRITE/ERASE access is currently implemented.
+ * using an AVR microconstroller. These only provide READ access to the 
+ * volume's contents. No WRITE/ERASE access is currently implemented.
  */
 
 #ifndef FAT_H

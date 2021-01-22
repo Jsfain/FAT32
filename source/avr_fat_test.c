@@ -61,24 +61,23 @@
 #include "spi.h"
 #include "prints.h"
 #include "sd_spi_base.h"
-#include "sd_spi_data_access.h"
+#include "sd_spi_rwe.h"
 #include "fat_bpb.h"
 #include "fat.h"
 #include "fattodisk_interface.h"
 
 
 void
-fat_print_fat_entry_members(FatEntry * entry);
+fat_print_fat_entry_members (FatEntry * entry);
 
 void
-fat_print_fat_directory_members(FatDir * dir);
+fat_print_fat_directory_members (FatDir * dir);
 
 
 // local function used for raw data access sd card access.
 // only used by this test file. In the SD Card Raw Data Access 
 // section. Not the AVR-FAT demo section. 
-uint32_t 
-enterBlockNumber();
+uint32_t enterBlockNumber();
 
 
 
@@ -323,7 +322,7 @@ int main(void)
 
       // **********************************************************************
       //                         SD Card raw data access
-
+/*
       uint32_t startBlockNum;
       uint32_t numOfBlocks;
       uint8_t  answer;
@@ -380,9 +379,9 @@ int main(void)
 
       //                    END SD Card raw data access                         
       // **********************************************************************
+  */
     }   
   
-
   // Something else to do. Print entered chars to screen.
   while(1)
       usart_transmit (usart_receive());
