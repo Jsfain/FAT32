@@ -1,21 +1,15 @@
 /*
-*******************************************************************************
-*                   INTERFACE FOR AVR-FAT to AVR-SD CARD MODULE
-*
-* File    : FATtoSD.C
-* Version : 0.0.0.2
-* Author  : Joshua Fain
-* Target  : ATMega1280
-* License : MIT
-* Copyright (c) 2020 Joshua Fain
-* 
-*
-* DESCRIPTION: 
-* Implements required interface functions declared in FATtoDISK_INTERFACE.H. 
-* These have been implemented here for accessing raw data on a FAT32-formatted
-* SD Card using the AVR-SD Card module.
-*******************************************************************************
-*/
+ *
+ * File    : FATtoSD.C
+ * Version : 0.0.0.2
+ * Author  : Joshua Fain
+ * Target  : ATMega1280
+ * License : MIT
+ * Copyright (c) 2020 Joshua Fain
+ * 
+ * Implementation of FATtoDISK.H.
+ *  *******************************************************************************
+ */
 
 
 
@@ -26,7 +20,7 @@
 #include "sd_spi_rwe.h"
 #include "fat_bpb.h"
 #include "fat.h"
-#include "fattodisk_interface.h"
+#include "fat_to_disk.h"
 
 
 
