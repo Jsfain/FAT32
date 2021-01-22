@@ -8,10 +8,7 @@
  * Copyright (c) 2020 Joshua Fain
  * 
  * Implementation of FATtoDISK.H.
- *  *******************************************************************************
  */
-
-
 
 #include <avr/io.h>
 #include "spi.h"
@@ -23,48 +20,35 @@
 #include "fat_to_disk.h"
 
 
+/*
+ ******************************************************************************
+ *                      "PRIVATE" FUNCTION PROTOTYPES
+ ******************************************************************************
+ */
 
+uint8_t pvt_getCardType (void);
 
 
 /*
-*******************************************************************************
-*******************************************************************************
- *                     
- *                      "PRIVATE" FUNCTION DECLARATIONS      
- *  
-*******************************************************************************
-*******************************************************************************
-*/
-
-uint8_t 
-pvt_getCardType (void);
-
-
+ ******************************************************************************
+ *                                 FUNCTIONS
+ ******************************************************************************
+ */
 
 /*
-*******************************************************************************
-*******************************************************************************
- *                     
- *                           FUNCTION DEFINITIONS       
- *  
-*******************************************************************************
-*******************************************************************************
-*/
+ * ----------------------------------------------------------------------------
+ *                                                             FIND BOOT SECTOR
+ *                                 
+ * Description : Finds the address of the boot sector on the FAT32-formatted 
+ *               SD card. This function is used by fat_setBPB().
+ * 
+ * Arguments   : void
+ * 
+ * Returns     : Address of the boot sector on the SD card.
+ * ----------------------------------------------------------------------------
+ */
 
-/* 
-------------------------------------------------------------------------------
-|                              FIND BOOT SECTOR
-|                                        
-| Description : This function must be implemented to find address of the the 
-|               boot sector on a FAT32-formatted disk. This function is used
-|               by fat_setBPB();
-|
-| Returns     : address of the boot sector on the physical disk.
--------------------------------------------------------------------------------
-*/
-
-uint32_t 
-FATtoDisk_findBootSector (void)
+uint32_t FATtoDisk_findBootSector (void)
 {
     uint8_t  block[512];
     uint16_t timeout = 0;
@@ -148,24 +132,25 @@ FATtoDisk_findBootSector (void)
 
 
 /* 
-------------------------------------------------------------------------------
-|                       READ SINGLE SECTOR FROM DISK
-|                                        
-| Description : This function must be implemented to load the contents of the
-|               sector at a specified address on the physical address to an 
-|               array.
-|
-| Arguments   : addr   - address of the sector on the physical disk that should
-|                        be read into the array, *arr.
-|             : *arr   - ptr to the array that will be loaded with the contents
-|                        of the disk sector at the specified address.
-|
-| Returns     : 0 if successful, 1 if there is a read failure.
--------------------------------------------------------------------------------
-*/
+ * ----------------------------------------------------------------------------
+ *                                                 READ SINGLE SECTOR FROM DISK
+ *                                       
+ * Description : Loads the contents of the sector/block at the specified 
+ *               address on the SD card into the array, *arr.
+ *
+ * Arguments   : addr     Address of the sector/block on the SD card that 
+ *                        should be read into the array, *arr.
+ * 
+ *               arr      Pointer to the array that will be loaded with the 
+ *                        contents of the sector/block on the SD card at 
+ *                        address, addr.
+ * 
+ * Returns     : 0 if successful.
+ *               1 if failure.
+ * ----------------------------------------------------------------------------
+ */
 
-uint8_t
-FATtoDisk_readSingleSector (uint32_t addr, uint8_t *arr)
+uint8_t FATtoDisk_readSingleSector (uint32_t addr, uint8_t *arr)
 {
     uint8_t  cardType;
     uint16_t err;
@@ -190,27 +175,22 @@ FATtoDisk_readSingleSector (uint32_t addr, uint8_t *arr)
 };
 
 
-
 /*
-*******************************************************************************
-*******************************************************************************
- *                     
- *                        "PRIVATE" FUNCTION DEFINITIONS        
- *  
-*******************************************************************************
-*******************************************************************************
-*/
+ ******************************************************************************
+ *                            "PRIVATE" FUNCTION        
+ ******************************************************************************
+ */
 
 /* 
-------------------------------------------------------------------------------
-|                              GET SD CARD TYPE
-|                                        
-| Description : Determines and returns the SD card type. The card type 
-|               determines if it is block or byte addressable.
-|
-| Returns     : SD card type - SDSC or SDHC.
--------------------------------------------------------------------------------
-*/
+ * ----------------------------------------------------------------------------
+ *                                                             GET SD CARD TYPE
+ *                                       
+ * Description : Determines and returns the SD card type. The card type is used 
+ *               determine if the SD card is block or byte addressable.
+ * 
+ * Returns     : SD card type - SDSC or SDHC.
+ * ----------------------------------------------------------------------------
+ */
 
 uint8_t pvt_getCardType()
 {
