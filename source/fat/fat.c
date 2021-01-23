@@ -131,12 +131,17 @@ void fat_initEntry (FatEntry *ent, BPB *bpb)
 
 uint8_t fat_setNextEntry (FatDir *currDir, FatEntry *currEnt, BPB *bpb)
 {
+  // store required bpb member values in local constant variables.
   const uint16_t bps  = bpb->bytesPerSec;
   const uint8_t  spc  = bpb->secPerClus;
   const uint32_t drfs = bpb->dataRegionFirstSector;
 
-  // capture currEnt state in local vars. These will be updated. If successful,
-  // the new (next) state will be stored back in the FatEntry members.
+  //
+  // capture currEnt state in local vars. These variables will be updated by
+  // this function. If the function is successful and is able to find a 'next'
+  // entry then the updated values of the variables will be used to update the 
+  // currEnt members.
+  //
   uint32_t clusIndx = currEnt->snEntClusIndx;
   uint8_t  currSecNumInClus = currEnt->snEntSecNumInClus;
   uint16_t entPos = currEnt->entPos;
@@ -144,10 +149,15 @@ uint8_t fat_setNextEntry (FatDir *currDir, FatEntry *currEnt, BPB *bpb)
   uint16_t snPosCurrSec = currEnt->snPosCurrSec;
   uint16_t snPosNextSec = currEnt->snPosNextSec;
 
-  // flags to signal corresponding vars should not be set to zero on the
-  // first run of the loops where, they are used, when the function is called.
-  uint8_t  currSecNumInClusStart = 1;
-  uint8_t  entryPosStart = 1;
+  // 
+  // These flags are set to 1 for the first cluster and sector loop when this 
+  // function is called. After which they are set to zero. They are used for 
+  // ensuring the loops start at the correct positions/values, and not zero,
+  // during the initial iteration. Subsequent iterations during a single
+  // function call will then start at 0.
+  //
+  uint8_t  currSecNumInClusStartFlag = 1;
+  uint8_t  entryPosStartFlag = 1;
 
   // physical (disk) sector numbers
   uint32_t currSecNumPhys; 
@@ -155,44 +165,85 @@ uint8_t fat_setNextEntry (FatDir *currDir, FatEntry *currEnt, BPB *bpb)
 
   // other local variable defs
   uint8_t  err;
-  uint8_t  currSecArr[bps]; 
-  uint8_t  nextSecArr[bps];
-  uint8_t  attrByte; 
-  char     lnStr[LN_STRING_LEN_MAX];
-  // Used when loading long name into lnStr.
-  uint8_t  lnStrIndx = 0; 
+  uint8_t  currSecArr[bps];                 // current 512 byte sector
+  uint8_t  nextSecArr[bps];                 // next 512 byte sector
+  uint8_t  attrByte;                        // entry attribute byte. (byte 11)
+  char     lnStr[LN_STRING_LEN_MAX];        // array for long name string
+  uint8_t  lnStrIndx = 0;                   // for loading long name into lnStr
 
-
-  // Loop to search for the next entry. Runs until reaching the end of the last
-  // cluster of the directory. Returns to calling function if error or the
-  // next entry in the directory was found.
+  //
+  // Loop to search for the next entry. This loop will run until reaching the
+  // end of the last cluster of the directory, causing the function to exit
+  // with END_OF_DIRECTORY, or until a 'next' entry is found.
+  // 
+  // The process for finding the next entry is to
+  // 1) Load the current sector into the currSecArr[].
+  // 2) Locate the starting entry and check if it is a long name.
+  // 3.1) If it is not a long name, skip to the bottom and load the currEnt
+  //      members with those of this short name entry and return.
+  // 3.2) If the entry is a long name, set the LN_EXISTS flag in lnFlags.
+  // 4) Read the long name order value in byte 1 of the entry to determine how
+  //    many 32-byte entries the long name requires. 
+  // 5) Use the length of the long name to determine how the long name and its
+  //    short name are distributed among adjacent sectors.
+  // 6) If it is determined that the long and short name are within the current
+  //    sector then can simply load the currEnt members with their new values.
+  // 7) The other long/short name distribution options are:
+  //    A) The long name exists entirely within the current sector, but 
+  //       occupies the last entry position causing the short name to be placed
+  //       at the first entry position of the next sector. If this is the case 
+  //       then the LN_LAST_SEC_ENTRY flag in lnFlags is set.
+  //    B) The long name is partially in the current sector and partially in
+  //       the next sector, in which case the short name entry would be in the
+  //       next sector as well. If this is the case, then the LN_CROSS_SEC flag
+  //       is set in lnFlags.
+  // 8) If either 7.A or 7.B occurs, then the next sector must be read into 
+  //    nextSecArr[] while still holding the current sector in currSecArr[]. 
+  // 9) The LN_CROSS_SEC and LN_LAST_SEC_ENTRY situations will have to be 
+  //    handled differently in order to read in the long name, but either
+  //    way the short name entry is in the next sector. 
+  // 10) Once the variables have been set, the currEnt members can be updated
+  //     and the function exits. 
+  // 11) If no next entry is found, then the function will exit with 
+  //     END_OF_DIRECTORY
+  //
+  // There are several other error checks and entry position adjustments that
+  // must be made, but the above lists the main steps.
+  
+  // loop through the directory clusters
   do 
-  {
-    if (currSecNumInClusStart == 0) 
-      currSecNumInClus = 0; 
+  { 
+    if (currSecNumInClusStartFlag == 0) 
+      currSecNumInClus = 0;
+
+    // loop through the sectors in the cluster
     for (; currSecNumInClus < spc; currSecNumInClus++)
     {
-      currSecNumInClusStart = 0;
+      currSecNumInClusStartFlag = 0;
 
-      // load sector into currSecArr[]
+      // load the current sector into currSecArr[]
       currSecNumPhys = currSecNumInClus + drfs + (clusIndx - 2) * spc;
       err = FATtoDisk_readSingleSector (currSecNumPhys, currSecArr);
-      if (err == 1) return FAILED_READ_SECTOR;
+      if (err == 1) 
+        return FAILED_READ_SECTOR;
       
-      if (entryPosStart == 0) entPos = 0;
+      if (entryPosStartFlag == 0) 
+        entPos = 0;
       for (; entPos < bps; entPos = entPos + ENTRY_LEN)
       {
-        entryPosStart = 0;
+        entryPosStartFlag = 0;
 
-        // adjust entPos if needed, based on long name flags
+        // adjust entPos if needed, based on long name flag settings
         if (lnFlags & LN_EXISTS)
         {
+          // greater than the value of the last entry position in a sector
           if (snPosCurrSec >= SECTOR_LEN - ENTRY_LEN)
           {
-            if (entPos != 0) //get next sector
+            // get next sector
+            if (entPos != 0) 
               break; 
             else 
-              snPosCurrSec = -ENTRY_LEN;
+              snPosCurrSec = -ENTRY_LEN;         // used for adjustment
           }
 
           if (lnFlags & (LN_CROSS_SEC | LN_LAST_SEC_ENTRY))
