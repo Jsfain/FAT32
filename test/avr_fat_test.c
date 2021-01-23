@@ -20,7 +20,7 @@
  *
  * COMMANDS:
  *  (1) cd <DIR>      : Change directory to the directory specified by <DIR>.
- *  (2) ls FILTERs>   : List directory contents based on specified <FILTERs>.
+ *  (2) ls <FILTERs>   : List directory contents based on specified <FILTERs>.
  *  (3) open <FILE>   : Print contents of <FILE> to a screen.
  *  (4) pwd           : Print the current working directory to screen. This 
  *                      actually prints the values of the FatDir instances 
@@ -82,18 +82,18 @@ int main(void)
   usart_init();
   spi_masterInit();
 
-  // Initialize SD Card
-  uint32_t sdInitResp;
-  CTV ctv;
+  // SD card
+  CTV *ctvPtr = malloc(sizeof(CTV));             // SD card type & version
+  uint32_t sdInitResp;                           // SD card init error response
 
-  // Attempt SD card initialization up to 5 times.
+
+  // Attempt SD card init up to 5 times.
   for (uint8_t i = 0; i < 5; i++)
   {
     print_str ("\n\n\r >> SD Card Initialization Attempt "); 
     print_dec(i);
-    sdInitResp = sd_spiModeInit (&ctv);
+    sdInitResp = sd_spiModeInit (ctvPtr);        // init SD card into SPI mode
 
-    // Failed to initialize if initResp is not 0.
     if (sdInitResp != 0)
     {    
       print_str (": FAILED TO INITIALIZE SD CARD.");
@@ -123,8 +123,8 @@ int main(void)
     
     //
     // Create and set Bios Parameter Block instance. Members of this instance
-    // will assist in pointing to physical disk sectors/blocks in the FAT 
-    // volume. This should only be set once.
+    // are used to calculate where on the physical disk volume, the FAT 
+    // sectors/blocks are located. This should only be set once here.
     //
     BPB *bpbPtr = malloc(sizeof(BPB));
     err = fat_setBPB (bpbPtr);
@@ -134,63 +134,80 @@ int main(void)
       fat_printBootSectorError(err);
     }
   
-    // Holds parameters/state of an entry in a FAT directory.
-    // Initialize by passing it to fat_initEntry();
+    //
+    // Create and initialize a FatEntry instance. Members of this instance are
+    // used for pointing to the location of a FAT entry within its directory.
+    // The instance should be initialized with fat_initEntry() before using.
+    //
     FatEntry *entPtr = malloc(sizeof(FatEntry));
     fat_initEntry (entPtr, bpbPtr);
    
-    // Holds parameters to reference a FAT directory.
-    // Must be initialized to the root directory.
+    //
+    // Create and set a FatDir instance. Members of this instance are used for
+    // holding parameters of a FAT directory. This instance can be treated as
+    // the current working directory. The instance should be initialized to 
+    // the root directory with fat_setDirToRoot() prior to using anywhere else.
+    //
     FatDir *cwdPtr = malloc(sizeof(FatDir));
     fat_setDirToRoot (cwdPtr, bpbPtr);
     
-    // This section implements a command-line like interface for navigating
-    // the FAT volume, and printing files to a screen.
-    uint8_t cmdLineLenMax = 100;
-    char    inputStr[cmdLineLenMax];
-    char    inputChar;
-    char    cmdStr[cmdLineLenMax];
-    char    argStr[cmdLineLenMax];
-    uint8_t argCnt;
-    uint8_t lastArgFlag = 0;
-    char    *spacePtr;
-    uint8_t numOfChars = 0;
-    uint8_t filter = 0;                          // used with fat_printDir()
-    uint8_t quit = 0;
+    // vars to implement cmd-line.
+    const uint8_t cmdLineLenMax = 100;           // max char len of cmd/arg
+    char    inputStr[cmdLineLenMax];             // hold cmd/arg str
+    char    inputChar;                           // for input chars of cmd/arg
+    char    cmdStr[cmdLineLenMax];               // separate cmd from inputStr
+    char    argStr[cmdLineLenMax];               // separate arg from inputStr
+    uint8_t argCnt;                              // count number of args
+    uint8_t lastArgFlag = 0;                     // indicates last arg
+    char    *spacePtr;                  // for parsing inputStr into cmd & args
+    uint8_t numOfChars = 0;                      // number of chars in inputStr
+    uint8_t fieldFlags = 0;     // specify which fields to print with 'ls' cmd.
+    uint8_t quit = 0;                            // flag used to exit cmd-line       
 
 
     print_str("\n\n\n\r");
     do
     {
-      // reset strings and variables
+      // reset strings and vars
       for (int k = 0; k < cmdLineLenMax; k++) 
       {
         inputStr[k] = '\0';
         cmdStr[k]   = '\0';
         argStr[k]   = '\0';
       }
-      filter = 0;
+      fieldFlags = 0;
       err = 0;
       numOfChars = 0;
       
-      // print cmdStr prompt to screen
+      // print cmd prompt to screen with cwd
       print_str("\n\r"); 
       print_str(cwdPtr->longParentPath);
       print_str(cwdPtr->longName); 
       print_str (" > ");
       
-      // Enter commands / arguments
+      // ---------------------------------- Get and Parse Command and Arguments
       inputChar = usart_receive();
       while (inputChar != '\r')
       {
-        // handle backspaces
+        //
+        // Handle Backspace for mac. 
+        // This section may need to be adjusted depending on what is being used
+        // to interact with the usart in order to send chars to the terminal.
+        // 
+        // On my mac the backspace button is ascii 127, which is delete. 
+        // True backspace is ascii 8 ('\b'). This section will handle this
+        // by printing a backspace char, '\b', then printing a space char, ' ',
+        // and then printing another '\b'. These steps are typically how I 
+        // expect the backspace button to operate, which is backspace and clear
+        // the character. 
+        // 
         if (inputChar == 127)  
         {
           print_str ("\b \b");
           if (numOfChars > 0) 
             numOfChars--;
         }
-        // print last char entered
+        // if no backspace then print the last char entered
         else 
         { 
           usart_transmit (inputChar);
@@ -213,18 +230,17 @@ int main(void)
       }
       strcpy (cmdStr, inputStr);
 
-      // Execute command
+      // ------------------------------------------------------ Execute Command
       if (numOfChars < cmdLineLenMax) 
       {
-        // Command: change directory
+        // ------------------------------- Command: "cd" (change directory)
         if ( !strcmp (cmdStr, "cd"))
         {   
           err = fat_setDir (cwdPtr, argStr, bpbPtr);
           if (err != SUCCESS) 
             fat_printError (err);
         }
-          
-        // Command: list directory contents
+        // ------------------------------- Command: "ls" (list dir contents)
         else if ( !strcmp(cmdStr, "ls"))
         {
           lastArgFlag = 0;
@@ -239,23 +255,23 @@ int main(void)
             *spacePtr = '\0';
       
             if (strcmp (argStr, "/LN") == 0) 
-                  filter |= LONG_NAME;
+                  fieldFlags |= LONG_NAME;
             else if (strcmp (argStr, "/SN") == 0) 
-                  filter |= SHORT_NAME;
+                  fieldFlags |= SHORT_NAME;
             else if (strcmp (argStr, "/A" ) == 0) 
-                  filter |= ALL;
+                  fieldFlags |= ALL;
             else if (strcmp (argStr, "/H" ) == 0) 
-                  filter |= HIDDEN;
+                  fieldFlags |= HIDDEN;
             else if (strcmp (argStr, "/C" ) == 0) 
-                  filter |= CREATION;
+                  fieldFlags |= CREATION;
             else if (strcmp (argStr, "/LA") == 0) 
-                  filter |= LAST_ACCESS;
+                  fieldFlags |= LAST_ACCESS;
             else if (strcmp (argStr, "/LM") == 0) 
-                  filter |= LAST_MODIFIED;
+                  fieldFlags |= LAST_MODIFIED;
             else if (strcmp (argStr, "/FS") == 0) 
-                  filter |= FILE_SIZE;
+                  fieldFlags |= FILE_SIZE;
             else if (strcmp (argStr, "/T" ) == 0) 
-                  filter |= TYPE;
+                  fieldFlags |= TYPE;
             
             if (lastArgFlag) break;
             strcpy (argStr, spacePtr + 1);
@@ -263,31 +279,31 @@ int main(void)
           while (argCnt++ < 10);
 
           // Send LONG_NAME as default argument.
-          if ((filter & SHORT_NAME) != SHORT_NAME) 
-            filter |= LONG_NAME;
+          if ((fieldFlags & SHORT_NAME) != SHORT_NAME) 
+            fieldFlags |= LONG_NAME;
           
           // Print column headings
           print_str("\n\n\r");
-          if (CREATION & filter) 
+          if (CREATION & fieldFlags) 
             print_str(" CREATION DATE & TIME,");
-          if (LAST_ACCESS & filter) 
+          if (LAST_ACCESS & fieldFlags) 
             print_str(" LAST ACCESS DATE,");
-          if (LAST_MODIFIED & filter) 
+          if (LAST_MODIFIED & fieldFlags) 
             print_str(" LAST MODIFIED DATE & TIME,");
-          if (FILE_SIZE & filter) 
+          if (FILE_SIZE & fieldFlags) 
             print_str(" SIZE,");
-          if (TYPE & filter) 
+          if (TYPE & fieldFlags) 
             print_str(" TYPE,");
 
           print_str(" NAME");
           print_str("\n\r");
 
-          err = fat_printDir (cwdPtr, filter, bpbPtr);
+          err = fat_printDir (cwdPtr, fieldFlags, bpbPtr);
           if (err != END_OF_DIRECTORY) 
             fat_printError (err);
         }
-        
-        // Command: open file and print it to screen
+
+        // ----------------------------- Command: "open" (print file to screen)
         else if (!strcmp(cmdStr, "open")) 
         { 
           err = fat_printFile (cwdPtr, argStr, bpbPtr);
@@ -295,7 +311,10 @@ int main(void)
             fat_printError (err);
         }
 
-        // Command: print FatDir members
+        // --------------------------- Command: "pwd" (print working directory)
+        //
+        // This will print the value of each FatDir member.
+        //
         else if (!strcmp(cmdStr, "pwd"))
         {
           print_str ("\n\rshortName = "); 
@@ -309,19 +328,21 @@ int main(void)
           print_str ("\n\rFATFirstCluster = "); 
           print_dec (cwdPtr->FATFirstCluster);
         }
-        
-        // quit the cmdStr line interface.
+
+        // --------------------------------------- Command: "q" (exit cmd-line)
         else if (cmdStr[0] == 'q') 
         { 
           print_str ("\n\rquit\n\r"); 
           quit = 1; 
         }
+
+        // --------------------------------------- Command: "Invalid Command"
         else  
           print_str ("\n\rInvalid command\n\r");
       }
       print_str ("\n\r");
 
-      // ensure USART Data Register is cleared.
+      // ensure USART Data Register, URDn, is cleared.
       for (int k = 0; k < 10; k++) 
         UDR0; 
     }
