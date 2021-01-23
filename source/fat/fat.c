@@ -29,7 +29,7 @@ uint8_t  pvt_checkName (char *nameStr);
 uint8_t  pvt_setDirToParent (FatDir *dir, BPB *bpb);
 uint32_t pvt_getNextClusIndex (uint32_t currClusIndx, BPB *bpb);
 void     pvt_printEntFields (uint8_t *byte, uint8_t flags);
-void     pvt_printShortName (uint8_t *byte, uint8_t flags);
+void     pvt_printShortName (uint8_t *byte);
 uint8_t  pvt_printFile (uint8_t *fileSec, BPB *bpb);
 void     pvt_loadLongName (int lnFirstEnt, int lnLastEnt, uint8_t *secArr, 
                            char *lnStr, uint8_t *lnStrIndx);
@@ -373,8 +373,9 @@ uint8_t fat_setNextEntry (FatDir *currDir, FatEntry *currEnt, BPB *bpb)
  *               then the function was unable to update the FatEntry.
  *  
  * Notes       : 1) This function can only set the directory to a child, or
- *                  the parent of the current instance of FatDir when the 
- *                  function is called.
+ *                  the parent of the current instance of FatDir, when the 
+ *                  function is called, or reset the instance to the ROOT 
+ *                  directory.
  * 
  *               2) Do not include any paths (relative or absolute) in the 
  *                  newDirStr. newDirStr must be only be a directory name which
@@ -398,28 +399,54 @@ uint8_t fat_setDir (FatDir *dir, char *newDirStr, BPB *bpb)
     return INVALID_DIR_NAME;
 
   // newDirStr == 'Current Directory' ?
-  if (!strcmp (newDirStr, ".")) 
+  else if (!strcmp (newDirStr, ".")) 
     return SUCCESS;
   
   // newDirStr == 'Parent Directory' ?
-  if (!strcmp (newDirStr, ".."))
+  else if (!strcmp (newDirStr, ".."))
   {
     // returns either FAILED_READ_SECTOR or SUCCESS
     return pvt_setDirToParent (dir, bpb);
   }
 
+  // newDirStr == 'Root Directory' ?
+  else if (!strcmp (newDirStr, "~"))
+  {
+    fat_setDirToRoot(dir, bpb);
+    return SUCCESS;
+  }
+
+  // 
+  // Create and initialize a FatEntry instance. This will set the snEntClusIndx
+  // member to the root directory and all other members to 0 or null strings.
+  // Afterwards, update the snEntClusIndx to point to the first cluster index of 
+  // the FatDir instance (dir).
+  //
   FatEntry * ent = malloc(sizeof * ent);
   fat_initEntry (ent, bpb);
   ent->snEntClusIndx = dir->FATFirstCluster;
 
-  uint8_t err = 0;
+  // 
+  // Search FatDir directory to see if a child directory matches newDirStr.
+  // This is done by repeatedly calling fat_setNextEntry() to set a FatEntry
+  // instance to the next entry in the directory and then comparing the 
+  // longName member of the instance to newDirStr. Note that the longName
+  // member will be the same as the shortName if a longName does not exist
+  // for the entry. Therefore, shortNames can only be used when a longName
+  // does not exist for the entry. 
+  //
+  uint8_t err;
   do 
   {
     err = fat_setNextEntry(dir, ent, bpb);
-    if (err != SUCCESS) return err;
+    if (err != SUCCESS) 
+      return err;
     
+    // check if long name of next entry matches the desired new directory.
     if (!strcmp(ent->longName, newDirStr) && (ent->snEnt[11] & DIR_ENTRY_ATTR))
     {                                                        
+      // If match, set FatDir instance members to those of the matching dir.
+
       dir->FATFirstCluster = ent->snEnt[21];
       dir->FATFirstCluster <<= 8;
       dir->FATFirstCluster |= ent->snEnt[20];
@@ -439,9 +466,11 @@ uint8_t fat_setDir (FatDir *dir, char *newDirStr, BPB *bpb)
         sn[k] = ent->snEnt[k];
       sn[snLen] = '\0';
 
+      // append current directory name to the path
       strcat (dir->longParentPath,  dir->longName );
       strcat (dir->shortParentPath, dir->shortName);
 
+      // update directory name to new directory name. 
       // if current directory is not root then append '/'
       if (dir->longName[0] != '/') 
         strcat(dir->longParentPath, "/"); 
@@ -456,7 +485,8 @@ uint8_t fat_setDir (FatDir *dir, char *newDirStr, BPB *bpb)
   }
   while (err != END_OF_DIRECTORY);
 
-  return END_OF_DIRECTORY;
+  // Did not find matching child directory, so FatDir is not changed.
+  return END_OF_DIRECTORY; 
 }
 
 
@@ -486,34 +516,38 @@ uint8_t fat_setDir (FatDir *dir, char *newDirStr, BPB *bpb)
 
 uint8_t fat_printDir (FatDir *dir, uint8_t entFilt, BPB *bpb)
 {
+  // 
+  // Create and initialize a FatEntry instance. This will set the snEntClusIndx
+  // member to the root directory and all other members to 0 or null strings.
+  // Afterwards, immediately update the snEntClusIndx to point to the first 
+  // cluster index of the FatDir instance (dir).
+  //
   FatEntry * ent = malloc(sizeof * ent);
   fat_initEntry (ent, bpb);
   ent->snEntClusIndx = dir->FATFirstCluster;
 
-  while (fat_setNextEntry(dir, ent, bpb) != END_OF_DIRECTORY)
+  // 
+  // Call fat_setNextEntry() to set FatEntry to the next entry in the current
+  // directory, dir, then print the entry and fields according to the entFilt
+  // setting. Repeat until reaching END_OF_DIRECTORY is returned.
+  //
+  while (fat_setNextEntry (dir, ent, bpb) != END_OF_DIRECTORY)
   { 
+    // only print hidden entries if the HIDDEN filter flag is been set.
     if (!(ent->snEnt[11] & HIDDEN_ATTR) || 
         (ent->snEnt[11] & HIDDEN_ATTR && entFilt & HIDDEN))
     {      
+      // Print short names if the SHORT_NAME filter flag is set.
       if ((entFilt & SHORT_NAME) == SHORT_NAME)
       {
         pvt_printEntFields (ent->snEnt, entFilt);
-        pvt_printShortName (ent->snEnt, entFilt);
+        pvt_printShortName (ent->snEnt);
       }
 
+      // Print long names if the LONG_NAME filter flag is set.
       if ((entFilt & LONG_NAME) == LONG_NAME)
       {
         pvt_printEntFields (ent->snEnt, entFilt);
-        if (ent->snEnt[11] & DIR_ENTRY_ATTR) 
-        { 
-          if ((entFilt & TYPE) == TYPE) 
-            print_str (" <DIR>   ");
-        }
-        else 
-        { 
-          if ((entFilt & TYPE) == TYPE) 
-            print_str (" <FILE>  ");
-        }
         print_str (ent->longName);
       }
     }   
@@ -622,6 +656,7 @@ void fat_printError (uint8_t err)
       break;
   }
 }
+
 
 /*
  ******************************************************************************
@@ -742,7 +777,7 @@ uint8_t pvt_checkName (char *nameStr)
   {       
     for (uint8_t j = 0; j < 9; j++)
     {
-      if (nameStr[k] == illegalCharacters[j]) 
+      if (nameStr[k] == illegalCharacters[j])
         return 1;
     }
   }
@@ -1079,11 +1114,11 @@ void pvt_printEntFields (uint8_t *secArr, uint8_t flags)
   
   print_str ("     ");
 
-  // Print file size in KB
+  // Print file size in bytes
   if (FILE_SIZE & flags)
   {
     uint32_t fileSize;
-    uint16_t div = 1000;
+    uint16_t div = 1;
     
     fileSize = secArr[31];
     fileSize <<= 8;
@@ -1112,7 +1147,16 @@ void pvt_printEntFields (uint8_t *secArr, uint8_t flags)
       print_str ("        ");
     
     print_dec (fileSize/div);
-    print_str ("kB  ");
+    print_str ("B  ");
+  }
+
+  // print entry type
+  if (TYPE & flags)
+  {
+    if (secArr[11] & DIR_ENTRY_ATTR) 
+      print_str (" <DIR>   ");
+    else 
+      print_str (" <FILE>  ");
   }
 }
 
@@ -1132,7 +1176,7 @@ void pvt_printEntFields (uint8_t *secArr, uint8_t flags)
  * ----------------------------------------------------------------------------
  */
 
-void pvt_printShortName (uint8_t *secArr, uint8_t flags)
+void pvt_printShortName (uint8_t *secArr)
 {
   char sn[9];
   char ext[5];
@@ -1143,8 +1187,6 @@ void pvt_printShortName (uint8_t *secArr, uint8_t flags)
   uint8_t attr = secArr[11];
   if (attr & 0x10)
   {
-    if ((flags & TYPE) == TYPE) 
-      print_str (" <DIR>   ");
     for (uint8_t k = 0; k < 8; k++) 
       sn[k] = secArr[k];
     
@@ -1153,9 +1195,6 @@ void pvt_printShortName (uint8_t *secArr, uint8_t flags)
   }
   else 
   {
-    if ((flags & TYPE) == TYPE) 
-      print_str (" <FILE>  ");
-
     // initialize extension char array
     strcpy (ext, ".   ");
     for (uint8_t k = 1; k < 4; k++) 
