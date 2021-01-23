@@ -75,40 +75,6 @@ uint32_t enterBlockNumber();
 int main(void)
 {
 
-
-/*
-  // **************************************************************************
-  //                            SD Card Initialization 
-  
-  // Initialize SD card and set ctv instance using the intialization routine.
-
-  CTV ctv;
-
-  uint32_t initResponse;
-
-  // Attempt, up to 5 times, to initialize the SD card.
-  for (uint8_t i = 0; i < 5; i++)
-    {
-      print_str ("\n\n\r SD Card Initialization Attempt # "); print_dec(i);
-      initResponse = sd_spiModeInit (&ctv);
-
-      if (((initResponse & 0xFF) != 0) && ((initResponse & 0xFFF00) != 0))
-        {    
-          print_str ("\n\n\r FAILED INITIALIZING SD CARD");
-          print_str ("\n\r Initialization Error Response: "); 
-          sd_printInitError (initResponse);
-          print_str ("\n\r R1 Response: "); sd_printR1 (initResponse);
-        }
-      else
-        {   
-          print_str ("\n\r SUCCESSFULLY INITIALIZED SD CARD");
-          break;
-        }
-    }
-  //                           END SD Card Initialization
-  // **************************************************************************
-  */
-
   // --------------------------------------------------------------------------
   //                                   USART, SPI, and SD CARD INITILIAIZATIONS
   
@@ -143,6 +109,7 @@ int main(void)
   }
   //                                                        END INITILIAIZATION
   // --------------------------------------------------------------------------
+
 
 
   if (sdInitResp == 0)

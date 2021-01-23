@@ -50,83 +50,88 @@ uint8_t pvt_getCardType (void);
 
 uint32_t FATtoDisk_findBootSector (void)
 {
-    uint8_t  block[512];
-    uint16_t timeout = 0;
-    uint8_t  r1;
-    uint8_t  bsflag = 0;
-    uint32_t startBlckNum = 0;
-    uint32_t maxNumOfBlcksToChck = 10;
-    uint32_t blckNum = 0;
-    uint8_t  cardType;
-    uint16_t addrMult = 0; // address multiplier
+  uint8_t  block[512];
+  uint16_t timeout = 0;
+  uint8_t  r1;
+  uint8_t  bsflag = 0;
+  uint32_t startBlckNum = 0;
+  uint32_t maxNumOfBlcksToChck = 10;
+  uint32_t blckNum = 0;
+  uint8_t  cardType;
+  uint16_t addrMult;                             // address multiplier
 
-    cardType = pvt_getCardType();
-    // SDHC is block addressable
-    // SDSC byte addressable
-    if (cardType == SDHC) addrMult = 1;
-    else addrMult =  BLOCK_LEN;
-    
-    CS_SD_LOW;
-    sd_sendCommand (READ_MULTIPLE_BLOCK, 
-                    startBlckNum * addrMult); // CMD18
-    r1 = sd_getR1();
-    if (r1 > 0)
+  // Determine card type.
+  cardType = pvt_getCardType();
+  if (cardType == SDHC)                          // SDHC is block addressable
+    addrMult = 1;
+  else                                           // SDSC byte addressable
+    addrMult = BLOCK_LEN;
+  
+  CS_SD_LOW;
+  sd_sendCommand (READ_MULTIPLE_BLOCK, startBlckNum * addrMult); 
+  r1 = sd_getR1();
+  if (r1 > 0)
+  {
+    CS_SD_HIGH
+    print_str ("\n\r R1 ERROR = "); 
+    sd_printR1 (r1);
+  }
+
+  if (r1 == 0)
+  {
+    blckNum = startBlckNum * addrMult;
+    do
+    {   
+      timeout = 0;
+      while (sd_receiveByteSPI() != 0xFE)        // wait for start block token
       {
-        CS_SD_HIGH
-        print_str("\n\r R1 ERROR = "); sd_printR1(r1);
+        timeout++;
+        if (timeout > 0xFE) 
+          print_str ("\n\rSTART_TOKEN_TIMEOUT");
       }
 
-    if (r1 == 0)
+      block[0] = sd_receiveByteSPI();
+      if (block[0] == 0xEB || block[0] == 0xE9)
       {
-        blckNum = startBlckNum * addrMult;
-        do
-          {   
-            timeout = 0;
-            while (sd_receiveByteSPI() != 0xFE) // wait for start block token.
-              {
-                timeout++;
-                if (timeout > 0x511) print_str ("\n\rSTART_TOKEN_TIMEOUT");
-              }
+        for (uint16_t k = 1; k < BLOCK_LEN; k++) 
+          block[k] = sd_receiveByteSPI();
 
-            block[0] = sd_receiveByteSPI();
-            if ((block[0] == 0xEB) || (block[0] == 0xE9))
-              {
-                for(uint16_t k = 1; k < BLOCK_LEN; k++) 
-                  block[k] = sd_receiveByteSPI();
-                if (((block[0] == 0xEB) && (block[2] == 0x90))
-                      || block[0] == 0xE9)
-                  {
-                    if ((block[510] == 0x55) && (block[511] == 0xAA)) 
-                      { 
-                        bsflag = 1; 
-                        break; 
-                      }
-                  }
-              }
-
-            else
-              {
-                for (uint16_t k = 1; k < BLOCK_LEN; k++) 
-                  sd_receiveByteSPI();
-              }
-
-            for (uint8_t k = 0; k < 2; k++) 
-              sd_receiveByteSPI(); // CRC
-            
-            blckNum++;
+        if ((block[0] == 0xEB && block[2] == 0x90) || block[0] == 0xE9)
+        {
+          if (block[510] == 0x55 && block[511] == 0xAA) 
+          { 
+            bsflag = 1; 
+            break; 
           }
-        while ((blckNum * addrMult) < (
-               (startBlckNum + maxNumOfBlcksToChck) * addrMult));
-        
-        sd_sendCommand (STOP_TRANSMISSION, 0);
-        sd_receiveByteSPI(); // R1b response. Don't care.
+        }
       }
-    CS_SD_HIGH;
 
-    if (bsflag == 1) 
-      return blckNum;
-    else 
-      return 0xFFFFFFFF; // failed token
+      else
+      {
+        for (uint16_t k = 1; k < BLOCK_LEN; k++) 
+          sd_receiveByteSPI();
+      }
+
+      // get CRC
+      for (uint8_t k = 0; k < 2; k++) 
+        sd_receiveByteSPI(); 
+      
+      blckNum++;
+    }
+    while (blckNum * addrMult 
+           < (startBlckNum + maxNumOfBlcksToChck) * addrMult);
+    
+    sd_sendCommand (STOP_TRANSMISSION, 0);
+
+    // Get the R1b response. Value doesn't matter.
+    sd_receiveByteSPI(); 
+  }
+  CS_SD_HIGH;
+
+  if (bsflag == 1) 
+    return blckNum;                              // success
+  else 
+    return 0xFFFFFFFF;                           // failed token
 }
 
 
@@ -152,26 +157,30 @@ uint32_t FATtoDisk_findBootSector (void)
 
 uint8_t FATtoDisk_readSingleSector (uint32_t addr, uint8_t *arr)
 {
-    uint8_t  cardType;
-    uint16_t err;
-    uint8_t  db[512];
-    uint32_t blckNum = addr;
+  uint8_t  cardType;
+  uint16_t err;
+  uint8_t  db[512];
+  uint32_t blckNum = addr;
 
-    // determine if card is SDSC or SDHC/SDXC
-    cardType = pvt_getCardType();
+  // determine if card is SDSC or SDHC/SDXC
+  cardType = pvt_getCardType();
 
-    // SDHC is block addressable SDSC byte addressable
-    if (cardType == SDHC)
-      err = sd_readSingleBlock (blckNum, db);
-    else // SDSC
-      err = sd_readSingleBlock (blckNum * BLOCK_LEN, db);
+  
+  if (cardType == SDHC)                          // SDHC is block addressable
+    err = sd_readSingleBlock (blckNum, db);
+  else                                           // SDSC is byte addressable
+    err = sd_readSingleBlock (blckNum * BLOCK_LEN, db);
 
-    if (err != READ_SUCCESS)
-      return 1; // failed
-    
-    for (int k = 0; k < 512; k++)
-      arr[k] = db[k];    
-    return 0; // successful
+  // failed
+  if (err != READ_SUCCESS)
+    return 1;                                  
+  
+  // load contents of data block into *arr
+  for (int k = 0; k < 512; k++)
+    arr[k] = db[k];
+        
+  // success
+  return 0;
 };
 
 
@@ -185,7 +194,7 @@ uint8_t FATtoDisk_readSingleSector (uint32_t addr, uint8_t *arr)
  * ----------------------------------------------------------------------------
  *                                                             GET SD CARD TYPE
  *                                       
- * Description : Determines and returns the SD card type. The card type is used 
+ * Description : Determines and returns the SD card type. The card type is used
  *               determine if the SD card is block or byte addressable.
  * 
  * Returns     : SD card type - SDSC or SDHC.
@@ -194,51 +203,55 @@ uint8_t FATtoDisk_readSingleSector (uint32_t addr, uint8_t *arr)
 
 uint8_t pvt_getCardType()
 {
-    uint8_t r1 = 0;
-    uint8_t cardType;
-    uint8_t resp;
-    uint8_t timeout = 0;
+  uint8_t r1 = 0;
+  uint8_t cardType;
+  uint8_t resp;
+  uint8_t timeout = 0;
 
-    // Get CSD version to determine if card is SDHC or SDSC
-    CS_SD_LOW;
-    sd_sendCommand (SEND_CSD,0);
-    r1 = sd_getR1();
-    if (r1 > 0) 
-      { 
-        CS_SD_HIGH; 
-        return 0xFF; // error getting CSD version
-      }
+  CS_SD_LOW;
+  sd_sendCommand (SEND_CSD, 0);
+  r1 = sd_getR1();
 
-    do
-      {
-        resp = sd_receiveByteSPI();
-        if ((resp >> 6) == 0) 
-          { 
-            cardType = SDSC; 
-            break;
-          }
-        else if ((resp >> 6) == 1) 
-          { 
-            cardType = SDHC; 
-            break; 
-          } 
-        
-        if(timeout++ >= 0xFF)
-          { 
-            // Ensure any portion of CSD sent is read in.
-            for(int k = 0; k < 20; k++) 
-              sd_receiveByteSPI();
-            CS_SD_HIGH; 
-            return 0xFF; 
-          }
-      }
-    while(1);
+  // error getting CSD
+  if (r1 > 0) 
+  { 
+    CS_SD_HIGH; 
+    return 0xFF;                             
+  }
 
-    // Not used, but must read in rest of CSD.
-    for(int k = 0; k < 20; k++) 
-      sd_receiveByteSPI();
+  // Get CSD version to determine if card is SDHC or SDSC
+  do
+  {
+    resp = sd_receiveByteSPI();
+    if (resp >> 6 == 0) 
+    { 
+      cardType = SDSC; 
+      break;
+    }
+    else if (resp >> 6 == 1) 
+    { 
+      cardType = SDHC; 
+      break; 
+    } 
     
-    CS_SD_HIGH;
+    if (timeout++ >= 0xFF)
+    { 
+      // Ensure any portion of CSD sent is read in to clear out register.
+      for(int k = 0; k < 20; k++) 
+        sd_receiveByteSPI();
 
-    return cardType;
+      CS_SD_HIGH;
+      // timeout fail
+      return 0xFF;                               
+    }
+  }
+  while(1);
+
+  // Not used, but should read in rest of CSD.
+  for(int k = 0; k < 20; k++) 
+    sd_receiveByteSPI();
+  
+  CS_SD_HIGH;
+
+  return cardType;
 }
