@@ -77,7 +77,7 @@
  *               members (BPB fields) of this struct. 
  * ----------------------------------------------------------------------------
  */
-typedef struct BiosParameterBlock
+typedef struct
 {
   uint16_t bytesPerSec;
   uint8_t  secPerClus;
@@ -120,7 +120,7 @@ BPB;
  * ----------------------------------------------------------------------------
  */
 
-uint8_t fat_setBPB (BPB * bpb);
+uint8_t fat_setBPB (BPB *bpb);
 
 
 /*
@@ -136,5 +136,6 @@ uint8_t fat_setBPB (BPB * bpb);
  */
 
 void fat_printBootSectorError (uint8_t err);
+
 
 #endif // FAT_BPB_H

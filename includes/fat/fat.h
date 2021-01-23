@@ -412,4 +412,5 @@ uint8_t fat_printFile (FatDir * dir, char * fileNameStr, BPB * bpb);
 
 void fat_printError(uint8_t err);
 
+
 #endif //FAT_H

@@ -1,5 +1,4 @@
 /*
- *
  * File    : FATtoSD.C
  * Version : 0.0.0.2
  * Author  : Joshua Fain
