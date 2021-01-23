@@ -487,6 +487,7 @@ uint8_t fat_setDir (FatDir *dir, char *newDirStr, BPB *bpb)
 uint8_t fat_printDir (FatDir *dir, uint8_t entFilt, BPB *bpb)
 {
   // Prints column headers according to entFilt
+  /*
   print_str("\n\n\r");
   if (CREATION & entFilt) print_str(" CREATION DATE & TIME,");
   if (LAST_ACCESS & entFilt) print_str(" LAST ACCESS DATE,");
@@ -496,7 +497,7 @@ uint8_t fat_printDir (FatDir *dir, uint8_t entFilt, BPB *bpb)
   
   print_str(" NAME");
   print_str("\n\r");
-
+  */
   FatEntry * ent = malloc(sizeof * ent);
   fat_initEntry (ent, bpb);
   ent->snEntClusIndx = dir->FATFirstCluster;

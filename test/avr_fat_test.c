@@ -263,6 +263,22 @@ int main(void)
           if ((filter & SHORT_NAME) != SHORT_NAME) 
             filter |= LONG_NAME;
           
+          // Print column headings
+          print_str("\n\n\r");
+          if (CREATION & filter) 
+            print_str(" CREATION DATE & TIME,");
+          if (LAST_ACCESS & filter) 
+            print_str(" LAST ACCESS DATE,");
+          if (LAST_MODIFIED & filter) 
+            print_str(" LAST MODIFIED DATE & TIME,");
+          if (FILE_SIZE & filter) 
+            print_str(" SIZE,");
+          if (TYPE & filter) 
+            print_str(" TYPE,");
+
+          print_str(" NAME");
+          print_str("\n\r");
+
           err = fat_printDir (&cwd, filter, &bpb);
           if (err != END_OF_DIRECTORY) 
             fat_printError (err);
