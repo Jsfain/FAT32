@@ -197,11 +197,11 @@
 
 typedef struct
 {
-  char     longName[LN_STRING_LEN_MAX];          
-  char     longParentPath[PATH_STRING_LEN_MAX];
-  char     shortName[9];
-  char     shortParentPath[PATH_STRING_LEN_MAX];
-  uint32_t FATFirstCluster;
+  char lnStr[LN_STRING_LEN_MAX];                 // directory long name
+  char lnPathStr[PATH_STRING_LEN_MAX];           // directory long name path
+  char snStr[9];                                 // directory short name
+  char snPathStr[PATH_STRING_LEN_MAX];           // directory short name path
+  uint32_t fstClusIndx;                  // index of directory's first cluster
 } 
 FatDir;
 
@@ -226,18 +226,21 @@ FatDir;
 
 typedef struct
 {
-  char    longName[LN_STRING_LEN_MAX];
-  char    shortName[13];
-  uint8_t snEnt[32]; 
+  char lnStr[LN_STRING_LEN_MAX];                 // entry long name
+  char snStr[13];                                // entry short name
+  uint8_t snEnt[32];                   // The 32 bytes of the short name entry
   
-  // these members save the entry's location for use when 
-  // navigating a directory using fat_setNextEntry()
-  uint32_t snEntClusIndx; 
-  uint8_t  snEntSecNumInClus; 
-  uint16_t entPos;  
-  uint8_t  lnFlags;
-  uint16_t snPosCurrSec;
-  uint16_t snPosNextSec;           
+  // 
+  // These members are used to assist fat_setNextEntry() when beginning to look
+  // for the next entry. Not all members will always be valid, and thus should
+  // only ever be used or updated by the fat_setNextEntry() function.
+  //  
+  uint32_t snEntClusIndx;      
+  uint8_t  snEntSecNumInClus;  
+  uint16_t entPos;             
+  uint8_t  lnFlags;            
+  uint16_t snPosCurrSec;  
+  uint16_t snPosNextSec;         
 }
 FatEntry;
 

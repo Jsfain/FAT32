@@ -79,7 +79,6 @@
 
 // local function prototypes
 void fat_print_fat_entry_members (FatEntry *entry);
-void fat_print_fat_directory_members (FatDir *dir);
 uint32_t enterBlockNumber();
 
 
@@ -189,8 +188,8 @@ int main(void)
       
       // print cmd prompt to screen with cwd
       print_str("\n\r"); 
-      print_str(cwdPtr->longParentPath);
-      print_str(cwdPtr->longName); 
+      print_str(cwdPtr->lnPathStr);
+      print_str(cwdPtr->lnStr); 
       print_str (" > ");
       
       // ---------------------------------- Get and Parse Command and Arguments
@@ -325,16 +324,16 @@ int main(void)
         //
         else if (!strcmp(cmdStr, "pwd"))
         {
-          print_str ("\n\rshortName = "); 
-          print_str (cwdPtr->shortName);
-          print_str ("\n\rshortParentPath = "); 
-          print_str (cwdPtr->shortParentPath);
-          print_str ("\n\rlongName = "); 
-          print_str (cwdPtr->longName);
-          print_str ("\n\rlongParentPath = "); 
-          print_str (cwdPtr->longParentPath);
-          print_str ("\n\rFATFirstCluster = "); 
-          print_dec (cwdPtr->FATFirstCluster);
+          print_str ("\n\rsnStr = "); 
+          print_str (cwdPtr->snStr);
+          print_str ("\n\rsnPathStr = "); 
+          print_str (cwdPtr->snPathStr);
+          print_str ("\n\rlnStr = "); 
+          print_str (cwdPtr->lnStr);
+          print_str ("\n\rlnPathStr = "); 
+          print_str (cwdPtr->lnPathStr);
+          print_str ("\n\rfstClusIndx = "); 
+          print_dec (cwdPtr->fstClusIndx);
         }
 
         // --------------------------------------- Command: "q" (exit cmd-line)
@@ -456,62 +455,52 @@ uint32_t enterBlockNumber()
   c = usart_receive();
   
   while (c!='\r')
+  {
+    if ((c >= '0') && (c <= '9'))
     {
-      if ((c >= '0') && (c <= '9'))
-        {
-          x = c - '0';
-          blockNumber = blockNumber * 10;
-          blockNumber += x;
-        }
-      else if (c == 127) // backspace
-        {
-          print_str ("\b ");
-          blockNumber = blockNumber/10;
-        }
-
-      print_str ("\r");
-      print_dec (blockNumber);
-      
-      if (blockNumber >= 4194304)
-        {
-          blockNumber = 0;
-          print_str ("\n\rblock number is too large.");
-          print_str ("\n\rEnter value < 4194304\n\r");
-        }
-      c = usart_receive();
+      x = c - '0';
+      blockNumber = blockNumber * 10;
+      blockNumber += x;
     }
+    else if (c == 127) // backspace
+    {
+      print_str ("\b ");
+      blockNumber = blockNumber/10;
+    }
+
+    print_str ("\r");
+    print_dec (blockNumber);
+    
+    if (blockNumber >= 4194304)
+    {
+      blockNumber = 0;
+      print_str ("\n\rblock number is too large.");
+      print_str ("\n\rEnter value < 4194304\n\r");
+    }
+    c = usart_receive();
+  }
   return blockNumber;
 }
 
-
+/*
 void
 fat_print_fat_entry_members(FatEntry * entry)
 {
-  print_str("\n\rentry->longName                   = ");print_str(entry->longName);
-  print_str("\n\rentry->shortName                  = ");print_str(entry->shortName);
-  print_str("\n\rentry->snEnt                      = { ");
+  print_str("\n\rentry->lnStr             = ");print_str(entry->lnStr);
+  print_str("\n\rentry->snStr             = ");print_str(entry->snStr);
+  print_str("\n\rentry->snEnt             = { ");
   for (uint8_t i = 0; i < 31; i++)
-    { 
-      print_hex(entry->snEnt[i]);
-      print_str(", ");
-    }
+  { 
+    print_hex(entry->snEnt[i]);
+    print_str(", ");
+  }
   print_hex(entry->snEnt[31]);
   print_str("} ");
-  print_str("\n\rentry->snEntClusIndx              = ");print_dec(entry->snEntClusIndx);
-  print_str("\n\rentry->snEntSecNumInClus          = ");print_dec(entry->snEntSecNumInClus);
-  print_str("\n\rentry->entPos                     = ");print_dec(entry->entPos);
-  print_str("\n\rentry->lnFlags                    = ");print_dec(entry->lnFlags);
-  print_str("\n\rentry->snPosCurrSec               = ");print_dec(entry->snPosCurrSec);
-  print_str("\n\rentry->snPosNextSec               = ");print_dec(entry->snPosNextSec);
+  print_str("\n\rentry->snEntClusIndx     = ");print_dec(entry->snEntClusIndx);
+  print_str("\n\rentry->snEntSecNumInClus = ");print_dec(entry->snEntSecNumInClus);
+  print_str("\n\rentry->entPos            = ");print_dec(entry->entPos);
+  print_str("\n\rentry->lnFlags           = ");print_dec(entry->lnFlags);
+  print_str("\n\rentry->snPosCurrSec      = ");print_dec(entry->snPosCurrSec);
+  print_str("\n\rentry->snPosNextSec      = ");print_dec(entry->snPosNextSec);
 }
-
-
-void
-fat_print_fat_directory_members(FatDir * dir)
-{
-  print_str ("\n\rshortName = "); print_str (dir->shortName);
-  print_str ("\n\rshortParentPath = "); print_str (dir->shortParentPath);
-  print_str ("\n\rlongName = "); print_str (dir->longName);
-  print_str ("\n\rlongParentPath = "); print_str (dir->longParentPath);
-  print_str ("\n\rFATFirstCluster = "); print_dec (dir->FATFirstCluster);
-}
+*/
