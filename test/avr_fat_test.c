@@ -55,6 +55,7 @@
 
 
 #include <string.h>
+#include <stdlib.h>
 #include <avr/io.h>
 #include "usart0.h"
 #include "spi.h"
@@ -67,8 +68,8 @@
 
 
 // local function prototypes
-void fat_print_fat_entry_members (FatEntry * entry);
-void fat_print_fat_directory_members (FatDir * dir);
+void fat_print_fat_entry_members (FatEntry *entry);
+void fat_print_fat_directory_members (FatDir *dir);
 uint32_t enterBlockNumber();
 
 
@@ -115,16 +116,18 @@ int main(void)
   if (sdInitResp == 0)
   {          
     // ------------------------------------------------------------------------
-    //                                                        COMMAND-LINE TEST
-
+    //                                                         FAT COMMAND-LINE
+    
+    // for returned errors
     uint8_t err;
     
-    // Create and set Bios Parameter Block instance. These members will 
-    // assist in pointing to region locations in the FAT volume. This only 
-    // needs to be called set once.
-    BPB bpb;
-    err = fat_setBPB (&bpb);
-
+    //
+    // Create and set Bios Parameter Block instance. Members of this instance
+    // will assist in pointing to physical disk sectors/blocks in the FAT 
+    // volume. This should only be set once.
+    //
+    BPB *bpbPtr = malloc(sizeof(BPB));
+    err = fat_setBPB (bpbPtr);
     if (err != BOOT_SECTOR_VALID)
     {
       print_str("\n\r fat_setBPB() returned ");
@@ -133,13 +136,13 @@ int main(void)
   
     // Holds parameters/state of an entry in a FAT directory.
     // Initialize by passing it to fat_initEntry();
-    FatEntry ent;
-    fat_initEntry (&ent, &bpb);
-
+    FatEntry *entPtr = malloc(sizeof(FatEntry));
+    fat_initEntry (entPtr, bpbPtr);
+   
     // Holds parameters to reference a FAT directory.
     // Must be initialized to the root directory.
-    FatDir cwd;
-    fat_setDirToRoot (&cwd, &bpb);
+    FatDir *cwdPtr = malloc(sizeof(FatDir));
+    fat_setDirToRoot (cwdPtr, bpbPtr);
     
     // This section implements a command-line like interface for navigating
     // the FAT volume, and printing files to a screen.
@@ -172,8 +175,8 @@ int main(void)
       
       // print cmdStr prompt to screen
       print_str("\n\r"); 
-      print_str(cwd.longParentPath);
-      print_str(cwd.longName); 
+      print_str(cwdPtr->longParentPath);
+      print_str(cwdPtr->longName); 
       print_str (" > ");
       
       // Enter commands / arguments
@@ -216,7 +219,7 @@ int main(void)
         // Command: change directory
         if ( !strcmp (cmdStr, "cd"))
         {   
-          err = fat_setDir (&cwd, argStr, &bpb);
+          err = fat_setDir (cwdPtr, argStr, bpbPtr);
           if (err != SUCCESS) 
             fat_printError (err);
         }
@@ -279,7 +282,7 @@ int main(void)
           print_str(" NAME");
           print_str("\n\r");
 
-          err = fat_printDir (&cwd, filter, &bpb);
+          err = fat_printDir (cwdPtr, filter, bpbPtr);
           if (err != END_OF_DIRECTORY) 
             fat_printError (err);
         }
@@ -287,7 +290,7 @@ int main(void)
         // Command: open file and print it to screen
         else if (!strcmp(cmdStr, "open")) 
         { 
-          err = fat_printFile (&cwd, argStr, &bpb);
+          err = fat_printFile (cwdPtr, argStr, bpbPtr);
           if (err != END_OF_FILE) 
             fat_printError (err);
         }
@@ -296,15 +299,15 @@ int main(void)
         else if (!strcmp(cmdStr, "pwd"))
         {
           print_str ("\n\rshortName = "); 
-          print_str (cwd.shortName);
+          print_str (cwdPtr->shortName);
           print_str ("\n\rshortParentPath = "); 
-          print_str (cwd.shortParentPath);
+          print_str (cwdPtr->shortParentPath);
           print_str ("\n\rlongName = "); 
-          print_str (cwd.longName);
+          print_str (cwdPtr->longName);
           print_str ("\n\rlongParentPath = "); 
-          print_str (cwd.longParentPath);
+          print_str (cwdPtr->longParentPath);
           print_str ("\n\rFATFirstCluster = "); 
-          print_dec (cwd.FATFirstCluster);
+          print_dec (cwdPtr->FATFirstCluster);
         }
         
         // quit the cmdStr line interface.
@@ -319,7 +322,8 @@ int main(void)
       print_str ("\n\r");
 
       // ensure USART Data Register is cleared.
-      for (int k = 0; k < 10; k++) UDR0; 
+      for (int k = 0; k < 10; k++) 
+        UDR0; 
     }
     while (quit == 0);   
 
