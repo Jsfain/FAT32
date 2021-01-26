@@ -396,7 +396,7 @@ uint8_t fat_setNextEntry (FatDir *currDir, FatEntry *currEnt, BPB *bpb)
           {
             attrByte = currSecArr[entPos + 11];
             pvt_updateFatEntryState (lnStr, entPos, currSecNumInClus, clusIndx,
-                                     entPos, snPosNextSec, lnFlags, currSecArr, 
+                                     entPos, snPosNextSec, lnFlags, currSecArr,
                                      currEnt);
             return SUCCESS;  
           }

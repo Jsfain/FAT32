@@ -126,8 +126,8 @@ int main(void)
     // ------------------------------------------------------------------------
     //                                                         FAT COMMAND-LINE
     
-    // for returned errors
-    uint8_t err;
+   
+    uint8_t err;                                 // for returned errors
     
     //
     // Create and set Bios Parameter Block instance. Members of this instance
@@ -141,14 +141,6 @@ int main(void)
       print_str("\n\r fat_setBPB() returned ");
       fat_printBootSectorError(err);
     }
-  
-    //
-    // Create and initialize a FatEntry instance. Members of this instance are
-    // used for pointing to the location of a FAT entry within its directory.
-    // The instance should be initialized with fat_initEntry() before using.
-    //
-    FatEntry *entPtr = malloc(sizeof(FatEntry));
-    fat_initEntry (entPtr, bpbPtr);
    
     //
     // Create and set a FatDir instance. Members of this instance are used for
