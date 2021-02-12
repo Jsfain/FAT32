@@ -15,7 +15,6 @@
 
 #include <avr/io.h>
 
-
 /*
  ******************************************************************************
  *                            FUNCTION PROTOTYPES
@@ -35,9 +34,7 @@
  * Returns     : address of the boot sector on the physical disk.
  * ----------------------------------------------------------------------------
  */
-
-uint32_t FATtoDisk_findBootSector (void);
-
+uint32_t FATtoDisk_FindBootSector(void);
 
 /* 
  * ----------------------------------------------------------------------------
@@ -58,8 +55,6 @@ uint32_t FATtoDisk_findBootSector (void);
  *               1 if there is a failure to load the array with the sector.
  * ----------------------------------------------------------------------------
  */
-
-uint8_t FATtoDisk_readSingleSector (uint32_t addr, uint8_t *arr);
-
+uint8_t FATtoDisk_ReadSingleSector(uint32_t addr, uint8_t *arr);
 
 #endif //FATTOSD_H

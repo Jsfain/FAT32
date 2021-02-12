@@ -14,9 +14,7 @@
 #ifndef FAT_H
 #define FAT_H
 
-
 #include <avr/io.h>
-
 
 /*
  ******************************************************************************
@@ -43,7 +41,6 @@
  *               use LN_ATTR_MASK.
  * ----------------------------------------------------------------------------
  */
-
 #define READ_ONLY_ATTR         0x01
 #define HIDDEN_ATTR            0x02
 #define SYSTEM_ATTR            0x04
@@ -51,7 +48,6 @@
 #define DIR_ENTRY_ATTR         0x10
 #define ARCHIVE_ATTR           0x20
 #define LN_ATTR_MASK           0x0F
-
 
 /* 
  * ----------------------------------------------------------------------------
@@ -71,10 +67,8 @@
  *                  sequence of long name entries).
  * ----------------------------------------------------------------------------
  */
-
 #define LN_LAST_ENTRY          0x40  
 #define LN_ORD_MASK            0x3F
-
 
 /* 
  * ----------------------------------------------------------------------------
@@ -98,11 +92,10 @@
 
 #ifndef SECTOR_LEN
 #define SECTOR_LEN             512               /* must always be 512 here */
-#endif
+#endif//SECTOR_LEN
 
 // Value at the FAT index location of the last cluster in a FAT dir or file.
 #define END_CLUSTER            0x0FFFFFFF
-
 
 /* 
  * ----------------------------------------------------------------------------
@@ -113,11 +106,9 @@
  *               adjacent sectors.
  * ----------------------------------------------------------------------------
  */
-
 #define LN_EXISTS              0x01
 #define LN_CROSS_SEC           0x02
 #define LN_LAST_SEC_ENTRY      0x04
-
 
 /* 
  * ----------------------------------------------------------------------------
@@ -126,7 +117,6 @@
  * Description : Error Flags returned by various FAT functions.
  * ----------------------------------------------------------------------------
  */
-
 #define SUCCESS                0x00
 #define INVALID_FILE_NAME      0x01
 #define INVALID_DIR_NAME       0x02
@@ -137,7 +127,6 @@
 #define CORRUPT_FAT_ENTRY      0x40
 #define FAILED_READ_SECTOR     0x80
 
-
 /* 
  * ----------------------------------------------------------------------------
  *                                                        FAT ENTRY FIELD FLAGS
@@ -146,7 +135,6 @@
  *               function that prints directory entries to a screen.
  * ----------------------------------------------------------------------------
  */
-
 #define SHORT_NAME             0x01
 #define LONG_NAME              0x02
 #define HIDDEN                 0x04
@@ -157,11 +145,9 @@
 #define FILE_SIZE              0x80
 #define ALL                    0xFF
 
-
 // set to any value < 256.
 #define PATH_STRING_LEN_MAX    100         /* max length of path string */
 #define LN_STRING_LEN_MAX      100         /* max length of long name string */
-
 
 /*
  ******************************************************************************     
@@ -194,7 +180,6 @@
  *                  manually, but only by passing it to FAT functions.
  * ----------------------------------------------------------------------------
  */
-
 typedef struct
 {
   char lnStr[LN_STRING_LEN_MAX];                 // directory long name
@@ -204,7 +189,6 @@ typedef struct
   uint32_t fstClusIndx;                  // index of directory's first cluster
 } 
 FatDir;
-
 
 /* 
  * ----------------------------------------------------------------------------
@@ -223,7 +207,6 @@ FatDir;
  *               manually, but only by passing it to the FAT functions.
  * ----------------------------------------------------------------------------
  */
-
 typedef struct
 {
   char lnStr[LN_STRING_LEN_MAX];                 // entry long name
@@ -231,9 +214,9 @@ typedef struct
   uint8_t snEnt[32];                   // The 32 bytes of the short name entry
   
   // 
-  // These members are used to assist fat_setNextEntry() when beginning to look
+  // These members are used to assist fat_SetNextEntry() when beginning to look
   // for the next entry. Not all members will always be valid, and thus should
-  // only ever be used or updated by the fat_setNextEntry() function.
+  // only ever be used or updated by the fat_SetNextEntry() function.
   //  
   uint32_t snEntClusIndx;      
   uint8_t  snEntSecNumInClus;  
@@ -243,7 +226,6 @@ typedef struct
   uint16_t snPosNextSec;         
 }
 FatEntry;
-
 
 /*
  ******************************************************************************
@@ -265,9 +247,7 @@ FatEntry;
  * Returns     : void
  * ----------------------------------------------------------------------------
  */
-
-void fat_setDirToRoot(FatDir * dir, BPB * bpb);
-
+void fat_SetDirToRoot(FatDir *dir, BPB *bpb);
 
 /*
  * ----------------------------------------------------------------------------
@@ -282,9 +262,7 @@ void fat_setDirToRoot(FatDir * dir, BPB * bpb);
  * Returns     : void
  * ----------------------------------------------------------------------------
  */
-
-void fat_initEntry(FatEntry * ent, BPB * bpb);
-
+void fat_InitEntry(FatEntry *ent, BPB *bpb);
 
 /*
  * ----------------------------------------------------------------------------
@@ -303,9 +281,7 @@ void fat_initEntry(FatEntry * ent, BPB * bpb);
  *               then the function was unable to update the FatEntry.
  * -----------------------------------------------------------------------------
  */
-
-uint8_t fat_setNextEntry (FatDir * currDir, FatEntry * currEntry, BPB * bpb);
-
+uint8_t fat_SetNextEntry(FatDir *currDir, FatEntry *currEntry, BPB *bpb);
 
 /*
  * ----------------------------------------------------------------------------
@@ -344,9 +320,7 @@ uint8_t fat_setNextEntry (FatDir * currDir, FatEntry * currEntry, BPB * bpb);
  *                  name.
  * ----------------------------------------------------------------------------
  */
-
-uint8_t fat_setDir (FatDir * dir, char * newDirStr, BPB * bpb);
-
+uint8_t fat_SetDir(FatDir *dir, char *newDirStr, BPB *bpb);
 
 /*
  * ----------------------------------------------------------------------------
@@ -371,9 +345,7 @@ uint8_t fat_setDir (FatDir * dir, char * newDirStr, BPB * bpb);
  *               argument. If not, then no entries will be printed.
  * ----------------------------------------------------------------------------
  */
-
-uint8_t fat_printDir (FatDir * dir, uint8_t entFld, BPB * bpb);
-
+uint8_t fat_PrintDir(FatDir *dir, uint8_t entFld, BPB *bpb);
 
 /*
  * ----------------------------------------------------------------------------
@@ -397,9 +369,7 @@ uint8_t fat_printDir (FatDir * dir, uint8_t entFld, BPB * bpb);
  *               entry does not exist, in which case it must be a short name.
  * ----------------------------------------------------------------------------
  */
-
-uint8_t fat_printFile (FatDir * dir, char * fileNameStr, BPB * bpb);
-
+uint8_t fat_PrintFile(FatDir *dir, char *fileNameStr, BPB *bpb);
 
 /*
  *-----------------------------------------------------------------------------
@@ -412,8 +382,6 @@ uint8_t fat_printFile (FatDir * dir, char * fileNameStr, BPB * bpb);
  * Returns     : void
  * ----------------------------------------------------------------------------
  */
-
-void fat_printError(uint8_t err);
-
+void fat_PrintError(uint8_t err);
 
 #endif //FAT_H

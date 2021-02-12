@@ -15,7 +15,6 @@
 
 #include <avr/io.h>
 
-
 /*
  ******************************************************************************
  *                                    MACROS      
@@ -36,21 +35,18 @@
  *               then this may produce unexpected results.
  * ----------------------------------------------------------------------------
  */
-
 #ifndef SECTOR_LEN
 #define SECTOR_LEN                      512
-#endif // SECTOR_LEN
-
+#endif//SECTOR_LEN
 
 /* 
  * ----------------------------------------------------------------------------
  *                                                      BOOT SECTOR ERROR FLAGS
  *
  * Description : Flags that will be returned by functions that read the boot
- *               sector, e.g. fat_setBPB().
+ *               sector, e.g. fat_SetBPB().
  * ----------------------------------------------------------------------------
  */
-
 #define CORRUPT_BOOT_SECTOR             0x01
 #define NOT_BOOT_SECTOR                 0x02
 #define INVALID_BYTES_PER_SECTOR        0x04
@@ -58,7 +54,6 @@
 #define BOOT_SECTOR_NOT_FOUND           0x10
 #define BOOT_SECTOR_VALID               0x20
 #define FAILED_READ_BOOT_SECTOR         0x40
-
 
 /*
  ******************************************************************************
@@ -91,7 +86,6 @@ typedef struct
 } 
 BPB;
 
-
 /*
  ******************************************************************************
  *                             FUNCTION PROTOTYPES      
@@ -111,7 +105,7 @@ BPB;
  * 
  * Returns     : Boot Sector Error Flag. If any value other than
  *               BOOT_SECTOR_VALID is returned then setting the BPB instance 
- *               failed. To print, pass to fat_printBootSectorError().
+ *               failed. To print, pass to fat_PrintBootSectorError().
  * 
  * Notes       : A valid BPB struct instance is a required argument of many 
  *               functions that access the FAT volume, therefore this function 
@@ -119,9 +113,7 @@ BPB;
  *               the FAT module.
  * ----------------------------------------------------------------------------
  */
-
-uint8_t fat_setBPB (BPB *bpb);
-
+uint8_t fat_SetBPB(BPB *bpb);
 
 /*
  * ----------------------------------------------------------------------------
@@ -134,8 +126,6 @@ uint8_t fat_setBPB (BPB *bpb);
  * Returns     : void
  * ----------------------------------------------------------------------------
  */
-
-void fat_printBootSectorError (uint8_t err);
-
+void fat_PrintBootSectorError(uint8_t err);
 
 #endif // FAT_BPB_H

@@ -18,15 +18,12 @@
 #include "fat.h"
 #include "fat_to_disk.h"
 
-
 /*
  ******************************************************************************
  *                      "PRIVATE" FUNCTION PROTOTYPES
  ******************************************************************************
  */
-
-uint8_t pvt_getCardType (void);
-
+static uint8_t pvt_GetCardType(void);
 
 /*
  ******************************************************************************
@@ -46,8 +43,7 @@ uint8_t pvt_getCardType (void);
  * Returns     : Address of the boot sector on the SD card.
  * ----------------------------------------------------------------------------
  */
-
-uint32_t FATtoDisk_findBootSector (void)
+uint32_t FATtoDisk_FindBootSector(void)
 {
   uint8_t  block[512];
   uint16_t timeout = 0;
@@ -60,7 +56,7 @@ uint32_t FATtoDisk_findBootSector (void)
   uint16_t addrMult;                             // address multiplier
 
   // Determine card type.
-  cardType = pvt_getCardType();
+  cardType = pvt_GetCardType();
   if (cardType == SDHC)                          // SDHC is block addressable
     addrMult = 1;
   else                                           // SDSC byte addressable
@@ -133,8 +129,6 @@ uint32_t FATtoDisk_findBootSector (void)
     return 0xFFFFFFFF;                           // failed token
 }
 
-
-
 /* 
  * ----------------------------------------------------------------------------
  *                                                 READ SINGLE SECTOR FROM DISK
@@ -153,8 +147,7 @@ uint32_t FATtoDisk_findBootSector (void)
  *               1 if failure.
  * ----------------------------------------------------------------------------
  */
-
-uint8_t FATtoDisk_readSingleSector (uint32_t addr, uint8_t *arr)
+uint8_t FATtoDisk_ReadSingleSector(uint32_t addr, uint8_t *arr)
 {
   uint8_t  cardType;
   uint16_t err;
@@ -162,7 +155,7 @@ uint8_t FATtoDisk_readSingleSector (uint32_t addr, uint8_t *arr)
   uint32_t blckNum = addr;
 
   // determine if card is SDSC or SDHC/SDXC
-  cardType = pvt_getCardType();
+  cardType = pvt_GetCardType();
 
   
   if (cardType == SDHC)                          // SDHC is block addressable
@@ -182,7 +175,6 @@ uint8_t FATtoDisk_readSingleSector (uint32_t addr, uint8_t *arr)
   return 0;
 };
 
-
 /*
  ******************************************************************************
  *                            "PRIVATE" FUNCTION        
@@ -199,8 +191,7 @@ uint8_t FATtoDisk_readSingleSector (uint32_t addr, uint8_t *arr)
  * Returns     : SD card type - SDSC or SDHC.
  * ----------------------------------------------------------------------------
  */
-
-uint8_t pvt_getCardType()
+static uint8_t pvt_GetCardType()
 {
   uint8_t r1 = 0;
   uint8_t cardType;

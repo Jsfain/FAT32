@@ -122,7 +122,6 @@ int main(void)
     // ------------------------------------------------------------------------
     //                                                         FAT COMMAND-LINE
     
-   
     uint8_t err;                                 // for returned errors
     
     //
@@ -131,21 +130,21 @@ int main(void)
     // sectors/blocks are located. This should only be set once here.
     //
     BPB *bpbPtr = malloc(sizeof(BPB));
-    err = fat_setBPB (bpbPtr);
+    err = fat_SetBPB (bpbPtr);
     if (err != BOOT_SECTOR_VALID)
     {
-      print_Str("\n\r fat_setBPB() returned ");
-      fat_printBootSectorError(err);
+      print_Str("\n\r fat_SetBPB() returned ");
+      fat_PrintBootSectorError(err);
     }
    
     //
     // Create and set a FatDir instance. Members of this instance are used for
     // holding parameters of a FAT directory. This instance can be treated as
     // the current working directory. The instance should be initialized to 
-    // the root directory with fat_setDirToRoot() prior to using anywhere else.
+    // the root directory with fat_SetDirToRoot() prior to using anywhere else.
     //
     FatDir *cwdPtr = malloc(sizeof(FatDir));
-    fat_setDirToRoot (cwdPtr, bpbPtr);
+    fat_SetDirToRoot (cwdPtr, bpbPtr);
     
     // vars to implement cmd-line.
     const uint8_t cmdLineLenMax = 100;           // max char len of cmd/arg
@@ -231,9 +230,9 @@ int main(void)
         // ------------------------------- Command: "cd" (change directory)
         if ( !strcmp (cmdStr, "cd"))
         {   
-          err = fat_setDir (cwdPtr, argStr, bpbPtr);
+          err = fat_SetDir (cwdPtr, argStr, bpbPtr);
           if (err != SUCCESS) 
-            fat_printError (err);
+            fat_PrintError (err);
         }
         // ------------------------------- Command: "ls" (list dir contents)
         else if ( !strcmp(cmdStr, "ls"))
@@ -293,17 +292,17 @@ int main(void)
           print_Str(" NAME");
           print_Str("\n\r");
 
-          err = fat_printDir (cwdPtr, fieldFlags, bpbPtr);
+          err = fat_PrintDir (cwdPtr, fieldFlags, bpbPtr);
           if (err != END_OF_DIRECTORY) 
-            fat_printError (err);
+            fat_PrintError (err);
         }
 
         // ----------------------------- Command: "open" (print file to screen)
         else if (!strcmp(cmdStr, "open")) 
         { 
-          err = fat_printFile (cwdPtr, argStr, bpbPtr);
+          err = fat_PrintFile (cwdPtr, argStr, bpbPtr);
           if (err != END_OF_FILE) 
-            fat_printError (err);
+            fat_PrintError (err);
         }
 
         // --------------------------- Command: "pwd" (print working directory)
