@@ -604,7 +604,7 @@ uint8_t fat_printDir (FatDir *dir, uint8_t entFilt, BPB *bpb)
       if ((entFilt & LONG_NAME) == LONG_NAME)
       {
         pvt_printEntFields (ent->snEnt, entFilt);
-        print_str (ent->lnStr);
+        print_Str (ent->lnStr);
       }
     }   
   }
@@ -671,7 +671,7 @@ uint8_t fat_printFile (FatDir *dir, char *fileNameStr, BPB *bpb)
          && !(ent->snEnt[11] & DIR_ENTRY_ATTR))
     {                                                        
       // matching file found. Now printing its contents.
-      print_str("\n\n\r");
+      print_Str("\n\n\r");
       return pvt_printFile (ent->snEnt, bpb);
     }
   }
@@ -699,34 +699,34 @@ void fat_printError (uint8_t err)
   switch(err)
   {
     case SUCCESS: 
-      print_str("\n\rSUCCESS");
+      print_Str("\n\rSUCCESS");
       break;
     case END_OF_DIRECTORY:
-      print_str("\n\rEND_OF_DIRECTORY");
+      print_Str("\n\rEND_OF_DIRECTORY");
       break;
     case INVALID_FILE_NAME:
-      print_str("\n\rINVALID_FILE_NAME");
+      print_Str("\n\rINVALID_FILE_NAME");
       break;
     case FILE_NOT_FOUND:
-      print_str("\n\rFILE_NOT_FOUND");
+      print_Str("\n\rFILE_NOT_FOUND");
       break;
     case INVALID_DIR_NAME:
-      print_str("\n\rINVALID_DIR_NAME");
+      print_Str("\n\rINVALID_DIR_NAME");
       break;
     case DIR_NOT_FOUND:
-      print_str("\n\rDIR_NOT_FOUND");
+      print_Str("\n\rDIR_NOT_FOUND");
       break;
     case CORRUPT_FAT_ENTRY:
-      print_str("\n\rCORRUPT_FAT_ENTRY");
+      print_Str("\n\rCORRUPT_FAT_ENTRY");
       break;
     case END_OF_FILE:
-      print_str("\n\rEND_OF_FILE");
+      print_Str("\n\rEND_OF_FILE");
       break;
     case FAILED_READ_SECTOR:
-      print_str("\n\rFAILED_READ_SECTOR");
+      print_Str("\n\rFAILED_READ_SECTOR");
       break;
     default:
-      print_str("\n\rUNKNOWN_ERROR");
+      print_Str("\n\rUNKNOWN_ERROR");
       break;
   }
 }
@@ -1074,7 +1074,7 @@ uint32_t pvt_getNextClusIndex (uint32_t currClusIndx, BPB *bpb)
 
 void pvt_printEntFields (uint8_t *secArr, uint8_t flags)
 {
-  print_str ("\n\r");
+  print_Str ("\n\r");
 
   // Print creation date and time 
   if (CREATION & flags)
@@ -1089,34 +1089,34 @@ void pvt_printEntFields (uint8_t *secArr, uint8_t flags)
     createDate = secArr[17];
     createDate <<= 8;
     createDate |= secArr[16];
-    print_str ("    ");
+    print_Str ("    ");
 
     if (((createDate & 0x01E0) >> 5) < 10) 
-      print_str ("0");
+      print_Str ("0");
 
-    print_dec ((createDate & 0x01E0) >> 5);
-    print_str ("/");
+    print_Dec ((createDate & 0x01E0) >> 5);
+    print_Str ("/");
     if ((createDate & 0x001F) < 10)
-      print_str ("0");
+      print_Str ("0");
     
-    print_dec (createDate & 0x001F);
-    print_str ("/");
-    print_dec (1980 + ((createDate & 0xFE00) >> 9));
-    print_str ("  ");
+    print_Dec (createDate & 0x001F);
+    print_Str ("/");
+    print_Dec (1980 + ((createDate & 0xFE00) >> 9));
+    print_Str ("  ");
     if (((createTime & 0xF800) >> 11) < 10) 
-      print_str ("0");
+      print_Str ("0");
     
-    print_dec (((createTime & 0xF800) >> 11));
-    print_str (":");
+    print_Dec (((createTime & 0xF800) >> 11));
+    print_Str (":");
     if (((createTime & 0x07E0) >> 5) < 10)
-      print_str ("0");
+      print_Str ("0");
     
-    print_dec ((createTime & 0x07E0) >> 5);
-    print_str (":");
+    print_Dec ((createTime & 0x07E0) >> 5);
+    print_Str (":");
     if ((2 * (createTime & 0x001F)) < 10) 
-      print_str ("0");
+      print_Str ("0");
 
-    print_dec (2 * (createTime & 0x001F));
+    print_Dec (2 * (createTime & 0x001F));
   }
 
   // Print last access date
@@ -1128,18 +1128,18 @@ void pvt_printEntFields (uint8_t *secArr, uint8_t flags)
     lastAccDate <<= 8;
     lastAccDate |= secArr[18];
 
-    print_str ("     ");
+    print_Str ("     ");
     if (((lastAccDate & 0x01E0) >> 5) < 10)
-      print_str ("0");
+      print_Str ("0");
 
-    print_dec ((lastAccDate & 0x01E0) >> 5);
-    print_str ("/");
+    print_Dec ((lastAccDate & 0x01E0) >> 5);
+    print_Str ("/");
     if ((lastAccDate & 0x001F) < 10) 
-      print_str("0");
+      print_Str("0");
 
-    print_dec (lastAccDate & 0x001F);
-    print_str ("/");
-    print_dec (1980 + ((lastAccDate & 0xFE00) >> 9));
+    print_Dec (lastAccDate & 0x001F);
+    print_Str ("/");
+    print_Dec (1980 + ((lastAccDate & 0xFE00) >> 9));
   }
 
   // Print last modified date / time
@@ -1153,42 +1153,42 @@ void pvt_printEntFields (uint8_t *secArr, uint8_t flags)
     writeDate <<= 8;
     writeDate |= secArr[24];
   
-    print_str ("     ");
+    print_Str ("     ");
     if (((writeDate & 0x01E0) >> 5) < 10) 
-      print_str ("0");
+      print_Str ("0");
 
-    print_dec ((writeDate & 0x01E0) >> 5);
-    print_str ("/");
+    print_Dec ((writeDate & 0x01E0) >> 5);
+    print_Str ("/");
     if ((writeDate & 0x001F) < 10) 
-      print_str ("0");
+      print_Str ("0");
 
-    print_dec (writeDate & 0x001F);
-    print_str ("/");
-    print_dec (1980 + ((writeDate & 0xFE00) >> 9));
+    print_Dec (writeDate & 0x001F);
+    print_Str ("/");
+    print_Dec (1980 + ((writeDate & 0xFE00) >> 9));
 
     // Load and Print write time
     writeTime = secArr[23];
     writeTime <<= 8;
     writeTime |= secArr[22];
 
-    print_str ("  ");
+    print_Str ("  ");
     if (((writeTime & 0xF800) >> 11) < 10)
-      print_str ("0");
+      print_Str ("0");
 
-    print_dec (((writeTime & 0xF800) >> 11));
-    print_str (":");      
+    print_Dec (((writeTime & 0xF800) >> 11));
+    print_Str (":");      
     if (((writeTime & 0x07E0) >> 5) < 10) 
-      print_str ("0");
+      print_Str ("0");
 
-    print_dec ((writeTime & 0x07E0) >> 5);
-    print_str (":");
+    print_Dec ((writeTime & 0x07E0) >> 5);
+    print_Str (":");
     if ((2 * (writeTime & 0x001F)) < 10) 
-      print_str ("0");
+      print_Str ("0");
 
-    print_dec (2 * (writeTime & 0x001F));
+    print_Dec (2 * (writeTime & 0x001F));
   }
   
-  print_str ("     ");
+  print_Str ("     ");
 
   // Print file size in bytes
   if (FILE_SIZE & flags)
@@ -1206,33 +1206,33 @@ void pvt_printEntFields (uint8_t *secArr, uint8_t flags)
 
     // print spaces for formatting printed output
     if (fileSize/div >= 10000000)
-      print_str (" ");
+      print_Str (" ");
     else if (fileSize/div >= 1000000) 
-      print_str ("  ");
+      print_Str ("  ");
     else if (fileSize/div >= 100000) 
-      print_str ("   ");
+      print_Str ("   ");
     else if (fileSize/div >= 10000) 
-      print_str ("    ");
+      print_Str ("    ");
     else if (fileSize/div >= 1000) 
-      print_str ("     ");
+      print_Str ("     ");
     else if (fileSize/div >= 100) 
-      print_str ("      ");
+      print_Str ("      ");
     else if (fileSize/div >= 10) 
-      print_str ("       "); 
+      print_Str ("       "); 
     else
-      print_str ("        ");
+      print_Str ("        ");
     
-    print_dec (fileSize/div);
-    print_str ("B  ");
+    print_Dec (fileSize/div);
+    print_Str ("B  ");
   }
 
   // print entry type
   if (TYPE & flags)
   {
     if (secArr[11] & DIR_ENTRY_ATTR) 
-      print_str (" <DIR>   ");
+      print_Str (" <DIR>   ");
     else 
-      print_str (" <FILE>  ");
+      print_Str (" <FILE>  ");
   }
 }
 
@@ -1269,8 +1269,8 @@ void pvt_printShortName (uint8_t *secArr)
     for (uint8_t k = 0; k < 8; k++) 
       sn[k] = secArr[k];
     
-    print_str (sn);
-    print_str ("    ");
+    print_Str (sn);
+    print_Str ("    ");
   }
 
   // file entries
@@ -1289,11 +1289,11 @@ void pvt_printShortName (uint8_t *secArr)
       }
     }
 
-    print_str (sn);
+    print_Str (sn);
     if (strcmp (ext, ".   ")) 
-      print_str (ext);
+      print_Str (ext);
     for (uint8_t p = 0; p < 10 - (strlen (sn) + 2); p++) 
-      print_str (" ");
+      print_Str (" ");
   }
 }
 
@@ -1349,9 +1349,9 @@ uint8_t pvt_printFile (uint8_t *fileSec, BPB *bpb)
       for (uint16_t k = 0; k < bpb->bytesPerSec; k++)
       {
         if (fileSec[k] == '\n') 
-          print_str ("\n\r");
+          print_Str ("\n\r");
         else if (fileSec[k] != 0) 
-          usart_transmit (fileSec[k]);
+          usart_Transmit (fileSec[k]);
         // check if end of file.
         else 
         {

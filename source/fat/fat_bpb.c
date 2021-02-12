@@ -134,28 +134,28 @@ fat_printBootSectorError (uint8_t err)
   switch (err)
   {
     case BOOT_SECTOR_VALID : 
-      print_str ("BOOT_SECTOR_VALID ");
+      print_Str ("BOOT_SECTOR_VALID ");
       break;
     case CORRUPT_BOOT_SECTOR :
-      print_str ("CORRUPT_BOOT_SECTOR ");
+      print_Str ("CORRUPT_BOOT_SECTOR ");
       break;
     case NOT_BOOT_SECTOR :
-      print_str ("NOT_BOOT_SECTOR ");
+      print_Str ("NOT_BOOT_SECTOR ");
       break;
     case INVALID_BYTES_PER_SECTOR:
-      print_str ("INVALID_BYTES_PER_SECTOR");
+      print_Str ("INVALID_BYTES_PER_SECTOR");
       break;
     case INVALID_SECTORS_PER_CLUSTER:
-      print_str ("INVALID_SECTORS_PER_CLUSTER");
+      print_Str ("INVALID_SECTORS_PER_CLUSTER");
       break;
     case BOOT_SECTOR_NOT_FOUND:
-      print_str ("BOOT_SECTOR_NOT_FOUND");
+      print_Str ("BOOT_SECTOR_NOT_FOUND");
       break;
     case FAILED_READ_BOOT_SECTOR:
-      print_str ("FAILED_READ_BOOT_SECTOR");
+      print_Str ("FAILED_READ_BOOT_SECTOR");
       break;
     default:
-      print_str ("UNKNOWN_ERROR");
+      print_Str ("UNKNOWN_ERROR");
       break;
   }
 }

@@ -29,7 +29,7 @@
  *                      members at the time it is called.
  * 
  * DEFS: 
- * (1) cwd = current working directory
+ * (1) 'cwd' = current working directory
  * 
  * NOTES: 
  * (1)  The module only has READ capabilities.
@@ -55,12 +55,9 @@
  *       /LA : Print last access date.
  *       /A  : ALL - prints all entries and all fields.
  *
- * (10) NOT CURRENTLY FUNCTIONAL 
- *      Enter 'q' to exit the command line portion of this testing module.
- *      After exiting, access to the raw data of the physical disk is provided
- *      using the functionality of the AVR-SD Card module. Prompts are provided 
- *      there as instructions. This raw data access is not considered part of
- *      the AVR-FAT module. 
+ * (10) Enter 'q' to exit the command-line. After exiting, the explicit FAT
+ *      functionality however, there is included a raw data access section
+ *      if you do use the AVR-SD card module along with the AVR-FAT module.
  * 
  */
 
@@ -77,9 +74,8 @@
 #include "fat_to_disk.h"
 
 
-// local function prototypes
-void fat_print_fat_entry_members (FatEntry *entry);
-uint32_t enterBlockNumber();
+// local function prototype
+uint32_t enterNumber();
 
 
 int main(void)
@@ -87,10 +83,10 @@ int main(void)
   // --------------------------------------------------------------------------
   //                                   USART, SPI, and SD CARD INITILIAIZATIONS
   
-  usart_init();
-  spi_masterInit();
+  usart_Init();
+  spi_MasterInit();
 
-  // SD card
+  // SD card initialization
   CTV *ctvPtr = malloc(sizeof(CTV));             // SD card type & version
   uint32_t sdInitResp;                           // SD card init error response
 
@@ -98,21 +94,21 @@ int main(void)
   // Attempt SD card init up to 5 times.
   for (uint8_t i = 0; i < 5; i++)
   {
-    print_str ("\n\n\r >> SD Card Initialization Attempt "); 
-    print_dec(i);
-    sdInitResp = sd_spiModeInit (ctvPtr);        // init SD card into SPI mode
+    print_Str("\n\n\r >> SD Card Initialization Attempt "); 
+    print_Dec(i);
+    sdInitResp = sd_InitModeSPI(ctvPtr);        // init SD card into SPI mode
 
     if (sdInitResp != 0)
     {    
-      print_str (": FAILED TO INITIALIZE SD CARD.");
-      print_str (" Initialization Error Response: "); 
-      sd_printInitError (sdInitResp);
-      print_str (", R1 Response: "); 
-      sd_printR1 (sdInitResp);
+      print_Str (": FAILED TO INITIALIZE SD CARD.");
+      print_Str (" Initialization Error Response: "); 
+      sd_PrintInitError (sdInitResp);
+      print_Str (", R1 Response: "); 
+      sd_PrintR1 (sdInitResp);
     }
     else
     {   
-      print_str (": SD CARD INITIALIZATION SUCCESSFUL");
+      print_Str (": SD CARD INITIALIZATION SUCCESSFUL");
       break;
     }
   }
@@ -138,7 +134,7 @@ int main(void)
     err = fat_setBPB (bpbPtr);
     if (err != BOOT_SECTOR_VALID)
     {
-      print_str("\n\r fat_setBPB() returned ");
+      print_Str("\n\r fat_setBPB() returned ");
       fat_printBootSectorError(err);
     }
    
@@ -164,7 +160,7 @@ int main(void)
     uint8_t fieldFlags = 0;     // specify which fields to print with 'ls' cmd.
     uint8_t quit = 0;                            // flag used to exit cmd-line       
 
-    print_str("\n\n\n\r");
+    print_Str("\n\n\n\r");
     do
     {
       // reset strings and vars
@@ -179,13 +175,13 @@ int main(void)
       numOfChars = 0;
       
       // print cmd prompt to screen with cwd
-      print_str("\n\r"); 
-      print_str(cwdPtr->lnPathStr);
-      print_str(cwdPtr->lnStr); 
-      print_str (" > ");
+      print_Str("\n\r"); 
+      print_Str(cwdPtr->lnPathStr);
+      print_Str(cwdPtr->lnStr); 
+      print_Str (" > ");
       
       // ---------------------------------- Get and Parse Command and Arguments
-      inputChar = usart_receive();
+      inputChar = usart_Receive();
       while (inputChar != '\r')
       {
         //
@@ -202,20 +198,20 @@ int main(void)
         // 
         if (inputChar == 127)  
         {
-          print_str ("\b \b");
+          print_Str ("\b \b");
           if (numOfChars > 0) 
             numOfChars--;
         }
         // if no backspace then print the last char entered
         else 
         { 
-          usart_transmit (inputChar);
+          usart_Transmit (inputChar);
           inputStr[numOfChars] = inputChar;
           numOfChars++;
         }
       
         // get next char
-        inputChar = usart_receive();
+        inputChar = usart_Receive();
         if (numOfChars >= cmdLineLenMax) 
           break;
       }
@@ -282,20 +278,20 @@ int main(void)
             fieldFlags |= LONG_NAME;
           
           // Print column headings
-          print_str("\n\n\r");
+          print_Str("\n\n\r");
           if (CREATION & fieldFlags) 
-            print_str(" CREATION DATE & TIME,");
+            print_Str(" CREATION DATE & TIME,");
           if (LAST_ACCESS & fieldFlags) 
-            print_str(" LAST ACCESS DATE,");
+            print_Str(" LAST ACCESS DATE,");
           if (LAST_MODIFIED & fieldFlags) 
-            print_str(" LAST MODIFIED DATE & TIME,");
+            print_Str(" LAST MODIFIED DATE & TIME,");
           if (FILE_SIZE & fieldFlags) 
-            print_str(" SIZE (Bytes),");
+            print_Str(" SIZE (Bytes),");
           if (TYPE & fieldFlags) 
-            print_str(" TYPE,");
+            print_Str(" TYPE,");
 
-          print_str(" NAME");
-          print_str("\n\r");
+          print_Str(" NAME");
+          print_Str("\n\r");
 
           err = fat_printDir (cwdPtr, fieldFlags, bpbPtr);
           if (err != END_OF_DIRECTORY) 
@@ -316,30 +312,30 @@ int main(void)
         //
         else if (!strcmp(cmdStr, "pwd"))
         {
-          print_str ("\n\rsnStr = "); 
-          print_str (cwdPtr->snStr);
-          print_str ("\n\rsnPathStr = "); 
-          print_str (cwdPtr->snPathStr);
-          print_str ("\n\rlnStr = "); 
-          print_str (cwdPtr->lnStr);
-          print_str ("\n\rlnPathStr = "); 
-          print_str (cwdPtr->lnPathStr);
-          print_str ("\n\rfstClusIndx = "); 
-          print_dec (cwdPtr->fstClusIndx);
+          print_Str ("\n\rsnStr = "); 
+          print_Str (cwdPtr->snStr);
+          print_Str ("\n\rsnPathStr = "); 
+          print_Str (cwdPtr->snPathStr);
+          print_Str ("\n\rlnStr = "); 
+          print_Str (cwdPtr->lnStr);
+          print_Str ("\n\rlnPathStr = "); 
+          print_Str (cwdPtr->lnPathStr);
+          print_Str ("\n\rfstClusIndx = "); 
+          print_Dec (cwdPtr->fstClusIndx);
         }
 
         // --------------------------------------- Command: "q" (exit cmd-line)
         else if (cmdStr[0] == 'q') 
         { 
-          print_str ("\n\rquit\n\r"); 
+          print_Str ("\n\rquit\n\r"); 
           quit = 1; 
         }
 
         // --------------------------------------- Command: "Invalid Command"
         else  
-          print_str ("\n\rInvalid command\n\r");
+          print_Str ("\n\rInvalid command\n\r");
       }
-      print_str ("\n\r");
+      print_Str ("\n\r");
 
       // ensure USART Data Register, URDn, is cleared.
       for (int k = 0; k < 10; k++) 
@@ -355,74 +351,78 @@ int main(void)
     // ------------------------------------------------------------------------
     //                                                       USER INPUT SECTION
     //
-    // This section allows a user to interact with the function 
-    // sd_printMultipleBlocks(). The user is asked which block number they 
-    // would like to print first, and then how many blocks they would like to 
-    // print. The sd_printMultipleBlocks() function is then called with these
-    // parameters and the blocks specified by the user are printed.
-    /*
-    uint32_t startBlockNum;
-    uint32_t numOfBlocks;
+    // This section allows a user to view raw data directly using the 
+    // sd_ReadSingleBlock() and sd_PrintSingleBlock() functions available in
+    // the SD card module.
+    
+    uint32_t startBlck;
+    uint32_t numOfBlcks;
     uint8_t  answer;
     uint16_t sdErr = 0;
+    uint8_t  blckArr[BLOCK_LEN];
+    
     do
+    {
+      do
       {
-        do
-          {
-            print_str ("\n\n\n\rEnter Start Block\n\r");
-            startBlockNum = enterBlockNumber();
-            print_str ("\n\rHow many blocks do you want to print?\n\r");
-            numOfBlocks = enterBlockNumber();
-            print_str ("\n\rYou have selected to print "); 
-            print_dec(numOfBlocks);
-            print_str (" blocks beginning at block number "); 
-            print_dec(startBlockNum);
-            print_str ("\n\rIs this correct? (y/n)");
-            answer = usart_receive();
-            usart_transmit (answer);
-            print_str ("\n\r");
-          }
-        while (answer != 'y');
+        print_Str ("\n\n\n\rEnter Start Block\n\r");
+        startBlck = enterNumber();
+        print_Str ("\n\rHow many blocks do you want to print?\n\r");
+        numOfBlcks = enterNumber();
+        print_Str ("\n\rYou have selected to print "); 
+        print_Dec(numOfBlcks);
+        print_Str (" blocks beginning at block number "); 
+        print_Dec(startBlck);
+        print_Str ("\n\rIs this correct? (y/n)");
+        answer = usart_Receive();
+        usart_Transmit (answer);
+        print_Str ("\n\r");
+      }
+      while (answer != 'y');
 
-        // Print blocks
-
+      // Print blocks
+      for (uint32_t blck = startBlck; blck < startBlck + numOfBlcks; blck++)
+      {
+        print_Str("\n\rBLOCK: ");
+        print_Dec(blck);
         // SDHC is block addressable
-        if (ctv.type == SDHC) 
-          sdErr = sd_printMultipleBlocks (
-                    startBlockNum, numOfBlocks);
+        if (ctvPtr->type == SDHC)
+          //sdErr = sd_printMultipleBlocks(startBlockNum, numOfBlocks);
+          sdErr = sd_ReadSingleBlock(blck, blckArr);
         // SDSC is byte addressable
         else 
-          sdErr = sd_printMultipleBlocks (
-                    startBlockNum * BLOCK_LEN, numOfBlocks);
+          sdErr = sd_ReadSingleBlock(blck * BLOCK_LEN, blckArr);
         
         if (sdErr != READ_SUCCESS)
           { 
-            print_str ("\n\r >> sd_printMultipleBlocks() returned ");
+            print_Str ("\n\r >> sd_printMultipleBlocks() returned ");
             if (sdErr & R1_ERROR)
               {
-                print_str ("R1 error: ");
-                sd_printR1 (sdErr);
+                print_Str ("R1 error: ");
+                sd_PrintR1 (sdErr);
               }
             else 
               { 
-                print_str (" error "); 
-                sd_printReadError (sdErr);
+                print_Str (" error "); 
+                sd_PrintReadError (sdErr);
               }
           }
-        print_str ("\n\rPress 'q' to quit: ");
-        answer = usart_receive();
-        usart_transmit (answer);
+        sd_PrintSingleBlock(blckArr);
       }
+      print_Str ("\n\rPress 'q' to quit: ");
+      answer = usart_Receive();
+      usart_Transmit (answer);
+    }
     while (answer != 'q');
 
     //                                                   END USER INPUT SECTION
     // ------------------------------------------------------------------------
-    */
+    
   }   
   
   // Something else to do. Print entered chars to screen.
   while(1)
-    usart_transmit (usart_receive());
+    usart_Transmit (usart_Receive());
   
   return 0;
 }
@@ -438,61 +438,39 @@ int main(void)
 
 // local function for taking user inputChar to specify a block
 // number. If nothing is entered then the block number is 0.
-uint32_t enterBlockNumber()
+uint32_t enterNumber()
 {
   uint8_t x;
   uint8_t c;
-  uint32_t blockNumber = 0;
+  uint32_t num = 0;
 
-  c = usart_receive();
+  c = usart_Receive();
   
   while (c!='\r')
   {
     if ((c >= '0') && (c <= '9'))
     {
       x = c - '0';
-      blockNumber = blockNumber * 10;
-      blockNumber += x;
+      num *= 10;
+      num += x;
     }
     else if (c == 127) // backspace
     {
-      print_str ("\b ");
-      blockNumber = blockNumber/10;
+      print_Str ("\b ");
+      num /= 10;
     }
 
-    print_str ("\r");
-    print_dec (blockNumber);
+    print_Str ("\r");
+    print_Dec (num);
     
-    if (blockNumber >= 4194304)
+    if (num >= 4194304)
     {
-      blockNumber = 0;
-      print_str ("\n\rblock number is too large.");
-      print_str ("\n\rEnter value < 4194304\n\r");
+      num = 0;
+      print_Str ("\n\rblock number is too large.");
+      print_Str ("\n\rEnter value < 4194304\n\r");
     }
-    c = usart_receive();
+    c = usart_Receive();
   }
-  return blockNumber;
+  return num;
 }
 
-/*
-void
-fat_print_fat_entry_members(FatEntry * entry)
-{
-  print_str("\n\rentry->lnStr             = ");print_str(entry->lnStr);
-  print_str("\n\rentry->snStr             = ");print_str(entry->snStr);
-  print_str("\n\rentry->snEnt             = { ");
-  for (uint8_t i = 0; i < 31; i++)
-  { 
-    print_hex(entry->snEnt[i]);
-    print_str(", ");
-  }
-  print_hex(entry->snEnt[31]);
-  print_str("} ");
-  print_str("\n\rentry->snEntClusIndx     = ");print_dec(entry->snEntClusIndx);
-  print_str("\n\rentry->snEntSecNumInClus = ");print_dec(entry->snEntSecNumInClus);
-  print_str("\n\rentry->entPos            = ");print_dec(entry->entPos);
-  print_str("\n\rentry->lnFlags           = ");print_dec(entry->lnFlags);
-  print_str("\n\rentry->snPosCurrSec      = ");print_dec(entry->snPosCurrSec);
-  print_str("\n\rentry->snPosNextSec      = ");print_dec(entry->snPosNextSec);
-}
-*/

@@ -23,6 +23,23 @@
 
 /* 
  * ----------------------------------------------------------------------------
+ *                                                                TIMEOUT LIMIT
+ *
+ * Description : This value determines the limit on number of attempts to get
+ *               valid values. The value can be any value < 0xFF. This is 
+ *               typically applied to loops polling for an SD card 
+ *               response/data. This does not represent a "time" value but
+ *               how many times an attempt to return a valid value will be made
+ *               before returning from a function with an error. 
+ * 
+ * Notes       : Some functions can have timeouts >= 0xFF and these are
+ *               implemented as multiples of and/or additions to this value.
+ * ----------------------------------------------------------------------------
+ */
+#define TIMEOUT_LIMIT           0xFE
+
+/* 
+ * ----------------------------------------------------------------------------
  *                                                                 BLOCK LENGTH
  *
  * Description : The SD card block length (in bytes) assumed by the host. 
@@ -31,7 +48,7 @@
  *               produce unexpected results and/or fail.
  * ----------------------------------------------------------------------------
  */
-#define BLOCK_LEN 512
+#define BLOCK_LEN               512
 
 /* 
  * ----------------------------------------------------------------------------
@@ -54,17 +71,18 @@
  * ----------------------------------------------------------------------------
  *                                                            R1 RESPONSE FLAGS
  * 
- * Description : Flags returned by sd_getR1().
+ * Description : Flags returned by sd_GetR1().
  * 
  * Notes       : 1) With the exception of R1_TIMEOUT, these flags correspond to
  *                  the first byte returned by the SD card in response to any 
  *                  command.
  *      
- *               2) R1_TIMEOUT will be set in the sd_getR1() return value if 
+ *               2) R1_TIMEOUT will be set in the sd_GetR1() return value if 
  *                  the SD card does not send an R1 response after set amount
  *                  of time.
  * ----------------------------------------------------------------------------
  */
+#define OUT_OF_IDLE             0x00
 #define IN_IDLE_STATE           0x01
 #define ERASE_RESET             0x02
 #define ILLEGAL_COMMAND         0x04
@@ -96,15 +114,18 @@
 
 /* 
  * ----------------------------------------------------------------------------
- *                                                                   CARD TYPES
+ *                                                      CARD TYPES and VERSIONS
  * 
  * Notes       : 1) High/extended capacity (SDHC) cards are block addressable.
  *               
  *               2) Standard capacity (SDSC) cards are byte addressable. 
  * ----------------------------------------------------------------------------
  */
-#define SDHC   1 
-#define SDSC   0
+#define SDHC           1 
+#define SDSC           0
+
+#define VERSION_1      1
+#define VERSION_2      2
 
 /* 
  * ----------------------------------------------------------------------------
@@ -122,13 +143,11 @@
  */
 #define HOST_CAPACITY_SUPPORT  SDHC
 
-
 /*
  ******************************************************************************
  *                                   STRUCTS
  ******************************************************************************
  */
-
 
 /* 
  * ----------------------------------------------------------------------------
@@ -152,10 +171,9 @@ typedef struct {
     uint8_t type;
 } CTV;
 
-
 /*
  ******************************************************************************
- *                           FUNCTION DECLARATIONS
+ *                           FUNCTION PROTOTYPES
  ******************************************************************************
  */
 
@@ -173,9 +191,7 @@ typedef struct {
  *               the lowest byte.
  * -----------------------------------------------------------------------------
  */
-
-uint32_t sd_spiModeInit (CTV* ctv);
-
+uint32_t sd_InitModeSPI(CTV* ctv);
 
 /*
  * ----------------------------------------------------------------------------
@@ -189,14 +205,12 @@ uint32_t sd_spiModeInit (CTV* ctv);
  * 
  * Notes       : 1) Call as many times as required to send the complete data 
  *                  packet, token, command, etc...
- * 
- *               2) This, and sd_receiveByteSPI(), are the SPI interfacing 
+ *
+ *               2) This, and sd_ReceiveByteSPI(), are the SPI interfacing 
  *                  functions.
  * ----------------------------------------------------------------------------
  */
-
-void sd_sendByteSPI (uint8_t byte);
-
+void sd_SendByteSPI(uint8_t byte);
 
 /*
  * ----------------------------------------------------------------------------
@@ -211,13 +225,11 @@ void sd_sendByteSPI (uint8_t byte);
  * Notes       : 1) Call as many times as necessary to get the complete data
  *                  packet, token, error response, etc... from the SD card.
  * 
- *               2) This, and sd_sendByteSPI(), are the SPI interfacing 
+ *               2) This, and sd_SendByteSPI(), are the SPI interfacing 
  *                  functions.
  * ----------------------------------------------------------------------------
  */
-
-uint8_t sd_receiveByteSPI (void);
-
+uint8_t sd_ReceiveByteSPI(void);
 
 /*
  * ----------------------------------------------------------------------------
@@ -232,9 +244,7 @@ uint8_t sd_receiveByteSPI (void);
  * Returns     : void
  * ----------------------------------------------------------------------------
  */
-
-void sd_sendCommand (uint8_t cmd, uint32_t arg);
-
+void sd_SendCommand(uint8_t cmd, uint32_t arg);
 
 /*
  * ----------------------------------------------------------------------------
@@ -247,32 +257,28 @@ void sd_sendCommand (uint8_t cmd, uint32_t arg);
  * 
  * Returns     : R1 response flag(s). See SD_SPI_BASE.H.
  * 
- * Notes       : 1) Always call immediately after sd_sendCommand().
+ * Notes       : 1) Always call immediately after sd_SendCommand().
  *               
- *               2) Pass the return value to sd_printR1() to print the value.
+ *               2) Pass the return value to sd_PrintR1() to print the value.
  * 
  *               3) R1_TIMEOUT is returned if the SD Card did not return an R1
  *                  response. 
  * ----------------------------------------------------------------------------
  */
-
-uint8_t sd_getR1 (void);
-
+uint8_t sd_GetR1(void);
 
 /*
  * ----------------------------------------------------------------------------
  *                                                      PRINT R1 RESPONSE FLAGS
  * 
- * Description : Prints the R1 response flag(s) returned by sd_getR1().
+ * Description : Prints the R1 response flag(s) returned by sd_GetR1().
  * 
- * Arguments   : r1     The R1 response flag(s) byte returned by sd_getR1().
+ * Arguments   : r1     The R1 response flag(s) byte returned by sd_GetR1().
  * 
  * Returns     : void
  * ----------------------------------------------------------------------------
  */
-
-void sd_printR1 (uint8_t r1);
-
+void sd_PrintR1(uint8_t r1);
 
 /*
  * ----------------------------------------------------------------------------
@@ -290,9 +296,9 @@ void sd_printR1 (uint8_t r1);
  *               function's returned value. The entire returned value can be 
  *               passed to this function without issue. Bits 0 to 7 correspond
  *               to the R1 Response portion of the Initialization Response. To 
- *               read the R1 portion pass initResp to sd_printR1().
+ *               read the R1 portion pass initResp to sd_PrintR1().
  * ----------------------------------------------------------------------------
  */
-void sd_printInitError (uint32_t initErr);
+void sd_PrintInitError(uint32_t initErr);
 
 #endif //SD_SPI_H
