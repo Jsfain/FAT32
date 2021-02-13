@@ -56,6 +56,7 @@ uint8_t fat_SetBPB(BPB *bpb)
   // If 0xFFFFFFFF was returned then locating boot sector failed.
   if (bpb->bootSecAddr != 0xFFFFFFFF)
   {
+    // load the from boot sector into the BootSector array.
     err = FATtoDisk_ReadSingleSector(bpb->bootSecAddr, BootSector);
     if (err == 1) 
       return FAILED_READ_BOOT_SECTOR;

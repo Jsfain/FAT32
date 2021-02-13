@@ -109,7 +109,7 @@ uint32_t FATtoDisk_FindBootSector(void)
 
       //
       // The values in theses byte array positions must be set as indicated
-      // or this is not the boot sector / BPB.
+      // or this is either not the boot sector / BPB, or it is corrupt.
       //
       if (((blckArr[0] == 0xEB && blckArr[2] == 0x90) || blckArr[0] == 0xE9)
             && (blckArr[510] == 0x55 && blckArr[511] == 0xAA))
