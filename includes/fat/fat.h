@@ -49,6 +49,14 @@
 #define ARCHIVE_ATTR           0x20
 #define LN_ATTR_MASK           0x0F
 
+// position of attribute byte relative to first byte of short name entry
+#define ATTR_BYTE_OFFSET       11
+
+//
+// not part of the attribute byte, but first byte of entry
+// is set to 0xE5 if the entry has been marked for deletion. 
+//
+#define DELETED_ENTRY_TOKEN    0xE5
 /* 
  * ----------------------------------------------------------------------------
  *                                                          LONG NAME POSITIONS
@@ -88,11 +96,13 @@
  *               using this module. 
  * ----------------------------------------------------------------------------
  */
-#define ENTRY_LEN              32                /* FAT entry byte length */
+#define ENTRY_LEN              32                // FAT entry byte length
 
 #ifndef SECTOR_LEN
 #define SECTOR_LEN             512               /* must always be 512 here */
 #endif//SECTOR_LEN
+
+#define LAST_ENTPOS_IN_SEC     SECTOR_LEN - ENTRY_LEN
 
 // Value at the FAT index location of the last cluster in a FAT dir or file.
 #define END_CLUSTER            0x0FFFFFFF
@@ -132,7 +142,8 @@
  *                                                        FAT ENTRY FIELD FLAGS
  *
  * Description : Flags to specify which entries should be printed by any FAT 
- *               function that prints directory entries to a screen.
+ *               function that prints directory entries to a screen, e.g. 
+ *               fat_PrintDir().
  * ----------------------------------------------------------------------------
  */
 #define SHORT_NAME             0x01
@@ -145,10 +156,28 @@
 #define FILE_SIZE              0x80
 #define ALL                    0xFF
 
-// set to any value < 256.
-#define PATH_STRING_LEN_MAX    100         /* max length of path string */
-#define LN_STRING_LEN_MAX      100         /* max length of long name string */
-
+/* 
+ * ----------------------------------------------------------------------------
+ *                                                               STRING LENGTHS
+ *
+ * Description : These values are used to specify the max length of strings and
+ *               character arrays associated with long / short names and paths.
+ * 
+ * Notes       : (1) The max path and long name strings should be large enough
+ *                   to hold the longest string that could be loaded into a
+ *                   char aray but must be < 256. 
+ *               (2) The short name and extension values should always be 8 and
+ *                   3, respsectively for the 8.3 form of the FAT short name.
+ *                   If these are used to define the length of an array to hold
+ *                   a string, then must add a position for the NULL char.               
+ * ----------------------------------------------------------------------------
+ */
+#define PATH_STRING_LEN_MAX    100         // max length of path string
+#define LN_STR_LEN_MAX         100         // max length of long name string
+// short names
+#define SN_NAME_STR_LEN        9  // num of bytes occupied by a short name
+#define SN_EXT_STR_LEN         4  // num of bytes occupied by a short name ext
+#define SN_STR_LEN             13 // this is for 8+3 char plus '.' and null.
 /*
  ******************************************************************************     
  *                                 STRUCTS      
@@ -182,11 +211,11 @@
  */
 typedef struct
 {
-  char lnStr[LN_STRING_LEN_MAX];                 // directory long name
-  char lnPathStr[PATH_STRING_LEN_MAX];           // directory long name path
-  char snStr[9];                                 // directory short name
-  char snPathStr[PATH_STRING_LEN_MAX];           // directory short name path
-  uint32_t fstClusIndx;                  // index of directory's first cluster
+  char lnStr[LN_STR_LEN_MAX];           // directory long name
+  char lnPathStr[PATH_STRING_LEN_MAX];  // directory long name path
+  char snStr[SN_NAME_STR_LEN];     // directory short name
+  char snPathStr[PATH_STRING_LEN_MAX];  // directory short name path
+  uint32_t fstClusIndx;                 // index of directory's first cluster
 } 
 FatDir;
 
@@ -209,7 +238,7 @@ FatDir;
  */
 typedef struct
 {
-  char lnStr[LN_STRING_LEN_MAX];                 // entry long name
+  char lnStr[LN_STR_LEN_MAX + 1];                 // entry long name
   char snStr[13];                                // entry short name
   uint8_t snEnt[32];                   // The 32 bytes of the short name entry
   

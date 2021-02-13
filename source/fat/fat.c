@@ -60,11 +60,11 @@ static void     pvt_UpdateFatEntryState(char *lnStr, uint16_t entPos,
 void fat_SetDirToRoot(FatDir *dir, BPB *bpb)
 {
   // Init names and paths to Empty strings by filling string arrays with nulls.
-  for (uint8_t strPos = 0; strPos < LN_STRING_LEN_MAX; strPos++)
+  for (uint8_t strPos = 0; strPos < LN_STR_LEN_MAX; strPos++)
     dir->lnStr[strPos] = '\0';
   for (uint8_t strPos = 0; strPos < PATH_STRING_LEN_MAX; strPos++)
     dir->lnPathStr[strPos] = '\0';
-  for (uint8_t strPos = 0; strPos < 9; strPos++)                                //**** MN
+  for (uint8_t strPos = 0; strPos < SN_NAME_STR_LEN; strPos++)
     dir->snStr[strPos] = '\0';
   for (uint8_t strPos = 0; strPos < PATH_STRING_LEN_MAX; strPos++)
     dir->snPathStr[strPos] = '\0';
@@ -94,9 +94,9 @@ void fat_SetDirToRoot(FatDir *dir, BPB *bpb)
 void fat_InitEntry(FatEntry *ent, BPB *bpb)
 {
   // set long and short name strings to empty by filling with nulls.
-  for(uint8_t strPos = 0; strPos < LN_STRING_LEN_MAX; strPos++)
+  for (uint8_t strPos = 0; strPos < LN_STR_LEN_MAX; strPos++)
     ent->lnStr[strPos] = '\0';
-  for(uint8_t strPos = 0; strPos < 13; strPos++)                                //**** MN
+  for (uint8_t strPos = 0; strPos < SN_STR_LEN; strPos++)              
     ent->snStr[strPos] = '\0';
 
   // fill sn entry array with 0s
@@ -137,9 +137,11 @@ void fat_InitEntry(FatEntry *ent, BPB *bpb)
 uint8_t fat_SetNextEntry(FatDir *currDir, FatEntry *currEnt, BPB *bpb)
 {
   // store required bpb member values in local constant variables.
-  const uint16_t bps  = bpb->bytesPerSec;
-  const uint8_t  spc  = bpb->secPerClus;
+  const uint32_t rci  = bpb->rootClus;      // root cluster index should be 2
+  const uint16_t bps  = bpb->bytesPerSec;   // should be 512 
+  const uint8_t  spc  = bpb->secPerClus;              
   const uint32_t drfs = bpb->dataRegionFirstSector;
+
 
   //
   // capture currEnt state in local vars. These variables will be updated by
@@ -173,7 +175,7 @@ uint8_t fat_SetNextEntry(FatDir *currDir, FatEntry *currEnt, BPB *bpb)
   uint8_t  currSecArr[bps];                 // current 512 byte sector
   uint8_t  nextSecArr[bps];                 // next 512 byte sector
   uint8_t  attrByte;                        // entry attribute byte. (byte 11)
-  char     lnStr[LN_STRING_LEN_MAX];        // array for long name string
+  char     lnStr[LN_STR_LEN_MAX];           // array for long name string
   uint8_t  lnStrIndx = 0;                   // for loading long name into lnStr
 
   //
@@ -235,11 +237,10 @@ uint8_t fat_SetNextEntry(FatDir *currDir, FatEntry *currEnt, BPB *bpb)
       currSecNumInClusStartFlag = 0;
 
       // load the current sector into currSecArr[].
-      currSecNumPhys = currSecNumInClus + drfs + (clusIndx - 2) * spc;         //****** MN
+      currSecNumPhys = currSecNumInClus + drfs + (clusIndx - rci) * spc;
       err = FATtoDisk_ReadSingleSector(currSecNumPhys, currSecArr);
-      if (err == 1)                                                            //****** MN
+      if (err == 1)
         return FAILED_READ_SECTOR;
-      
 
       //
       // Similar to currSecNumInClus flag, this flag will be set to 0, thus set
@@ -249,7 +250,7 @@ uint8_t fat_SetNextEntry(FatDir *currDir, FatEntry *currEnt, BPB *bpb)
       // wherever currEnt is pointing. All subsequent iterations of the loop 
       // should start at 0. 
       // 
-      if (entryPosStartFlag == 0)                                              //****** MN
+      if (entryPosStartFlag == 0)
         entPos = 0;
 
       // Sector loop. Loop through the entries in the sector.
@@ -270,7 +271,7 @@ uint8_t fat_SetNextEntry(FatDir *currDir, FatEntry *currEnt, BPB *bpb)
           int tempSecPos = snPosCurrSec; 
 
           // greater than the value of the last entry position in a sector
-          if (snPosCurrSec >= SECTOR_LEN - ENTRY_LEN)                            // ****** could have a LAST_ENTRY_POSITION macro?
+          if (snPosCurrSec >= LAST_ENTPOS_IN_SEC)
           {
             // get next sector if entPos does not point to sector's first entry
             if (entPos != 0) 
@@ -294,14 +295,14 @@ uint8_t fat_SetNextEntry(FatDir *currDir, FatEntry *currEnt, BPB *bpb)
         // reset
         lnFlags = 0;
 
-        // If first value of entry is 0, rest of entries should be empty.
+        // if first value of entry is 0, rest of entries should be empty
         if (currSecArr[entPos] == 0) 
           return END_OF_DIRECTORY;
 
-        // if entPos is not a deleted entry. Deleted = 0xE5 in first byte of sn
-        if (currSecArr[entPos] != 0xE5)
+        // only continue with current entry if it has not marked for deletion
+        if (currSecArr[entPos] != DELETED_ENTRY_TOKEN)
         {
-          attrByte = currSecArr[entPos + 11];                                   // ******** MN
+          attrByte = currSecArr[entPos + ATTR_BYTE_OFFSET];
 
           // if entPos points to a long name entry?
           if ((attrByte & LN_ATTR_MASK) == LN_ATTR_MASK)
@@ -311,7 +312,7 @@ uint8_t fat_SetNextEntry(FatDir *currDir, FatEntry *currEnt, BPB *bpb)
               return CORRUPT_FAT_ENTRY;
 
             // reset lnStr as array of nulls.
-            for (uint8_t strPos = 0; strPos < LN_STRING_LEN_MAX; strPos++) 
+            for (uint8_t strPos = 0; strPos < LN_STR_LEN_MAX; strPos++) 
               lnStr[strPos] = '\0';
             
             // reset
@@ -342,20 +343,20 @@ uint8_t fat_SetNextEntry(FatDir *currDir, FatEntry *currEnt, BPB *bpb)
               //
               if (currSecNumInClus >= spc - 1)
               {
-                uint32_t temp;         // using temp just to make more readable
-                temp = pvt_GetNextClusIndex(clusIndx, bpb);
-                nextSecNumPhys = drfs + (temp - 2) * spc;
+                // nextClusIndx used to improve readability.
+                uint32_t nextClusIndx = pvt_GetNextClusIndex(clusIndx, bpb);
+                nextSecNumPhys = drfs + (nextClusIndx - rci) * spc;
               }
               else 
                 nextSecNumPhys = 1 + currSecNumPhys;
               
               err = FATtoDisk_ReadSingleSector(nextSecNumPhys, nextSecArr);
-              if (err == 1)                                                   // ***** MN
+              if (err == 1)
                 return FAILED_READ_SECTOR;
               
               // specify location of the short name entry in the next sector
               snPosNextSec = snPosCurrSec - bps;
-              attrByte = nextSecArr[snPosNextSec + 11];                       // ***** MN - Attrbyte
+              attrByte = nextSecArr[snPosNextSec + ATTR_BYTE_OFFSET];
 
               // Verify snPosNextSec does not point to long name
               if ((attrByte & LN_ATTR_MASK) == LN_ATTR_MASK)
@@ -378,10 +379,10 @@ uint8_t fat_SetNextEntry(FatDir *currDir, FatEntry *currEnt, BPB *bpb)
                 // the long name portion in the current sector. This should
                 // begin at entPos.
                 //
-                pvt_LoadLongName(snPosNextSec - ENTRY_LEN, 0,
-                                 nextSecArr, lnStr, &lnStrIndx);
-                pvt_LoadLongName(SECTOR_LEN - ENTRY_LEN, entPos, 
-                                 currSecArr, lnStr, &lnStrIndx);
+                pvt_LoadLongName(snPosNextSec - ENTRY_LEN, 0, nextSecArr,
+                                 lnStr, &lnStrIndx);
+                pvt_LoadLongName(LAST_ENTPOS_IN_SEC, entPos, currSecArr, 
+                                 lnStr, &lnStrIndx);
 
                 // update the currEnt members with values for the 'next' entry.
                 pvt_UpdateFatEntryState(lnStr, entPos, currSecNumInClus, 
@@ -397,13 +398,14 @@ uint8_t fat_SetNextEntry(FatDir *currDir, FatEntry *currEnt, BPB *bpb)
               else if (lnFlags & LN_LAST_SEC_ENTRY)
               {
                 // Entry preceeding short name must be first entry of long name
-                if ((currSecArr[SECTOR_LEN - ENTRY_LEN] & LN_ORD_MASK) != 1)    // ****** could have a LAST_ENTRY_POSITION macro?
+                if ((currSecArr[LAST_ENTPOS_IN_SEC] & LN_ORD_MASK) != 1)
                   return CORRUPT_FAT_ENTRY;
 
                 // load long name into lnStr[]
-                pvt_LoadLongName(SECTOR_LEN - ENTRY_LEN, entPos,               // ****** could have a LAST_ENTRY_POSITION macro?
-                                 currSecArr, lnStr, &lnStrIndx);
+                pvt_LoadLongName(LAST_ENTPOS_IN_SEC, entPos, currSecArr,       
+                                 lnStr, &lnStrIndx);
                 
+                // update the currEnt members with values for the 'next' entry.
                 pvt_UpdateFatEntryState(lnStr, entPos, currSecNumInClus, 
                                         clusIndx, snPosCurrSec, snPosNextSec,
                                         lnFlags, nextSecArr, currEnt);
@@ -416,7 +418,7 @@ uint8_t fat_SetNextEntry(FatDir *currDir, FatEntry *currEnt, BPB *bpb)
             // Long and short name are in the current sector.
             else
             {   
-              attrByte = currSecArr[snPosCurrSec + 11];
+              attrByte = currSecArr[snPosCurrSec + ATTR_BYTE_OFFSET];
               
               // Verify snPosNextSec does not point to long name
               if ((attrByte & LN_ATTR_MASK) == LN_ATTR_MASK)
@@ -429,7 +431,8 @@ uint8_t fat_SetNextEntry(FatDir *currDir, FatEntry *currEnt, BPB *bpb)
               // load long name into lnStr[]
               pvt_LoadLongName(snPosCurrSec - ENTRY_LEN, entPos, currSecArr, 
                                lnStr, &lnStrIndx);
-
+              
+              // update the currEnt members with values for the 'next' entry.
               pvt_UpdateFatEntryState(lnStr, entPos, currSecNumInClus, 
                                       clusIndx, snPosCurrSec, snPosNextSec,
                                       lnFlags, currSecArr, currEnt);
@@ -440,7 +443,9 @@ uint8_t fat_SetNextEntry(FatDir *currDir, FatEntry *currEnt, BPB *bpb)
           // Long name does not exist. Use short name instead.
           else
           {
-            attrByte = currSecArr[entPos + 11];                                // ******** MS AttrByte
+            attrByte = currSecArr[entPos + ATTR_BYTE_OFFSET];
+
+            // update the currEnt members with values for the 'next' entry.
             pvt_UpdateFatEntryState(lnStr, entPos, currSecNumInClus, clusIndx,
                                     entPos, snPosNextSec, lnFlags, currSecArr,
                                     currEnt);
@@ -453,8 +458,7 @@ uint8_t fat_SetNextEntry(FatDir *currDir, FatEntry *currEnt, BPB *bpb)
   // get index of the next cluster and continue looping if not last cluster 
   while ((clusIndx = pvt_GetNextClusIndex(clusIndx, bpb)) != END_CLUSTER);
 
-  // return here if the end of the directory 
-  // was reached without finding the next entry.
+  // return here if the end of the dir was reached without finding next entry.
   return END_OF_DIRECTORY;
 }
 
@@ -850,7 +854,7 @@ static void pvt_UpdateFatEntryState(char *lnStr, uint16_t entPos,
     strcpy(ent->lnStr, sn);
   else
   {
-    for (uint8_t i = 0; i < LN_STRING_LEN_MAX; i++)
+    for (uint8_t i = 0; i < LN_STR_LEN_MAX; i++)
     {
       ent->lnStr[i] = lnStr[i];
       if (*lnStr == '\0') 
@@ -875,7 +879,7 @@ static void pvt_UpdateFatEntryState(char *lnStr, uint16_t entPos,
 static uint8_t pvt_CheckName(char *nameStr)
 {
   // check that long name is not too large for current settings.
-  if (strlen (nameStr) > LN_STRING_LEN_MAX) 
+  if (strlen (nameStr) > LN_STR_LEN_MAX) 
     return 1;
   
   // illegal if empty string or begins with a space char
