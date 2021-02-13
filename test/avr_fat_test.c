@@ -129,6 +129,7 @@ int main(void)
     // are used to calculate where on the physical disk volume, the FAT 
     // sectors/blocks are located. This should only be set once here.
     //
+    
     BPB *bpbPtr = malloc(sizeof(BPB));
     err = fat_SetBPB (bpbPtr);
     if (err != BOOT_SECTOR_VALID)
@@ -136,7 +137,8 @@ int main(void)
       print_Str("\n\r fat_SetBPB() returned ");
       fat_PrintBootSectorError(err);
     }
-   
+    
+
     //
     // Create and set a FatDir instance. Members of this instance are used for
     // holding parameters of a FAT directory. This instance can be treated as

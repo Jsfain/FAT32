@@ -36,97 +36,101 @@ static uint8_t pvt_GetCardType(void);
  *                                                             FIND BOOT SECTOR
  *                                 
  * Description : Finds the address of the boot sector on the FAT32-formatted 
- *               SD card. This function is used by fat_setBPB().
+ *               SD card. This function is used by fat_SetBPB().
  * 
  * Arguments   : void
  * 
  * Returns     : Address of the boot sector on the SD card.
+ * 
+ * Notes       : The search for the boot sector will search a total of
+ *               'maxNumOfBlcksToChck' starting at 'startBlckNum'.
  * ----------------------------------------------------------------------------
  */
 uint32_t FATtoDisk_FindBootSector(void)
 {
-  uint8_t  block[512];
-  uint16_t timeout = 0;
-  uint8_t  r1;
-  uint8_t  bsflag = 0;
-  uint32_t startBlckNum = 0;
-  uint32_t maxNumOfBlcksToChck = 10;
-  uint32_t blckNum = 0;
-  uint8_t  cardType;
-  uint16_t addrMult;                             // address multiplier
+  // search range variables
+  const uint32_t maxNumOfBlcksToChck = 50;  // total num of blocks to search
+  const uint32_t startBlckNum = 0;          // block num to start the search
 
-  // Determine card type.
-  cardType = pvt_GetCardType();
-  if (cardType == SDHC)                          // SDHC is block addressable
-    addrMult = 1;
-  else                                           // SDSC byte addressable
+  // other
+  uint32_t blckNum;                         // return value. Block num of BS
+  uint8_t  r1;                              // R1 response
+
+  //
+  // Determine card type. If SDHC then the SD card is block addressable and
+  // the block number will be the address of the block. If SDSC then the card
+  // is byte addressable, in which case the address of the block is the number
+  // of the first byte in the block, thus the address would be found by
+  // multiplying the number of the first byte in the block by BLOCK_LEN (=512).
+  // 
+  uint16_t addrMult = 1;                    // init for SDHC. Block addressable
+  if (pvt_GetCardType() == SDSC)            // SDSC is block addressable
     addrMult = BLOCK_LEN;
   
+  // Send the READ MULTIPLE BLOCK command and confirm R1 Response is good.
   CS_SD_LOW;
-  sd_SendCommand (READ_MULTIPLE_BLOCK, startBlckNum * addrMult); 
-  r1 = sd_GetR1();
-  if (r1 > 0)
+  sd_SendCommand(READ_MULTIPLE_BLOCK, startBlckNum * addrMult); 
+  if ((r1 = sd_GetR1()) > OUT_OF_IDLE)
   {
     CS_SD_HIGH
-    print_Str ("\n\r R1 ERROR = "); 
-    sd_PrintR1 (r1);
+    print_Str("\n\r R1 ERROR = "); 
+    sd_PrintR1(r1);
+    return 0xFFFFFFFF;                      // return failed token
   }
-
-  if (r1 == 0)
-  {
-    blckNum = startBlckNum * addrMult;
+  else
+  {  
+    blckNum = startBlckNum * addrMult;      // block address / number
     do
     {   
-      timeout = 0;
-      while (sd_ReceiveByteSPI() != 0xFE)        // wait for start block token
+      uint8_t  blckArr[BLOCK_LEN];          // to hold the block data bytes
+      uint16_t timeout = 0;
+
+      //
+      // 0xFE is the Start Block Token. This token is sent by the
+      // SD Card to signal data that it is about to start sending data.
+      //
+      while (sd_ReceiveByteSPI() != 0xFE)
       {
         timeout++;
-        if (timeout > 0xFE) 
-          print_Str ("\n\rSTART_TOKEN_TIMEOUT");
-      }
-
-      block[0] = sd_ReceiveByteSPI();
-      if (block[0] == 0xEB || block[0] == 0xE9)
-      {
-        for (uint16_t k = 1; k < BLOCK_LEN; k++) 
-          block[k] = sd_ReceiveByteSPI();
-
-        if ((block[0] == 0xEB && block[2] == 0x90) || block[0] == 0xE9)
-        {
-          if (block[510] == 0x55 && block[511] == 0xAA) 
-          { 
-            bsflag = 1; 
-            break; 
-          }
+        if (timeout > TIMEOUT_LIMIT)
+        { 
+          print_Str("\n\rSTART_TOKEN_TIMEOUT");
+          return 0xFFFFFFFF;                // return failed token
         }
       }
 
-      else
+      // load all bytes of the sector into the block array
+      for (uint16_t byteNum = 0; byteNum < BLOCK_LEN; byteNum++) 
+        blckArr[byteNum] = sd_ReceiveByteSPI();
+      
+      // 16-bit CRC. CRC is off (default) so these values do not matter.
+      sd_ReceiveByteSPI(); 
+      sd_ReceiveByteSPI(); 
+
+      //
+      // The values in theses byte array positions must be set as indicated
+      // or this is not the boot sector / BPB.
+      //
+      if (((blckArr[0] == 0xEB && blckArr[2] == 0x90) || blckArr[0] == 0xE9)
+            && (blckArr[510] == 0x55 && blckArr[511] == 0xAA))
       {
-        for (uint16_t k = 1; k < BLOCK_LEN; k++) 
-          sd_ReceiveByteSPI();
+        // Successfully found the boot sector!
+        sd_SendCommand(STOP_TRANSMISSION, 0);   // stop sending data blocks.
+        sd_ReceiveByteSPI();                     // R1B resp. Don't care.
+        CS_SD_HIGH;
+        return blckNum;                          // return success!
       }
 
-      // get CRC
-      for (uint8_t k = 0; k < 2; k++) 
-        sd_ReceiveByteSPI(); 
-      
       blckNum++;
     }
-    while (blckNum * addrMult 
-           < (startBlckNum + maxNumOfBlcksToChck) * addrMult);
-    
-    sd_SendCommand (STOP_TRANSMISSION, 0);
-
-    // Get the R1b response. Value doesn't matter.
-    sd_ReceiveByteSPI(); 
+    while (blckNum < startBlckNum + maxNumOfBlcksToChck);
   }
+  
+  // FAILED to find BS in the set block range.
+  sd_SendCommand(STOP_TRANSMISSION, 0);          // stop sending data blocks.
+  sd_ReceiveByteSPI();                            // R1B resp. Don't care.
   CS_SD_HIGH;
-
-  if (bsflag == 1) 
-    return blckNum;                              // success
-  else 
-    return 0xFFFFFFFF;                           // failed token
+  return 0xFFFFFFFF;                              // return failed token
 }
 
 /* 
@@ -147,32 +151,26 @@ uint32_t FATtoDisk_FindBootSector(void)
  *               1 if failure.
  * ----------------------------------------------------------------------------
  */
-uint8_t FATtoDisk_ReadSingleSector(uint32_t addr, uint8_t *arr)
+uint8_t FATtoDisk_ReadSingleSector(uint32_t blckNum, uint8_t *blckArr)
 {
-  uint8_t  cardType;
-  uint16_t err;
-  uint8_t  db[512];
-  uint32_t blckNum = addr;
+  //
+  // Determine card type. If SDHC then the SD card is block addressable and
+  // the block number will be the address of the block. If SDSC then the card
+  // is byte addressable, in which case the address of the block is the number
+  // of the first byte in the block, thus the address would be found by
+  // multiplying the number of the first byte in the block by BLOCK_LEN (=512).
+  // 
+  uint16_t addrMult = 1;                    // init for SDHC. Block addressable
+  if (pvt_GetCardType() == SDSC)            // SDSC is block addressable
+    addrMult = BLOCK_LEN;
 
-  // determine if card is SDSC or SDHC/SDXC
-  cardType = pvt_GetCardType();
+  // Load data block into array by passing the array to the Read Block function
+  if (sd_ReadSingleBlock(blckNum * addrMult, blckArr) == READ_SUCCESS)
+    // success
+    return 0; 
 
-  
-  if (cardType == SDHC)                          // SDHC is block addressable
-    err = sd_ReadSingleBlock (blckNum, db);
-  else                                           // SDSC is byte addressable
-    err = sd_ReadSingleBlock (blckNum * BLOCK_LEN, db);
-
-  // failed
-  if (err != READ_SUCCESS)
-    return 1;                                  
-  
-  // load contents of data block into *arr
-  for (int k = 0; k < 512; k++)
-    arr[k] = db[k];
-        
-  // success
-  return 0;
+  // fail
+  return 1;
 };
 
 /*
@@ -191,28 +189,25 @@ uint8_t FATtoDisk_ReadSingleSector(uint32_t addr, uint8_t *arr)
  * Returns     : SD card type - SDSC or SDHC.
  * ----------------------------------------------------------------------------
  */
-static uint8_t pvt_GetCardType()
+
+static uint8_t pvt_GetCardType(void)
 {
-  uint8_t r1 = 0;
   uint8_t cardType;
   uint8_t resp;
   uint8_t timeout = 0;
 
   CS_SD_LOW;
-  sd_SendCommand (SEND_CSD, 0);
-  r1 = sd_GetR1();
-
-  // error getting CSD
-  if (r1 > 0) 
+  sd_SendCommand(SEND_CSD, 0);
+  if (sd_GetR1() > OUT_OF_IDLE) 
   { 
     CS_SD_HIGH; 
-    return 0xFF;                             
+    return 0xFF;                            // R1 error. Failed to get the CSD                       
   }
-
   // Get CSD version to determine if card is SDHC or SDSC
   do
   {
     resp = sd_ReceiveByteSPI();
+    // if bit 6 of first CSD byte is 0 --> SDSC or 1 --> SDHC. 
     if (resp >> 6 == 0) 
     { 
       cardType = SDSC; 
@@ -223,14 +218,15 @@ static uint8_t pvt_GetCardType()
       cardType = SDHC; 
       break; 
     } 
-    
-    if (timeout++ >= 0xFF)
+    // if timeout is reached
+    if (timeout++ >= TIMEOUT_LIMIT)
     { 
-      // Ensure any portion of CSD sent is read in to clear out register.
-      for(int k = 0; k < 20; k++) 
+      // Receive rest of CSD bytes. No used.
+      for(int byteNum = 0; byteNum < 20; byteNum++) 
         sd_ReceiveByteSPI();
 
       CS_SD_HIGH;
+
       // timeout fail
       return 0xFF;                               
     }
@@ -238,10 +234,11 @@ static uint8_t pvt_GetCardType()
   while(1);
 
   // Not used, but should read in rest of CSD.
-  for(int k = 0; k < 20; k++) 
+  for(int byteNum = 0; byteNum < 20; byteNum++) 
     sd_ReceiveByteSPI();
   
   CS_SD_HIGH;
 
+  // success
   return cardType;
 }

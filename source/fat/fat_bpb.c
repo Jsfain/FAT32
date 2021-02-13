@@ -41,6 +41,8 @@
  *               functions that access the FAT volume, therefore this function 
  *               should be called first, before implementing any other parts of
  *               the FAT module.
+ * 
+ * Limitation  : Only works if Boot Sector is sector 0 on the physical disk. 
  * ----------------------------------------------------------------------------
  */
 uint8_t fat_SetBPB(BPB *bpb)
@@ -62,8 +64,8 @@ uint8_t fat_SetBPB(BPB *bpb)
     return BOOT_SECTOR_NOT_FOUND;
   
   //
-  // The last 2 bytes of the Boot Sector / BPB are the signature bytes. The
-  // values of these should be 0x55 and 0xAA.
+  // The last 2 bytes of the Boot Sector / BPB are signature bytes. The values
+  // of these should be 0x55 and 0xAA.
   //
   if (BootSector[SECTOR_LEN - 2] == 0x55 && BootSector[SECTOR_LEN - 1] == 0xAA)
   {
@@ -72,11 +74,11 @@ uint8_t fat_SetBPB(BPB *bpb)
     bpb->bytesPerSec <<= 8;                 
     bpb->bytesPerSec |= BootSector[11];
     
-    // currently only Bytes Per Sector = 512 (=SECTOR_LEN) can be implemented.
+    // currently Bytes Per Sector must 512 (=SECTOR_LEN).
     if (bpb->bytesPerSec != SECTOR_LEN)
       return INVALID_BYTES_PER_SECTOR;
 
-    // byte 13 of the BPB is SPC
+    // byte 13 of the BPB is the Sectors Per Cluster value
     bpb->secPerClus = BootSector[13];
     
     // Only numbers listed below are valid for the Sectors Per Cluster value.
@@ -154,28 +156,28 @@ void fat_PrintBootSectorError(uint8_t err)
   switch(err)
   {
     case BOOT_SECTOR_VALID: 
-      print_Str ("BOOT_SECTOR_VALID ");
+      print_Str("BOOT_SECTOR_VALID ");
       break;
     case CORRUPT_BOOT_SECTOR:
-      print_Str ("CORRUPT_BOOT_SECTOR ");
+      print_Str("CORRUPT_BOOT_SECTOR ");
       break;
     case NOT_BOOT_SECTOR:
-      print_Str ("NOT_BOOT_SECTOR ");
+      print_Str("NOT_BOOT_SECTOR ");
       break;
     case INVALID_BYTES_PER_SECTOR:
-      print_Str ("INVALID_BYTES_PER_SECTOR");
+      print_Str("INVALID_BYTES_PER_SECTOR");
       break;
     case INVALID_SECTORS_PER_CLUSTER:
-      print_Str ("INVALID_SECTORS_PER_CLUSTER");
+      print_Str("INVALID_SECTORS_PER_CLUSTER");
       break;
     case BOOT_SECTOR_NOT_FOUND:
-      print_Str ("BOOT_SECTOR_NOT_FOUND");
+      print_Str("BOOT_SECTOR_NOT_FOUND");
       break;
     case FAILED_READ_BOOT_SECTOR:
-      print_Str ("FAILED_READ_BOOT_SECTOR");
+      print_Str("FAILED_READ_BOOT_SECTOR");
       break;
     default:
-      print_Str ("UNKNOWN_ERROR");
+      print_Str("UNKNOWN_ERROR");
       break;
   }
 }
