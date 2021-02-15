@@ -33,44 +33,44 @@
  * Arguments   : bpb     Pointer to an instance of a BPB struct. This function
  *                       will set the members of this instance.
  * 
- * Returns     : Boot Sector Error Flag. If any value other than
- *               BOOT_SECTOR_VALID is returned then setting the BPB instance 
- *               failed. To print, pass to fat_PrintBootSectorError().
+ * Returns     : Boot Sector Error Flag. If any value other than BPB_VALID is
+ *               returned then setting the BPB instance failed. To print, pass
+ *               to the returned value to fat_PrintErrorBPB().
  * 
  * Notes       : A valid BPB struct instance is a required argument of many 
  *               functions that access the FAT volume, therefore this function 
  *               should be called first, before implementing any other parts of
  *               the FAT module.
  * 
- * Limitation  : Only works if Boot Sector is sector 0 on the physical disk. 
+ * Limitation  : Only works if Boot Sector, which contains the BPB, is sector 0 
+ *               on the physical disk. 
  * ----------------------------------------------------------------------------
  */
 uint8_t fat_SetBPB(BPB *bpb)
 {
-  uint8_t BootSector[SECTOR_LEN];
+  // array to hold contents of the Boot Sector, which contains the BPB.
+  uint8_t BootSector[SECTOR_LEN];    
   uint8_t err;
 
   // Locate boot sector address on the disk. 
   bpb->bootSecAddr = FATtoDisk_FindBootSector();
-  
-  // If 0xFFFFFFFF was returned then locating boot sector failed.
-  if (bpb->bootSecAddr != 0xFFFFFFFF)
+  if (bpb->bootSecAddr != FAILED_FIND_BOOT_SECTOR)
   {
     // load the from boot sector into the BootSector array.
     err = FATtoDisk_ReadSingleSector(bpb->bootSecAddr, BootSector);
     if (err == 1) 
-      return FAILED_READ_BOOT_SECTOR;
+      return FAILED_READ_BPB;
   }
   else
-    return BOOT_SECTOR_NOT_FOUND;
+    return BPB_NOT_FOUND;
   
   //
-  // The last 2 bytes of the Boot Sector / BPB are signature bytes. The values
-  // of these should be 0x55 and 0xAA.
+  // The last 2 bytes of the Boot Sector are signature bytes. The values of
+  // of these must be 0x55 and 0xAA.
   //
   if (BootSector[SECTOR_LEN - 2] == 0x55 && BootSector[SECTOR_LEN - 1] == 0xAA)
   {
-    // bytes 11 and 12 of BPB block contain the Bytes Per Sector value.
+    // bytes 11 and 12 of BS / BPB contain the Bytes Per Sector value.
     bpb->bytesPerSec = BootSector[12];      
     bpb->bytesPerSec <<= 8;                 
     bpb->bytesPerSec |= BootSector[11];
@@ -79,7 +79,7 @@ uint8_t fat_SetBPB(BPB *bpb)
     if (bpb->bytesPerSec != SECTOR_LEN)
       return INVALID_BYTES_PER_SECTOR;
 
-    // byte 13 of the BPB is the Sectors Per Cluster value
+    // byte 13 of the BS / BPB is the Sectors Per Cluster value
     bpb->secPerClus = BootSector[13];
     
     // Only numbers listed below are valid for the Sectors Per Cluster value.
@@ -91,16 +91,16 @@ uint8_t fat_SetBPB(BPB *bpb)
       return INVALID_SECTORS_PER_CLUSTER;
     }
 
-    // bytes 14 and 15 of the BPB are the Reserved Sector Count
+    // bytes 14 and 15 of the BS / BPB are the Reserved Sector Count
     bpb->rsvdSecCnt = BootSector[15];
     bpb->rsvdSecCnt <<= 8;
     bpb->rsvdSecCnt |= BootSector[14];
 
-    // byte 16 of the BPB give the total number of FAT in the volume
+    // byte 16 of the BS / BPB give the total number of FAT in the volume
     bpb->numOfFats = BootSector[16];
 
     //
-    // bytes 36 to 39 of the BPB give the size of a single FAT in a FAT32
+    // bytes 36 to 39 of the BS / BPB give the size of a single FAT in a FAT32
     // volume. The size is the total sector count required by a single FAT.
     //
     bpb->fatSize32 =  BootSector[39];
@@ -112,7 +112,7 @@ uint8_t fat_SetBPB(BPB *bpb)
     bpb->fatSize32 |= BootSector[36];
 
     // 
-    // bytes 44 to 47 of the BPB give the cluster number of the root directory
+    // bytes 44 to 47 of the BS / BPB give the cluster number of the root dir
     // in the FAT32 volume. This value is the index of the cluster in the FAT.
     // The value should be 2 or the first usable (not bad) cluster available
     // after that.
@@ -130,40 +130,39 @@ uint8_t fat_SetBPB(BPB *bpb)
     // first sector of the FAT32 volume's Data Region. Since the first cluster
     // of the Data Region is the Root Directory, this value points to the 
     // absolute physical sector number of the Root Directory. The value is
-    // calculated from the parameter values of the BPB.
+    // calculated from BPB parameter values.
     //
     bpb->dataRegionFirstSector = bpb->bootSecAddr + bpb->rsvdSecCnt 
                                   + (bpb->numOfFats * bpb->fatSize32);
-    
-    return BOOT_SECTOR_VALID;
+    return BPB_VALID;
   }
   else 
-    return NOT_BOOT_SECTOR;
+    return NOT_BPB;
 }
 
 /*
  * ----------------------------------------------------------------------------
- *                                                 PRINT BOOT SECTOR ERROR FLAG 
+ *                                       PRINT BIOS PARAMETER BLOCK ERROR FLAGS 
  * 
- * Description : Print the Boot Sector Error Flag. 
+ * Description : Print the Bios Parameter Block Error Flag. 
  * 
- * Arguments   : err     boot sector error flag(s).
+ * Arguments   : err     BPB error flag(s).
  * 
  * Returns     : void
  * ----------------------------------------------------------------------------
  */
-void fat_PrintBootSectorError(uint8_t err)
+void fat_PrintErrorBPB(uint8_t err)
 {  
   switch(err)
   {
-    case BOOT_SECTOR_VALID: 
-      print_Str("BOOT_SECTOR_VALID ");
+    case BPB_VALID:
+      print_Str("BPB_VALID ");
       break;
-    case CORRUPT_BOOT_SECTOR:
-      print_Str("CORRUPT_BOOT_SECTOR ");
+    case CORRUPT_BPB:
+      print_Str("CORRUPT_BPB ");
       break;
-    case NOT_BOOT_SECTOR:
-      print_Str("NOT_BOOT_SECTOR ");
+    case NOT_BPB:
+      print_Str("NOT_BPB ");
       break;
     case INVALID_BYTES_PER_SECTOR:
       print_Str("INVALID_BYTES_PER_SECTOR");
@@ -171,11 +170,11 @@ void fat_PrintBootSectorError(uint8_t err)
     case INVALID_SECTORS_PER_CLUSTER:
       print_Str("INVALID_SECTORS_PER_CLUSTER");
       break;
-    case BOOT_SECTOR_NOT_FOUND:
-      print_Str("BOOT_SECTOR_NOT_FOUND");
+    case BPB_NOT_FOUND:
+      print_Str("BPB_NOT_FOUND");
       break;
-    case FAILED_READ_BOOT_SECTOR:
-      print_Str("FAILED_READ_BOOT_SECTOR");
+    case FAILED_READ_BPB:
+      print_Str("FAILED_READ_BPB");
       break;
     default:
       print_Str("UNKNOWN_ERROR");

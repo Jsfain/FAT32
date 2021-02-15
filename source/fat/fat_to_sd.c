@@ -64,7 +64,7 @@ uint32_t FATtoDisk_FindBootSector(void)
   // multiplying the number of the first byte in the block by BLOCK_LEN (=512).
   // 
   uint16_t addrMult = 1;                    // init for SDHC. Block addressable
-  if (pvt_GetCardType() == SDSC)            // SDSC is block addressable
+  if (pvt_GetCardType() == SDSC)            // SDSC --> byte addressable
     addrMult = BLOCK_LEN;
   
   // Send the READ MULTIPLE BLOCK command and confirm R1 Response is good.
@@ -73,9 +73,9 @@ uint32_t FATtoDisk_FindBootSector(void)
   if ((r1 = sd_GetR1()) > OUT_OF_IDLE)
   {
     CS_SD_HIGH
-    print_Str("\n\r R1 ERROR = "); 
-    sd_PrintR1(r1);
-    return 0xFFFFFFFF;                      // return failed token
+    //print_Str("\n\r R1 ERROR = "); 
+    //sd_PrintR1(r1);
+    return FAILED_FIND_BOOT_SECTOR;
   }
   else
   {  
@@ -95,7 +95,7 @@ uint32_t FATtoDisk_FindBootSector(void)
         if (timeout > TIMEOUT_LIMIT)
         { 
           print_Str("\n\rSTART_TOKEN_TIMEOUT");
-          return 0xFFFFFFFF;                // return failed token
+          return FAILED_FIND_BOOT_SECTOR;
         }
       }
 
@@ -128,9 +128,9 @@ uint32_t FATtoDisk_FindBootSector(void)
   
   // FAILED to find BS in the set block range.
   sd_SendCommand(STOP_TRANSMISSION, 0);          // stop sending data blocks.
-  sd_ReceiveByteSPI();                            // R1B resp. Don't care.
+  sd_ReceiveByteSPI();                           // R1B resp. Don't care.
   CS_SD_HIGH;
-  return 0xFFFFFFFF;                              // return failed token
+  return FAILED_FIND_BOOT_SECTOR;                // return failed token
 }
 
 /* 
@@ -147,8 +147,8 @@ uint32_t FATtoDisk_FindBootSector(void)
  *                        contents of the sector/block on the SD card at 
  *                        address, addr.
  * 
- * Returns     : 0 if successful.
- *               1 if failure.
+ * Returns     : READ_SECTOR_SUCCES if successful.
+ *               READ_SECTOR_FAILED if failure.
  * ----------------------------------------------------------------------------
  */
 uint8_t FATtoDisk_ReadSingleSector(uint32_t blckNum, uint8_t *blckArr)
@@ -166,11 +166,9 @@ uint8_t FATtoDisk_ReadSingleSector(uint32_t blckNum, uint8_t *blckArr)
 
   // Load data block into array by passing the array to the Read Block function
   if (sd_ReadSingleBlock(blckNum * addrMult, blckArr) == READ_SUCCESS)
-    // success
-    return 0; 
-
-  // fail
-  return 1;
+    return FTD_READ_SECTOR_SUCCESS; 
+  else
+    return FTD_READ_SECTOR_FAILED;
 };
 
 /*

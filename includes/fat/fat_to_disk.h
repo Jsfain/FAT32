@@ -17,21 +17,46 @@
 
 /*
  ******************************************************************************
+ *                                 MACROS
+ ******************************************************************************
+ */
+
+//
+// If FATtoDisk_FindBootSector() is successful it will return the physical 
+// location of the boot sector (i.e. it's block/sector address on the disk).
+// If the boot sector is not found it should return this value here. This is 
+// set to the highest possible 32-bit integer because the boot sector should 
+// never be found here, and if it is, then it would be pointless, as nothing 
+// could exist at a higher address.
+// 
+#define FAILED_FIND_BOOT_SECTOR    0xFFFFFFFF
+
+//
+// values returned by FATtoDisk_ReadSingleSector(). Specify with FTD_ to
+// indicate that this is from the FATtoDisk files.
+//
+#define FTD_READ_SECTOR_SUCCESS        0
+#define FTD_READ_SECTOR_FAILED         1
+
+/*
+ ******************************************************************************
  *                            FUNCTION PROTOTYPES
  ******************************************************************************
  */
 
-/* 
+/*
  * ----------------------------------------------------------------------------
  *                                                             FIND BOOT SECTOR
- *                                        
- * Description : This function must be implemented locate the address of the 
- *               FAT boot sector on a FAT32-formatted disk. This function is 
- *               used by fat_setBPB().
+ *                                 
+ * Description : Finds the address of the boot sector on the FAT32-formatted 
+ *               SD card. This function is used by fat_SetBPB().
  * 
  * Arguments   : void
  * 
- * Returns     : address of the boot sector on the physical disk.
+ * Returns     : Address of the boot sector on the SD card.
+ * 
+ * Notes       : The search for the boot sector will search a total of
+ *               'maxNumOfBlcksToChck' starting at 'startBlckNum'.
  * ----------------------------------------------------------------------------
  */
 uint32_t FATtoDisk_FindBootSector(void);

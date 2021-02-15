@@ -27,8 +27,8 @@
  *
  * Description : The expected value of a FAT32 sector length, in bytes. 
  *       
- * Notes       : This value should match the boot sector's / bios parameter
- *               block's 'bytes per sector' field. 
+ * Notes       : This value should match the bios parameter block's 'bytes per
+ *               sector' field.
  * 
  * Warning     : Currently this value should be set to 512 for the current 
  *               implementation to work. If this does not match the bps field
@@ -41,19 +41,19 @@
 
 /* 
  * ----------------------------------------------------------------------------
- *                                                      BOOT SECTOR ERROR FLAGS
+ *                                             BIOS PARAMETER BLOCK ERROR FLAGS
  *
- * Description : Flags that will be returned by functions that read the boot
- *               sector, e.g. fat_SetBPB().
+ * Description : Flags that will be returned by functions that read the BPB 
+ *               from the boot sector, e.g. fat_SetBPB().
  * ----------------------------------------------------------------------------
  */
-#define CORRUPT_BOOT_SECTOR             0x01
-#define NOT_BOOT_SECTOR                 0x02
+#define CORRUPT_BPB                     0x01
+#define NOT_BPB                         0x02
 #define INVALID_BYTES_PER_SECTOR        0x04
 #define INVALID_SECTORS_PER_CLUSTER     0x08
-#define BOOT_SECTOR_NOT_FOUND           0x10
-#define BOOT_SECTOR_VALID               0x20
-#define FAILED_READ_BOOT_SECTOR         0x40
+#define BPB_NOT_FOUND                   0x10
+#define BPB_VALID                       0x20
+#define FAILED_READ_BPB                 0x40
 
 /*
  ******************************************************************************
@@ -68,7 +68,7 @@
  * Description : The members of this struct correspond to the Bios Parameter 
  *               Block fields needed by this module.
  * 
- * Notes       : Some of the members also are for values calculated from other
+ * Notes       : Some of the members are also for values calculated from other
  *               members (BPB fields) of this struct. 
  * ----------------------------------------------------------------------------
  */
@@ -80,7 +80,6 @@ typedef struct
   uint8_t  numOfFats;
   uint32_t fatSize32;
   uint32_t rootClus;
-
   uint32_t bootSecAddr;
   uint32_t dataRegionFirstSector;
 } 
@@ -103,29 +102,32 @@ BPB;
  * Arguments   : bpb     Pointer to an instance of a BPB struct. This function
  *                       will set the members of this instance.
  * 
- * Returns     : Boot Sector Error Flag. If any value other than
- *               BOOT_SECTOR_VALID is returned then setting the BPB instance 
- *               failed. To print, pass to fat_PrintBootSectorError().
+ * Returns     : Boot Sector Error Flag. If any value other than BPB_VALID is
+ *               returned then setting the BPB instance failed. To print, pass
+ *               to the returned value to fat_PrintErrorBPB().
  * 
  * Notes       : A valid BPB struct instance is a required argument of many 
  *               functions that access the FAT volume, therefore this function 
  *               should be called first, before implementing any other parts of
  *               the FAT module.
+ * 
+ * Limitation  : Only works if Boot Sector, which contains the BPB, is sector 0 
+ *               on the physical disk. 
  * ----------------------------------------------------------------------------
  */
 uint8_t fat_SetBPB(BPB *bpb);
 
 /*
  * ----------------------------------------------------------------------------
- *                                                 PRINT BOOT SECTOR ERROR FLAG 
+ *                                       PRINT BIOS PARAMETER BLOCK ERROR FLAGS 
  * 
- * Description : Print the Boot Sector Error Flag. 
+ * Description : Print the Bios Parameter Block Error Flag. 
  * 
- * Arguments   : err     boot sector error flag(s).
+ * Arguments   : err     BPB error flag(s).
  * 
  * Returns     : void
  * ----------------------------------------------------------------------------
  */
-void fat_PrintBootSectorError(uint8_t err);
+void fat_PrintErrorBPB(uint8_t err);
 
 #endif // FAT_BPB_H

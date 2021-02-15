@@ -175,9 +175,10 @@
 #define PATH_STRING_LEN_MAX    100         // max length of path string
 #define LN_STR_LEN_MAX         100         // max length of long name string
 // short names
-#define SN_NAME_STR_LEN        9  // num of bytes occupied by a short name
-#define SN_EXT_STR_LEN         4  // num of bytes occupied by a short name ext
-#define SN_STR_LEN             13 // this is for 8+3 char plus '.' and null.
+#define SN_NAME_STR_LEN  9  // num of bytes occupied by a short name + null
+#define SN_EXT_STR_LEN   4  // num of bytes occupied by a short name ext + null
+#define SN_STR_LEN       13 // this is for 8 and 3 sn plus '.' and null.
+
 /*
  ******************************************************************************     
  *                                 STRUCTS      

@@ -132,10 +132,10 @@ int main(void)
     
     BPB *bpbPtr = malloc(sizeof(BPB));
     err = fat_SetBPB (bpbPtr);
-    if (err != BOOT_SECTOR_VALID)
+    if (err != BPB_VALID)
     {
       print_Str("\n\r fat_SetBPB() returned ");
-      fat_PrintBootSectorError(err);
+      fat_PrintErrorBPB(err);
     }
     
 
