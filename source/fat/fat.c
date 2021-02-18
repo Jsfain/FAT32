@@ -20,7 +20,7 @@
 
 /*
  ******************************************************************************
- *                      "PRIVATE" FUNCTION PROTOTYPES    
+ *                      "PRIVATE" FUNCTION PROTOTYPES (and MACROS)  
  ******************************************************************************
  */
 
@@ -36,6 +36,10 @@ static void     pvt_UpdateFatEntryState(char *lnStr, uint16_t entPos,
                             uint8_t snEntSecNumInClus, uint32_t snEntClusIndx,
                             uint16_t snPosCurrSec, uint16_t snPosNextSec,
                             uint8_t lnFlags, uint8_t  *secArr, FatEntry *ent);
+
+// macros used by the local static functions
+#define LEGAL   0
+#define ILLEGAL 1
 
 /*
  ******************************************************************************
@@ -59,21 +63,10 @@ static void     pvt_UpdateFatEntryState(char *lnStr, uint16_t entPos,
  */
 void fat_SetDirToRoot(FatDir *dir, BPB *bpb)
 {
-  // Init names and paths to Empty strings by filling string arrays with nulls.
-  for (uint8_t strPos = 0; strPos < LN_STR_LEN_MAX; strPos++)
-    dir->lnStr[strPos] = '\0';
-  for (uint8_t strPos = 0; strPos < PATH_STRING_LEN_MAX; strPos++)
-    dir->lnPathStr[strPos] = '\0';
-  for (uint8_t strPos = 0; strPos < SN_NAME_STR_LEN; strPos++)
-    dir->snStr[strPos] = '\0';
-  for (uint8_t strPos = 0; strPos < PATH_STRING_LEN_MAX; strPos++)
-    dir->snPathStr[strPos] = '\0';
-  
-  // set long and short name strings to '/' indicating the ROOT directory.
-  dir->lnStr[0] = '/';
-  dir->snStr[0] = '/';
-
-  // set the first cluster index to point to the ROOT directory.
+  strcpy(dir->snStr, "/");
+  strcpy(dir->snPathStr, "");
+  strcpy(dir->lnStr, "/");
+  strcpy(dir->lnPathStr, "");
   dir->fstClusIndx = bpb->rootClus;
 }
 
@@ -276,10 +269,8 @@ uint8_t fat_SetNextEntry(FatDir *currDir, FatEntry *currEnt, BPB *bpb)
           // entPos points to a long name entry?
           if ((attrByte & LN_ATTR_MASK) == LN_ATTR_MASK)
           {
-            // array for long name string init to array of nulls.
-            char lnStr[LN_STR_LEN_MAX];           
-            for (uint8_t strPos = 0; strPos < LN_STR_LEN_MAX; strPos++) 
-              lnStr[strPos] = '\0'; 
+            // array for long name string. Init to array of nulls.
+            char lnStr[LN_STR_LEN_MAX] = {'\0'};
             
             // entPos must be pointing to the last entry of long name here.
             if ( !(currSecArr[entPos] & LN_LAST_ENTRY)) 
@@ -488,7 +479,7 @@ uint8_t fat_SetDir(FatDir *dir, char *newDirStr, BPB *bpb)
   // For function return error. Used as the loop conditon.
   uint8_t err;                                  
 
-  if (pvt_CheckName(newDirStr))
+  if (pvt_CheckName(newDirStr) == ILLEGAL)
     return INVALID_DIR_NAME;
 
   // newDirStr == 'Current Directory'?
@@ -554,10 +545,9 @@ uint8_t fat_SetDir(FatDir *dir, char *newDirStr, BPB *bpb)
       if (strlen(newDirStr) < SN_NAME_STR_LEN - 1)
         snLen = strlen(newDirStr);
 
-      char sn[SN_NAME_STR_LEN];                                    
+      char sn[SN_NAME_STR_LEN] = {'\0'};                                    
       for (uint8_t strPos = 0; strPos < snLen; strPos++)  
         sn[strPos] = ent->snEnt[strPos];
-      sn[snLen] = '\0';
 
       // Append current directory name to the path
       strcat (dir->lnPathStr, dir->lnStr);
@@ -675,7 +665,7 @@ uint8_t fat_PrintFile(FatDir *dir, char *fileNameStr, BPB *bpb)
   // For function return values/errors. Used as the loop conditon.
   uint8_t err;
 
-  if (pvt_CheckName (fileNameStr))
+  if (pvt_CheckName(fileNameStr) == ILLEGAL)
     return INVALID_FILE_NAME;
 
   // 
@@ -792,67 +782,48 @@ static void pvt_UpdateFatEntryState(char *lnStr, uint16_t entPos,
                             uint16_t snPosCurrSec, uint16_t snPosNextSec, 
                             uint8_t lnFlags, uint8_t *secArr, FatEntry *ent)
 {
-  char    sn[SN_STR_LEN];
+  // top section will set these variables to assist loading of FatEntry members
+  char sn[SN_STR_LEN] = {'\0'};
+  uint16_t snPos;  
   uint8_t Indx = 0;
 
-  uint16_t snPos = snPosCurrSec;
   if (lnFlags & (LN_CROSS_SEC | LN_LAST_SEC_ENTRY))
     snPos = snPosNextSec;
+  else
+    snPos = snPosCurrSec;
+ 
+  for (uint8_t byteNum = 0; byteNum < SN_NAME_STR_LEN - 1; byteNum++)
+    if (secArr[snPos + byteNum] != ' ')
+      sn[Indx++] = secArr[snPos + byteNum];
 
-  if (lnFlags & LN_EXISTS) 
-    ent->entPos = entPos;
-  else 
-    ent->entPos = entPos + ENTRY_LEN;
+  if (secArr[snPos + SN_NAME_STR_LEN - 1] != ' ')
+  {
+    sn[Indx++] = '.';
+    for (uint8_t byteNum = SN_NAME_STR_LEN - 1;
+         byteNum < SN_STR_LEN - 2; byteNum++)
+      if (secArr[snPos + byteNum] != ' ') 
+        sn[Indx++] = secArr[snPos + byteNum];
+  }
 
+  // load FatEntry members  
+  for (uint8_t byteNum = 0; byteNum < ENTRY_LEN; byteNum++)
+    ent->snEnt[byteNum] = secArr[snPos + byteNum];
+    
   ent->snEntSecNumInClus = snEntSecNumInClus;
   ent->snEntClusIndx = snEntClusIndx;
   ent->snPosCurrSec = snPosCurrSec;
   ent->snPosNextSec = snPosNextSec;
   ent->lnFlags = lnFlags;
-
-  for (uint8_t byteNum = 0; byteNum < ENTRY_LEN; byteNum++)
-    ent->snEnt[byteNum] = secArr[snPos + byteNum];
-
-  for (uint8_t strPos = 0; strPos < SN_STR_LEN; strPos++)
-    sn[strPos] = '\0';
-  
-  Indx = 0;
-  for (uint8_t byteNum = 0; byteNum < SN_NAME_STR_LEN - 1; byteNum++)
-  {
-    if (secArr[snPos + byteNum] != ' ')
-    { 
-      sn[Indx] = secArr[snPos + byteNum];
-      Indx++;
-    }
-  }
-  if (secArr[snPos + SN_NAME_STR_LEN - 1] != ' ')
-  {
-    sn[Indx] = '.';
-    Indx++;
-    for (uint8_t byteNum = SN_NAME_STR_LEN - 1; 
-         byteNum < SN_STR_LEN - 2; byteNum++)
-    {
-      if (secArr[snPos + byteNum] != ' ')
-      { 
-        sn[Indx] = secArr[snPos + byteNum];
-        Indx++;
-      }
-    }
-  }
+  if (lnFlags & LN_EXISTS) 
+    ent->entPos = entPos;
+  else 
+    ent->entPos = entPos + ENTRY_LEN;
 
   strcpy(ent->snStr, sn);
-  
   if ( !(lnFlags & LN_EXISTS))
     strcpy(ent->lnStr, sn);
   else
-  {
-    for (uint8_t strPos = 0; strPos < LN_STR_LEN_MAX; strPos++)
-    {
-      ent->lnStr[strPos] = lnStr[strPos];
-      if (*lnStr == '\0') 
-        break;
-    }
-  }      
+    strcpy(ent->lnStr, lnStr);   
 }
 
 /*
@@ -864,40 +835,32 @@ static void pvt_UpdateFatEntryState(char *lnStr, uint16_t entPos,
  * Arguments   : nameStr     Pointer to the string to be verified as a legal 
  *                           FAT entry name.
  * 
- * Returns     : 0 if LEGAL.
- *               1 if ILLEGAL.
+ * Returns     : LEGAL or ILLEGAL
  * -----------------------------------------------------------------------------
  */
 static uint8_t pvt_CheckName(char *nameStr)
 {
-  // check that long name is not too large for current settings.
+  // check that long name is not too large for current settings
   if (strlen(nameStr) > LN_STR_LEN_MAX) 
-    return 1;                                                                    // *****  MN
+    return ILLEGAL;
   
   // illegal if empty string or begins with a space char
-  if ((strcmp (nameStr, "") == 0) || (nameStr[0] == ' ')) 
-    return 1;                                                                    // *****  MN
+  if (strcmp(nameStr, "") == 0 || nameStr[0] == ' ') 
+    return ILLEGAL;
 
-  // illegal if contains an illegal char
-  char illegalCharacters[] = {'\\','/',':','*','?','"','<','>','|'};
+  // illegal if contains an illegal char. Arrary ends in null, treat as string
+  char illCharsArr[] = {'\\','/',':','*','?','"','<','>','|','\0'};
   for (uint8_t strPos = 0; strPos < strlen(nameStr); strPos++)
-  {       
-    for (uint8_t iCharPos = 0; iCharPos < 9; iCharPos++)
-    {
-      if (nameStr[strPos] == illegalCharacters[iCharPos])
-        return 1;                                                                    // *****  MN
-    }
-  }
+    for (uint8_t iCharPos = 0; iCharPos < strlen(illCharsArr); iCharPos++)
+      if (nameStr[strPos] == illCharsArr[iCharPos])
+        return ILLEGAL;
 
-  // illegal if all space characters.
+  // illegal if all space characters
   for (uint8_t strPos = 0; strPos < strlen(nameStr); strPos++)  
-  {
     if (nameStr[strPos] != ' ')
-      // LEGAL
-      return 0;                                                                         // *****  MN                             
-  }
-  // ILLEGAL
-  return 1;                                                                       // *****  MN                                   
+      return LEGAL;                         
+
+  return ILLEGAL;             
 }
 
 /*
@@ -921,14 +884,19 @@ static uint8_t pvt_SetDirToParent(FatDir *dir, BPB *bpb)
   uint8_t  currSecArr[bpb->bytesPerSec];
   uint8_t  err;
 
+  // physical sector number on disk
   currSecNumPhys = bpb->dataRegionFirstSector 
                    + (dir->fstClusIndx - 2) * bpb->secPerClus;
 
-  // function returns either 0 for success for 1 for failed.
-  err = FATtoDisk_ReadSingleSector (currSecNumPhys, currSecArr);
-  if (err == FTD_READ_SECTOR_FAILED)    // FATtoDisk read sector failed 
+  // load currSecArr with disk sector at curreSecNumPhys
+  err = FATtoDisk_ReadSingleSector(currSecNumPhys, currSecArr);
+  if (err == FTD_READ_SECTOR_FAILED)
    return FAILED_READ_SECTOR;
 
+  //
+  // byte 52, 53, 58,and 59 of the first sector of a directory contain the
+  // value of the first FAT cluster index of its parent directory.
+  //  
   parentDirFirstClus = currSecArr[53];
   parentDirFirstClus <<= 8;
   parentDirFirstClus |= currSecArr[52];
@@ -937,40 +905,36 @@ static uint8_t pvt_SetDirToParent(FatDir *dir, BPB *bpb)
   parentDirFirstClus <<= 8;
   parentDirFirstClus |= currSecArr[58];
 
-  // dir is already the root directory, do nothing.
+  // 
+  // if dir is already the root directory, do nothing, else if root directory 
+  // is the parent dir set FatDir members to the root directory, else set 
+  // FatDir members to the parent directory.
+  //
   if (dir->fstClusIndx == bpb->rootClus); 
-
-  // parent of dir is root directory ?
   else if (parentDirFirstClus == 0)
-  {
-    strcpy (dir->snStr, "/");
-    strcpy (dir->snPathStr, "");
-    strcpy (dir->lnStr, "/");
-    strcpy (dir->lnPathStr, "");
-    dir->fstClusIndx = bpb->rootClus;
-  }
-
-  // parent directory is not root directory
+    fat_SetDirToRoot(dir, bpb);
   else
   {          
     char tmpShortNamePath[PATH_STRING_LEN_MAX];
     char tmpLongNamePath[PATH_STRING_LEN_MAX];
 
-    strlcpy (tmpShortNamePath, dir->snPathStr, 
-              strlen (dir->snPathStr));
-    strlcpy (tmpLongNamePath, dir->lnPathStr,
-              strlen (dir->lnPathStr));
+    // load current path member values to temp strings
+    strlcpy(tmpShortNamePath, dir->snPathStr, strlen(dir->snPathStr));
+    strlcpy(tmpLongNamePath,  dir->lnPathStr, strlen(dir->lnPathStr));
     
-    char *shortNameLastDirInPath = strrchr (tmpShortNamePath, '/');
-    char *longNameLastDirInPath  = strrchr (tmpLongNamePath , '/');
+    // create pointer to location in temp strings holding the final '/'
+    char *shortNameLastDirInPath = strrchr(tmpShortNamePath, '/');
+    char *longNameLastDirInPath  = strrchr(tmpLongNamePath , '/');
     
-    strcpy (dir->snStr, shortNameLastDirInPath + 1);
-    strcpy (dir->lnStr , longNameLastDirInPath  + 1);
+    // copy last directory in path string to the short/long name strings
+    strcpy(dir->snStr, shortNameLastDirInPath + 1);
+    strcpy(dir->lnStr, longNameLastDirInPath  + 1);
 
-    strlcpy (dir->snPathStr, tmpShortNamePath, 
-            (shortNameLastDirInPath + 2) - tmpShortNamePath);
-    strlcpy (dir->lnPathStr,  tmpLongNamePath,  
-            (longNameLastDirInPath  + 2) -  tmpLongNamePath);
+    // remove the last directory in path strings
+    strlcpy(dir->snPathStr, tmpShortNamePath,
+           (shortNameLastDirInPath + 2) - tmpShortNamePath);
+    strlcpy(dir->lnPathStr,  tmpLongNamePath,  
+           (longNameLastDirInPath  + 2) -  tmpLongNamePath);
 
     dir->fstClusIndx = parentDirFirstClus;
   }
@@ -1008,37 +972,25 @@ static uint8_t pvt_SetDirToParent(FatDir *dir, BPB *bpb)
 static void pvt_LoadLongName(int lnFirstEnt, int lnLastEnt, uint8_t *secArr, 
                              char *lnStr, uint8_t *lnStrIndx)
 {
-  for (int i = lnFirstEnt; i >= lnLastEnt; i = i - ENTRY_LEN)
+  // loop over the entries in the sector containing the long name
+  for (int entPos = lnFirstEnt; entPos >= lnLastEnt; entPos -= ENTRY_LEN)
   {                                              
-    for (uint16_t n = i + 1; n < i + 11; n++)
-    {                                  
-      if (secArr[n] == 0 || secArr[n] > 126);
-      else 
-      { 
-        lnStr[*lnStrIndx] = secArr[n];
-        (*lnStrIndx)++;  
-      }
-    }
+    // multiple loops over single entry to load the long name chars
 
-    for (uint16_t n = i + 14; n < i + 26; n++)
-    {                                  
-      if (secArr[n] == 0 || secArr[n] > 126);
-      else 
-      { 
-        lnStr[*lnStrIndx] = secArr[n];
-        (*lnStrIndx)++;
-      }
-    }
+    for (uint16_t byteNum = entPos + 1; byteNum < entPos + 11; byteNum++)                               
+      // if char is zero or > 127 (out of ascii range) discard.
+      if (secArr[byteNum] > 0 && secArr[byteNum] <= 127)
+        lnStr[(*lnStrIndx)++] = secArr[byteNum];
+
+    for (uint16_t byteNum = entPos + 14; byteNum < entPos + 26; byteNum++)                               
+      // if char is zero or > 127 (out of ascii range) discard.
+      if (secArr[byteNum] > 0 && secArr[byteNum] <= 127)
+        lnStr[(*lnStrIndx)++] = secArr[byteNum];
     
-    for (uint16_t n = i + 28; n < i + 32; n++)
-    {                                  
-      if (secArr[n] == 0 || secArr[n] > 126);
-      else 
-      { 
-        lnStr[*lnStrIndx] = secArr[n];  
-        (*lnStrIndx)++;  
-      }
-    }        
+    for (uint16_t byteNum = entPos + 28; byteNum < entPos + 32; byteNum++)                              
+      // if char is zero or > 127 (out of ascii range) discard.
+      if (secArr[byteNum] > 0 && secArr[byteNum] <= 127)
+        lnStr[(*lnStrIndx)++] = secArr[byteNum];     
   }
 }
 
