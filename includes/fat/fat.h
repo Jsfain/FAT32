@@ -239,7 +239,7 @@ FatDir;
  */
 typedef struct
 {
-  char lnStr[LN_STR_LEN_MAX + 1];                 // entry long name
+  char lnStr[LN_STR_LEN_MAX + 1];                // entry long name
   char snStr[13];                                // entry short name
   uint8_t snEnt[32];                   // The 32 bytes of the short name entry
   
@@ -252,8 +252,7 @@ typedef struct
   uint8_t  snEntSecNumInClus;  
   uint16_t entPos;             
   uint8_t  lnFlags;            
-  uint16_t snPosCurrSec;  
-  uint16_t snPosNextSec;         
+  uint16_t snPos;
 }
 FatEntry;
 
