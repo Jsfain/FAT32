@@ -28,7 +28,7 @@ static uint8_t  pvt_CheckName(char *nameStr);
 static uint8_t  pvt_SetDirToParent(FatDir *dir, BPB *bpb);
 static uint32_t pvt_GetNextClusIndex(uint32_t currClusIndx, BPB *bpb);
 static void     pvt_PrintEntFields(uint8_t *byte, uint8_t flags);
-static void     pvt_PrintShortName(uint8_t *byte);
+static void     pvt_PrintShortName(const uint8_t *byte);
 static uint8_t  pvt_PrintFile(uint8_t *fileSec, BPB *bpb);
 static void     pvt_LoadLongName(int lnFirstEnt, int lnLastEnt, 
                             uint8_t *secArr, char *lnStr, uint8_t *lnStrIndx);
@@ -37,7 +37,7 @@ static void     pvt_UpdateFatEntryState(char *lnStr, uint16_t entPos,
                             uint16_t snPosCurrSec, uint16_t snPosNextSec,
                             uint8_t lnFlags, uint8_t  *secArr, FatEntry *ent);
 
-// macros used by the local static functions
+// macros used by the local static (private) functions
 #define LEGAL   0
 #define ILLEGAL 1
 
@@ -86,21 +86,13 @@ void fat_SetDirToRoot(FatDir *dir, BPB *bpb)
  */
 void fat_InitEntry(FatEntry *ent, BPB *bpb)
 {
-  // set long and short name strings to empty by filling with nulls.
-  for (uint8_t strPos = 0; strPos < LN_STR_LEN_MAX; strPos++)
-    ent->lnStr[strPos] = '\0';
-  for (uint8_t strPos = 0; strPos < SN_STR_LEN; strPos++)              
-    ent->snStr[strPos] = '\0';
-
-  // fill sn entry array with 0s
+  // set long and short names to empty strings
+  ent->lnStr[0] = '\0';
+  ent->snStr[0] = '\0';
+  
+  // fill short name entry array with 0's
   for(uint8_t pos = 0; pos < ENTRY_LEN; pos++)
     ent->snEnt[pos] = 0;
-
-  // 
-  // Set the cluster index to point to the ROOT directory. The setting of this
-  // member will indicate which directory the entry is located in.
-  //
-  ent->snEntClusIndx = bpb->rootClus;
 
   // set rest of the FatEntry members to 0. 
   ent->snEntSecNumInClus = 0;
@@ -108,6 +100,9 @@ void fat_InitEntry(FatEntry *ent, BPB *bpb)
   ent->lnFlags = 0;
   ent->snPosCurrSec = 0;
   ent->snPosCurrSec = 0;
+
+  // Set the cluster index to point to the ROOT directory.
+  ent->snEntClusIndx = bpb->rootClus;
 }
 
 /*
@@ -642,7 +637,7 @@ uint8_t fat_PrintDir(FatDir *dir, uint8_t entFilt, BPB *bpb)
  * ----------------------------------------------------------------------------
  *                                                         PRINT FILE TO SCREEN
  *                                       
- * Description : Prints the contents of a file to the screen.
+ * Description : Prints the contents of a PLAIN TEXT file to the screen. 
  * 
  * Arguments   : dir             Pointer to a FatDir instance. This directory
  *                               must contain the entry for the file that will
@@ -1021,14 +1016,14 @@ static uint32_t pvt_GetNextClusIndex(uint32_t currClusIndx, BPB *bpb)
   uint32_t fatSectorToRead = clusIndx + bpb->rsvdSecCnt;
   uint8_t  sectorArr[bpb->bytesPerSec];
   
-  FATtoDisk_ReadSingleSector (fatSectorToRead, sectorArr);
+  FATtoDisk_ReadSingleSector(fatSectorToRead, sectorArr);
 
-  clusIndx = 0;
-  clusIndx = sectorArr[clusIndxStartByte+3];
+  clusIndx  = 0;
+  clusIndx  = sectorArr[clusIndxStartByte + 3];
   clusIndx <<= 8;
-  clusIndx |= sectorArr[clusIndxStartByte+2];
+  clusIndx |= sectorArr[clusIndxStartByte + 2];
   clusIndx <<= 8;
-  clusIndx |= sectorArr[clusIndxStartByte+1];
+  clusIndx |= sectorArr[clusIndxStartByte + 1];
   clusIndx <<= 8;
   clusIndx |= sectorArr[clusIndxStartByte];
 
@@ -1067,34 +1062,34 @@ static void pvt_PrintEntFields(uint8_t *secArr, uint8_t flags)
     createDate = secArr[17];
     createDate <<= 8;
     createDate |= secArr[16];
-    print_Str ("    ");
+    print_Str("    ");
 
-    if (((createDate & 0x01E0) >> 5) < 10) 
-      print_Str ("0");
+    if ((createDate & 0x01E0) >> 5 < 10) 
+      print_Str("0");
 
-    print_Dec ((createDate & 0x01E0) >> 5);
-    print_Str ("/");
+    print_Dec((createDate & 0x01E0) >> 5);
+    print_Str("/");
     if ((createDate & 0x001F) < 10)
-      print_Str ("0");
+      print_Str("0");
     
-    print_Dec (createDate & 0x001F);
-    print_Str ("/");
-    print_Dec (1980 + ((createDate & 0xFE00) >> 9));
-    print_Str ("  ");
-    if (((createTime & 0xF800) >> 11) < 10) 
-      print_Str ("0");
+    print_Dec(createDate & 0x001F);
+    print_Str("/");
+    print_Dec(1980 + ((createDate & 0xFE00) >> 9));
+    print_Str("  ");
+    if ((createTime & 0xF800) >> 11 < 10) 
+      print_Str("0");
     
-    print_Dec (((createTime & 0xF800) >> 11));
-    print_Str (":");
-    if (((createTime & 0x07E0) >> 5) < 10)
-      print_Str ("0");
+    print_Dec((createTime & 0xF800) >> 11);
+    print_Str(":");
+    if ((createTime & 0x07E0) >> 5 < 10)
+      print_Str("0");
     
-    print_Dec ((createTime & 0x07E0) >> 5);
-    print_Str (":");
-    if ((2 * (createTime & 0x001F)) < 10) 
-      print_Str ("0");
+    print_Dec((createTime & 0x07E0) >> 5);
+    print_Str(":");
+    if (2 * (createTime & 0x001F) < 10) 
+      print_Str("0");
 
-    print_Dec (2 * (createTime & 0x001F));
+    print_Dec(2 * (createTime & 0x001F));
   }
 
   // Print last access date
@@ -1106,18 +1101,18 @@ static void pvt_PrintEntFields(uint8_t *secArr, uint8_t flags)
     lastAccDate <<= 8;
     lastAccDate |= secArr[18];
 
-    print_Str ("     ");
-    if (((lastAccDate & 0x01E0) >> 5) < 10)
-      print_Str ("0");
+    print_Str("     ");
+    if ((lastAccDate & 0x01E0) >> 5 < 10)
+      print_Str("0");
 
-    print_Dec ((lastAccDate & 0x01E0) >> 5);
-    print_Str ("/");
+    print_Dec((lastAccDate & 0x01E0) >> 5);
+    print_Str("/");
     if ((lastAccDate & 0x001F) < 10) 
       print_Str("0");
 
-    print_Dec (lastAccDate & 0x001F);
-    print_Str ("/");
-    print_Dec (1980 + ((lastAccDate & 0xFE00) >> 9));
+    print_Dec(lastAccDate & 0x001F);
+    print_Str("/");
+    print_Dec(1980 + ((lastAccDate & 0xFE00) >> 9));
   }
 
   // Print last modified date / time
@@ -1131,42 +1126,42 @@ static void pvt_PrintEntFields(uint8_t *secArr, uint8_t flags)
     writeDate <<= 8;
     writeDate |= secArr[24];
   
-    print_Str ("     ");
-    if (((writeDate & 0x01E0) >> 5) < 10) 
-      print_Str ("0");
+    print_Str("     ");
+    if ((writeDate & 0x01E0) >> 5 < 10) 
+      print_Str("0");
 
-    print_Dec ((writeDate & 0x01E0) >> 5);
-    print_Str ("/");
+    print_Dec((writeDate & 0x01E0) >> 5);
+    print_Str("/");
     if ((writeDate & 0x001F) < 10) 
-      print_Str ("0");
+      print_Str("0");
 
-    print_Dec (writeDate & 0x001F);
-    print_Str ("/");
-    print_Dec (1980 + ((writeDate & 0xFE00) >> 9));
+    print_Dec(writeDate & 0x001F);
+    print_Str("/");
+    print_Dec(1980 + ((writeDate & 0xFE00) >> 9));
 
     // Load and Print write time
     writeTime = secArr[23];
     writeTime <<= 8;
     writeTime |= secArr[22];
 
-    print_Str ("  ");
-    if (((writeTime & 0xF800) >> 11) < 10)
-      print_Str ("0");
+    print_Str("  ");
+    if ((writeTime & 0xF800) >> 11 < 10)
+      print_Str("0");
 
-    print_Dec (((writeTime & 0xF800) >> 11));
-    print_Str (":");      
-    if (((writeTime & 0x07E0) >> 5) < 10) 
-      print_Str ("0");
+    print_Dec((writeTime & 0xF800) >> 11);
+    print_Str(":");      
+    if ((writeTime & 0x07E0) >> 5 < 10) 
+      print_Str("0");
 
-    print_Dec ((writeTime & 0x07E0) >> 5);
-    print_Str (":");
-    if ((2 * (writeTime & 0x001F)) < 10) 
-      print_Str ("0");
+    print_Dec((writeTime & 0x07E0) >> 5);
+    print_Str(":");
+    if (2 * (writeTime & 0x001F) < 10) 
+      print_Str("0");
 
-    print_Dec (2 * (writeTime & 0x001F));
+    print_Dec(2 * (writeTime & 0x001F));
   }
   
-  print_Str ("     ");
+  print_Str("     ");
 
   // Print file size in bytes
   if (FILE_SIZE & flags)
@@ -1184,33 +1179,33 @@ static void pvt_PrintEntFields(uint8_t *secArr, uint8_t flags)
 
     // print spaces for formatting printed output
     if (fileSize/div >= 10000000)
-      print_Str (" ");
+      print_Str(" ");
     else if (fileSize/div >= 1000000) 
-      print_Str ("  ");
+      print_Str("  ");
     else if (fileSize/div >= 100000) 
-      print_Str ("   ");
+      print_Str("   ");
     else if (fileSize/div >= 10000) 
-      print_Str ("    ");
+      print_Str("    ");
     else if (fileSize/div >= 1000) 
-      print_Str ("     ");
+      print_Str("     ");
     else if (fileSize/div >= 100) 
-      print_Str ("      ");
+      print_Str("      ");
     else if (fileSize/div >= 10) 
-      print_Str ("       "); 
+      print_Str("       "); 
     else
-      print_Str ("        ");
+      print_Str("        ");
     
-    print_Dec (fileSize/div);
-    print_Str ("B  ");
+    print_Dec(fileSize / div);
+    print_Str("B  ");
   }
 
   // print entry type
   if (TYPE & flags)
   {
     if (secArr[11] & DIR_ENTRY_ATTR) 
-      print_Str (" <DIR>   ");
+      print_Str(" <DIR>   ");
     else 
-      print_Str (" <FILE>  ");
+      print_Str(" <FILE>  ");
   }
 }
 
@@ -1228,47 +1223,49 @@ static void pvt_PrintEntFields(uint8_t *secArr, uint8_t flags)
  * Returns     : void
  * ----------------------------------------------------------------------------
  */
-static void pvt_PrintShortName(uint8_t *secArr)
+static void pvt_PrintShortName(const uint8_t *secArr)
 {
-  char sn[9];
-  char ext[5];
-  uint8_t attr = secArr[11];
+  char snStr[SN_NAME_STR_LEN] = {'\0'};
+  char extStr[SN_EXT_STR_LEN + 1] = {'\0'}; // adding 1 for '.' position
 
-  // initialize sn to all spaces string
-  for (uint8_t k = 0; k < 8; k++) 
-    sn[k] = ' ';
-  sn[8] = '\0';
-
-  // no extension if dir entry  
-  if (attr & DIR_ENTRY_ATTR)
+  // If directory entry then assume no extension  
+  if (secArr[ATTR_BYTE_OFFSET] & DIR_ENTRY_ATTR)
   {
-    for (uint8_t k = 0; k < 8; k++) 
-      sn[k] = secArr[k];
-    
-    print_Str (sn);
-    print_Str ("    ");
+    // load short name chars in secArr into sn string array
+    for (uint8_t bytePos = 0; bytePos < 8; bytePos++)                                                     
+      snStr[bytePos] = secArr[bytePos];
+
+    // print directory short name
+    print_Str(snStr);
+
+    // print spaces for formatting                         
+    print_Str("    ");                      
   }
 
-  // file entries
+  // file entries. must handle extension.
   else 
   {
-    strcpy (ext, ".   ");
-    for (uint8_t k = 1; k < 4; k++) 
-      ext[k] = secArr[7 + k];
-    for (uint8_t k = 0; k < 8; k++) 
+    // load name portion of short name into the snStr
+    for (uint8_t bytePos = 0; bytePos < 8; bytePos++)
     {
-      sn[k] = secArr[k];
-      if (sn[k] == ' ') 
+      snStr[bytePos] = secArr[bytePos];
+      if (snStr[bytePos] == ' ') 
       { 
-        sn[k] = '\0'; 
+        snStr[bytePos] = '\0'; 
         break; 
       }
     }
-    print_Str (sn);
-    if (strcmp (ext, ".   ")) 
-      print_Str (ext);
-    for (uint8_t p = 0; p < 10 - (strlen (sn) + 2); p++) 
-      print_Str (" ");
+    // print short name string
+    print_Str(snStr);
+
+    // load extension from sector array. Extension chars begin at byte 7
+    strcpy(extStr, ".   ");
+    for (uint8_t bytePos = 1; bytePos < SN_EXT_STR_LEN; bytePos++) 
+      extStr[bytePos] = secArr[7 + bytePos];
+
+    // if extenstion exists, print it.
+    if (strcmp(extStr, ".   ")) 
+      print_Str(extStr);
   }
 }
 
@@ -1276,7 +1273,8 @@ static void pvt_PrintShortName(uint8_t *secArr)
  * ----------------------------------------------------------------------------
  *                                                   (PRIVATE) PRINT A FAT FILE
  * 
- * Description : performs the print file operation.
+ * Description : Performs the print file operation. This will output plain text
+ *               to the screen.
  * 
  * Arguments   : fileSec     Pointer to array holding the contents of the FAT 
  *                           sector where the file-to-be-printed's short name 
@@ -1289,13 +1287,8 @@ static void pvt_PrintShortName(uint8_t *secArr)
  */
 static uint8_t pvt_PrintFile(uint8_t *fileSec, BPB *bpb)
 {
-  uint32_t currSecNumPhys;
-  uint32_t clus;
-  uint8_t  err;
-  uint8_t  eof = 0; // end of file flag
-
   //get FAT index for file's first cluster
-  clus =  fileSec[21];
+  uint32_t clus = fileSec[21];
   clus <<= 8;
   clus |= fileSec[20];
   clus <<= 8;
@@ -1303,45 +1296,66 @@ static uint8_t pvt_PrintFile(uint8_t *fileSec, BPB *bpb)
   clus <<= 8;
   clus |= fileSec[26];
 
-  // read in and print file contents to the screen.
+  // loop over clusters to read in and print file
   do
   {
-    uint32_t currSecNumInClus = 0;
-    for (; currSecNumInClus < bpb->secPerClus; currSecNumInClus++) 
+    // loop over sectors in the cluster to read in and print file
+    for (uint32_t currSecNumInClus = 0; 
+         currSecNumInClus < bpb->secPerClus; 
+         currSecNumInClus++) 
     {
-      if (eof == 1) 
-        break;
-      currSecNumPhys = currSecNumInClus + bpb->dataRegionFirstSector
-                        + (clus - 2) * bpb->secPerClus;
+      // calculate address of the sector on the physical disk to read in
+      uint32_t currSecNumPhys = currSecNumInClus + bpb->dataRegionFirstSector
+                              + (clus - 2) * bpb->secPerClus;
 
-      // function returns either 0 for success for 1 for failed.
-      err = FATtoDisk_ReadSingleSector (currSecNumPhys, fileSec);
-      if (err == FTD_READ_SECTOR_FAILED)    // FATtoDisk read sector failed 
+      // read disk sector in the sector array
+      uint8_t secArr[SECTOR_LEN];
+      if (FATtoDisk_ReadSingleSector(currSecNumPhys, secArr) 
+          == FTD_READ_SECTOR_FAILED)  
         return FAILED_READ_SECTOR;
 
-      for (uint16_t k = 0; k < bpb->bytesPerSec; k++)
+      for (uint16_t byteNum = 0; byteNum < bpb->bytesPerSec; byteNum++)
       {
-        if (fileSec[k] == '\n') 
+        // end of file flag. Set to 1 if eof is detected.
+        uint8_t eof = 0;
+
+        // 
+        // for output formatting. Currently using terminal that requires "\n\r"
+        // to go to the start of the next line. Therefore is '\n' is detected
+        // then need to print "\n\r".
+        //
+        if (secArr[byteNum] == '\n') 
           print_Str ("\n\r");
-        else if (fileSec[k] != 0) 
-          usart_Transmit (fileSec[k]);
-        // check if end of file.
+        
+        // else just print the character directly to the screen if not 0. 
+        else if (secArr[byteNum] != 0) 
+          usart_Transmit(secArr[byteNum]);
+       
+        // else character is zero likely indicatin the eof.
         else 
         {
+          // assume eof and set flag
           eof = 1;
-          for (uint16_t i = k+1; i < bpb->bytesPerSec; i++)
+          
+          // confirm rest of bytes in the current sector are 0
+          for (byteNum++; byteNum < bpb->bytesPerSec; byteNum++)
           {
-            if (fileSec[i] != 0) 
+            // if any byte is not 0 then not at eof so reset eof to 0
+            if (secArr[byteNum] != 0) 
             { 
+              byteNum--;
               eof = 0;
               break;
             }
           }
-        }
+         }
+        // if eof flag is set here the return. else continue.
+        if (eof)
+          return END_OF_FILE;
       }
     }
   } 
-  while ((clus = pvt_GetNextClusIndex (clus,bpb)) != END_CLUSTER);
+  while ((clus = pvt_GetNextClusIndex(clus, bpb)) != END_CLUSTER);
   
   return END_OF_FILE;
 }
