@@ -75,7 +75,7 @@
  *                  sequence of long name entries).
  * ----------------------------------------------------------------------------
  */
-#define LN_LAST_ENTRY          0x40  
+#define LN_LAST_ENTRY_FLAG     0x40  
 #define LN_ORD_MASK            0x3F
 
 /* 
@@ -116,9 +116,9 @@
  *               adjacent sectors.
  * ----------------------------------------------------------------------------
  */
-#define LN_EXISTS              0x01
-#define LN_CROSS_SEC           0x02
-#define LN_LAST_SEC_ENTRY      0x04
+#define LN_EXISTS_FLAG         0x01
+#define LN_CROSS_SEC_FLAG      0x02
+#define LN_LAST_SEC_ENTRY_FLAG 0x04
 
 /* 
  * ----------------------------------------------------------------------------
@@ -251,7 +251,6 @@ typedef struct
   uint32_t snEntClusIndx;      
   uint8_t  snEntSecNumInClus;  
   uint16_t entPos;             
-  uint8_t  lnFlags;            
   uint16_t snPos;
 }
 FatEntry;
