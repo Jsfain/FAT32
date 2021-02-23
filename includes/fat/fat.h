@@ -78,6 +78,7 @@
 #define LN_LAST_ENTRY_FLAG     0x40  
 #define LN_ORD_MASK            0x3F
 
+
 /* 
  * ----------------------------------------------------------------------------
  *                                                ENTRY and SECTOR BYTE LENGTHS
@@ -109,16 +110,12 @@
 
 /* 
  * ----------------------------------------------------------------------------
- *                                          LONG NAME SECTOR DISTRIBUTION FLAGS
+ *                                                       LONG NAME EXISTS FLAGS
  *
- * Description : Flags used by FAT functions to indicate if a long name exists
- *               and how it, and its short name entry, are distributed between
- *               adjacent sectors.
+ * Description : Flag used by FAT functions to indicate if a long name exists.
  * ----------------------------------------------------------------------------
  */
 #define LN_EXISTS_FLAG         0x01
-#define LN_CROSS_SEC_FLAG      0x02
-#define LN_LAST_SEC_ENTRY_FLAG 0x04
 
 /* 
  * ----------------------------------------------------------------------------

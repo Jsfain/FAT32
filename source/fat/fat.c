@@ -118,7 +118,7 @@ void fat_InitEntry(FatEntry *ent, BPB *bpb)
  *
  * Returns     : A FAT Error Flag. If any value other than SUCCESS is returned 
  *               then the function was unable to update the FatEntry.
- * -----------------------------------------------------------------------------
+ * ----------------------------------------------------------------------------
  */
 uint8_t fat_SetNextEntry(FatDir *currDir, FatEntry *currEnt, BPB *bpb)
 {
@@ -128,57 +128,17 @@ uint8_t fat_SetNextEntry(FatDir *currDir, FatEntry *currEnt, BPB *bpb)
   //
   uint32_t clusIndx = currEnt->snEntClusIndx;
   uint16_t snPos = currEnt->snPos;
-  uint8_t  currSecNumInClus = currEnt->snEntSecNumInClus;
+  uint8_t  secNumInClus = currEnt->snEntSecNumInClus;
   uint16_t entPos = currEnt->entPos;
-
-  //
-  // Loop to search for the next entry. This loop will run until reaching the
-  // end of the last cluster of the directory, causing the function to exit
-  // with END_OF_DIRECTORY, or until a 'next' entry is found.
-  // 
-  // The process for finding the next entry is:
-  // 1) Load the current sector into currSecArr[].
-  // 2) Locate the starting entry and check if it is a long name.
-  // 3.1) If it is not a long name, skip to the bottom of the loop and load the
-  //      curreEnt members with those of this short name entry and return.
-  // 3.2) If the entry is a long name, set the LN_EXISTS_FLAG in lnFlags.
-  // 4) Read the 'long name order' value in byte 1 of the entry to determine
-  //    how many 32-byte entries the long name requires. 
-  // 5) Use the length of the long name to determine how the long name, and its
-  //    short name, are distributed among adjacent sectors.
-  // 6) If it is determined that the long and short name are within the current
-  //    sector then simply load the currEnt members with their new values.
-  // 7) The other long/short name distribution options are:
-  //    A) The long name exists entirely within the current sector, but 
-  //       occupies the last entry position causing the short name to be placed
-  //       at the first entry position of the next sector. If this is the case 
-  //       then the LN_LAST_SEC_ENTRY_FLAG in lnFlags is set.
-  //    B) The long name is partially in the current sector and partially in
-  //       the next sector, in which case the short name entry would be in the
-  //       next sector as well. If this is the case, then the LN_CROSS_SEC_FLAG
-  //       is set in lnFlags.
-  // 8) If either 7.A or 7.B occurs, then the next sector must be read into 
-  //    nextSecArr[] while still holding the current sector in currSecArr[]. 
-  // 9) The LN_CROSS_SEC_FLAG and LN_LAST_SEC_ENTRY_FLAG situations will have
-  //    to be handled differently in order to read in the long name, but either
-  //    way the short name entry is in the next sector. 
-  // 10) Once the variables have been set, the currEnt members can be updated
-  //     and the function exits. 
-  // 11) If no 'next' entry is found, then the function will exit with 
-  //     END_OF_DIRECTORY and the FatEnt fields will not be updated.
-  //
-  // There are several other error checks and entry position adjustments that
-  // must be made, but the above lists the main steps.
-  //
 
   // loop through clusters in the directory
   do 
   {   
-    // Loop through sectors in the cluster. 
-    for (; currSecNumInClus < bpb->secPerClus; currSecNumInClus++)
+    // loop through sectors in the cluster
+    for (; secNumInClus < bpb->secPerClus; secNumInClus++)
     {
       //
-      // if short name was last entry in the sector then need to get next
+      // if short name was last entry of a sector then need to get next
       // sector and point sn/entPos to the first entry in that sector.
       //
       if (snPos == LAST_ENTPOS_IN_SEC)
@@ -188,13 +148,13 @@ uint8_t fat_SetNextEntry(FatDir *currDir, FatEntry *currEnt, BPB *bpb)
         continue;
       }
 
-      uint8_t currSecArr[bpb->bytesPerSec];         
-
       // calculate location of the current sector on the physical (disk)
-      uint32_t physSecNum = currSecNumInClus + bpb->dataRegionFirstSector
+      uint32_t physSecNum = secNumInClus + bpb->dataRegionFirstSector
                           + (clusIndx - bpb->rootClus) * bpb->secPerClus;
-
-      if (FATtoDisk_ReadSingleSector(physSecNum, currSecArr) 
+      
+      // create and load array with sector data bytes
+      uint8_t secArr[bpb->bytesPerSec];  
+      if (FATtoDisk_ReadSingleSector(physSecNum, secArr) 
           == FTD_READ_SECTOR_FAILED)
         return FAILED_READ_SECTOR;
 
@@ -202,13 +162,14 @@ uint8_t fat_SetNextEntry(FatDir *currDir, FatEntry *currEnt, BPB *bpb)
       for (; entPos < bpb->bytesPerSec; entPos = entPos + ENTRY_LEN)
       {
         uint8_t lnFlags = 0;
+
         // if first byte of an entry is 0, rest of entries should be empty
-        if (!currSecArr[entPos])                                                       
+        if (!secArr[entPos])                                                       
           return END_OF_DIRECTORY;
 
-        if (currSecArr[entPos] != DELETED_ENTRY_TOKEN)
+        if (secArr[entPos] != DELETED_ENTRY_TOKEN)
         {
-          uint8_t attrByte = currSecArr[entPos + ATTR_BYTE_OFFSET];
+          uint8_t attrByte = secArr[entPos + ATTR_BYTE_OFFSET];
 
           // entPos points to a long name entry?
           if ((attrByte & LN_ATTR_MASK) == LN_ATTR_MASK)
@@ -217,44 +178,43 @@ uint8_t fat_SetNextEntry(FatDir *currDir, FatEntry *currEnt, BPB *bpb)
             char lnStr[LN_STR_LEN_MAX] = {'\0'};
             
             // entPos must be pointing to the last entry of long name here.
-            if ( !(currSecArr[entPos] & LN_LAST_ENTRY_FLAG))
+            if ( !(secArr[entPos] & LN_LAST_ENTRY_FLAG))
               return CORRUPT_FAT_ENTRY;
             
             //
-            // locate position of short name in current sector.
-            // Based on number of entries required by long name. 
+            // Locate position of short name relative to the first byte in the 
+            // current sector. Based on num of entries required by long name.
             //
-            snPos = entPos + ENTRY_LEN * (LN_ORD_MASK & currSecArr[entPos]);
+            snPos = entPos + ENTRY_LEN * (LN_ORD_MASK & secArr[entPos]);
 
             // set long name flags
             lnFlags |= LN_EXISTS_FLAG;
-            if (snPos > bpb->bytesPerSec)              
-              lnFlags |= LN_CROSS_SEC_FLAG;
-            else if (snPos == SECTOR_LEN) 
-              lnFlags |= LN_LAST_SEC_ENTRY_FLAG;
 
             // if short name is in the next sector
-            if (lnFlags & (LN_CROSS_SEC_FLAG | LN_LAST_SEC_ENTRY_FLAG))
+            if (snPos >= bpb->bytesPerSec)
             {
               uint8_t nextSecArr[bpb->bytesPerSec]; 
+              uint8_t crossSectorBoundaryFlag = 0;
+              if (snPos > bpb->bytesPerSec)              
+                crossSectorBoundaryFlag++;
 
               // 
               // locate next sector. If current sec number is the last sec in
               // the cluster (spc - 1) then next sec is in next cluster else 
               // increment current sec number for locate next sec.
               //
-              if (currSecNumInClus >= bpb->secPerClus - 1)
+              if (secNumInClus >= bpb->secPerClus - 1)
               {
                 physSecNum = bpb->dataRegionFirstSector
                            + (pvt_GetNextClusIndex(clusIndx, bpb) 
                            - bpb->rootClus)
                            * bpb->secPerClus;
-                currSecNumInClus = 0;
+                secNumInClus = 0;
               }
               else 
               {
                 physSecNum++;
-                currSecNumInClus++;
+                secNumInClus++;
               }
 
               // load next sector into nextSecArr[].
@@ -271,7 +231,7 @@ uint8_t fat_SetNextEntry(FatDir *currDir, FatEntry *currEnt, BPB *bpb)
                 return CORRUPT_FAT_ENTRY;
               
               // Handles ln cross sector boundary --> sn in the next sector
-              if (lnFlags & LN_CROSS_SEC_FLAG)
+              if(crossSectorBoundaryFlag)
               {
                 uint8_t lnStrIndx = 0;
 
@@ -287,37 +247,31 @@ uint8_t fat_SetNextEntry(FatDir *currDir, FatEntry *currEnt, BPB *bpb)
                 //
                 pvt_LoadLongName(snPos - ENTRY_LEN, 0, nextSecArr,                   
                                  lnStr, &lnStrIndx);
-                pvt_LoadLongName(LAST_ENTPOS_IN_SEC, entPos, currSecArr, 
+                pvt_LoadLongName(LAST_ENTPOS_IN_SEC, entPos, secArr, 
                                  lnStr, &lnStrIndx);
-
-                // update the currEnt members with values for the 'next' entry.
-                pvt_UpdateFatEntryState(lnStr, snPos + ENTRY_LEN, currSecNumInClus, 
-                                        clusIndx, lnFlags, nextSecArr, currEnt, 
-                                        snPos);
-                return SUCCESS;
               }
 
               // Handles ln entirely in current sector --> sn in next sector.
-              else if (lnFlags & LN_LAST_SEC_ENTRY_FLAG)
+              else
               {
                 uint8_t lnStrIndx = 0;
 
                 // Entry preceeding short name must be first entry of long name
-                if ((currSecArr[LAST_ENTPOS_IN_SEC] & LN_ORD_MASK) != 1)
+                if ((secArr[LAST_ENTPOS_IN_SEC] & LN_ORD_MASK) != 1)
                   return CORRUPT_FAT_ENTRY;
 
                 // load long name into lnStr[]
-                pvt_LoadLongName(LAST_ENTPOS_IN_SEC, entPos, currSecArr,      
+                pvt_LoadLongName(LAST_ENTPOS_IN_SEC, entPos, secArr,      
                                  lnStr, &lnStrIndx);
-                
-                // update the currEnt members with values for the 'next' entry.
-                pvt_UpdateFatEntryState(lnStr, snPos + ENTRY_LEN, currSecNumInClus, 
-                                        clusIndx, lnFlags, nextSecArr, currEnt, 
-                                        snPos);
-                return SUCCESS;
               }
-              else 
-                return CORRUPT_FAT_ENTRY;
+              //else 
+              //  return CORRUPT_FAT_ENTRY;
+
+              // update the currEnt members with values for the 'next' entry.
+              pvt_UpdateFatEntryState(lnStr, snPos + ENTRY_LEN, secNumInClus, 
+                                      clusIndx, lnFlags, nextSecArr, currEnt, 
+                                      snPos);
+              return SUCCESS;
             }
 
             // Long and short name are in the current sector.
@@ -326,23 +280,23 @@ uint8_t fat_SetNextEntry(FatDir *currDir, FatEntry *currEnt, BPB *bpb)
               uint8_t lnStrIndx = 0;
 
               // Verify snPos not point to long name
-              attrByte = currSecArr[snPos + ATTR_BYTE_OFFSET];
+              attrByte = secArr[snPos + ATTR_BYTE_OFFSET];
 
               if ((attrByte & LN_ATTR_MASK) == LN_ATTR_MASK)
                 return CORRUPT_FAT_ENTRY;
       
               // entry preceeding short name must be first entry of long name
-              if ((currSecArr[snPos - ENTRY_LEN] & LN_ORD_MASK) != 1)
+              if ((secArr[snPos - ENTRY_LEN] & LN_ORD_MASK) != 1)
                 return CORRUPT_FAT_ENTRY;
               
               // load long name into lnStr[]
-              pvt_LoadLongName(snPos - ENTRY_LEN, entPos, currSecArr,  
+              pvt_LoadLongName(snPos - ENTRY_LEN, entPos, secArr,  
                                lnStr, &lnStrIndx);
 
               // update the currEnt members with values for the 'next' entry.
-              pvt_UpdateFatEntryState(lnStr, snPos + ENTRY_LEN, currSecNumInClus, 
-                                      clusIndx, lnFlags, currSecArr, currEnt,
-                                      snPos);
+              pvt_UpdateFatEntryState(lnStr, snPos + ENTRY_LEN, 
+                                      secNumInClus, clusIndx, lnFlags, 
+                                      secArr, currEnt, snPos);
               return SUCCESS;                          
             }                   
           }
@@ -352,19 +306,19 @@ uint8_t fat_SetNextEntry(FatDir *currDir, FatEntry *currEnt, BPB *bpb)
           {
             char lnDummyStr[1];
 
-            attrByte = currSecArr[entPos + ATTR_BYTE_OFFSET];
+            attrByte = secArr[entPos + ATTR_BYTE_OFFSET];
 
             // update the currEnt members with values for the 'next' entry.
-            pvt_UpdateFatEntryState(lnDummyStr, entPos + ENTRY_LEN, currSecNumInClus, 
-                        clusIndx, lnFlags, currSecArr, currEnt, 
-                        entPos);
+            pvt_UpdateFatEntryState(lnDummyStr, entPos + ENTRY_LEN, 
+                                    secNumInClus, clusIndx, lnFlags, 
+                                    secArr, currEnt, entPos);
             return SUCCESS;  
           }
         }
       }
       entPos = 0;                 // reset counter for sector loop
     }
-    currSecNumInClus = 0;         // reset counter for cluster loop
+    secNumInClus = 0;         // reset counter for cluster loop
   }
   // get index of next cluster and continue looping if not last cluster 
   while ((clusIndx = pvt_GetNextClusIndex(clusIndx, bpb)) != END_CLUSTER);
