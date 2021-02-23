@@ -108,24 +108,19 @@ void fat_InitEntry(FatEntry *ent, BPB *bpb)
  *                                                  SET FAT ENTRY TO NEXT ENTRY 
  *                                      
  * Description : Updates the FatEntry instance, currEnt, to the next entry in 
- *               the current directory.
+ *               its directory.
  * 
- * Arguments   : currDir     Current directory. Pointer to a FatDir instance.
- * 
- *               currEnt     Current entry. Pointer to a FatEntry instance.
+ * Arguments   : currEnt     Current entry. Pointer to a FatEntry instance.
  * 
  *               bpb         Pointer to a valid instance of a BPB struct.
  *
  * Returns     : A FAT Error Flag. If any value other than SUCCESS is returned 
  *               then the function was unable to update the FatEntry.
- * ----------------------------------------------------------------------------
+ * -----------------------------------------------------------------------------
  */
-uint8_t fat_SetNextEntry(FatDir *currDir, FatEntry *currEnt, BPB *bpb)
+uint8_t fat_SetNextEntry(FatEntry *currEnt, BPB *bpb)
 {
-  //
-  // capture currEnt state in local vars. These will be updated by the function
-  // and if successful the corresponding currEnt memebers will be updated.
-  //
+  // capture currEnt state in local vars.
   uint32_t clusIndx = currEnt->snEntClusIndx;
   uint16_t snPos = currEnt->snPos;
   uint8_t  secNumInClus = currEnt->snEntSecNumInClus;
@@ -148,21 +143,19 @@ uint8_t fat_SetNextEntry(FatDir *currDir, FatEntry *currEnt, BPB *bpb)
         continue;
       }
 
-      // calculate location of the current sector on the physical (disk)
+      // calculate physical location of sector on the disk/volume
       uint32_t physSecNum = secNumInClus + bpb->dataRegionFirstSector
                           + (clusIndx - bpb->rootClus) * bpb->secPerClus;
       
-      // create and load array with sector data bytes
+      // create and load array with sector data bytes from disk
       uint8_t secArr[bpb->bytesPerSec];  
       if (FATtoDisk_ReadSingleSector(physSecNum, secArr) 
           == FTD_READ_SECTOR_FAILED)
         return FAILED_READ_SECTOR;
 
-      // loop through the entries in the sector.
+      // loop through entries in the sector.
       for (; entPos < bpb->bytesPerSec; entPos = entPos + ENTRY_LEN)
       {
-        uint8_t lnFlags = 0;
-
         // if first byte of an entry is 0, rest of entries should be empty
         if (!secArr[entPos])                                                       
           return END_OF_DIRECTORY;
@@ -187,17 +180,15 @@ uint8_t fat_SetNextEntry(FatDir *currDir, FatEntry *currEnt, BPB *bpb)
             //
             snPos = entPos + ENTRY_LEN * (LN_ORD_MASK & secArr[entPos]);
 
-            // set long name flags
-            lnFlags |= LN_EXISTS_FLAG;
-
             // if short name is in the next sector
             if (snPos >= bpb->bytesPerSec)
             {
-              uint8_t nextSecArr[bpb->bytesPerSec]; 
-              uint8_t crossSectorBoundaryFlag = 0;
+              
+              uint8_t lnCrossSectorBoundaryFlag = 0;
               if (snPos > bpb->bytesPerSec)              
-                crossSectorBoundaryFlag++;
-
+                lnCrossSectorBoundaryFlag++;
+              
+              uint8_t nextSecArr[bpb->bytesPerSec]; 
               // 
               // locate next sector. If current sec number is the last sec in
               // the cluster (spc - 1) then next sec is in next cluster else 
@@ -231,7 +222,7 @@ uint8_t fat_SetNextEntry(FatDir *currDir, FatEntry *currEnt, BPB *bpb)
                 return CORRUPT_FAT_ENTRY;
               
               // Handles ln cross sector boundary --> sn in the next sector
-              if(crossSectorBoundaryFlag)
+              if(lnCrossSectorBoundaryFlag)
               {
                 uint8_t lnStrIndx = 0;
 
@@ -269,8 +260,8 @@ uint8_t fat_SetNextEntry(FatDir *currDir, FatEntry *currEnt, BPB *bpb)
 
               // update the currEnt members with values for the 'next' entry.
               pvt_UpdateFatEntryState(lnStr, snPos + ENTRY_LEN, secNumInClus, 
-                                      clusIndx, lnFlags, nextSecArr, currEnt, 
-                                      snPos);
+                                      clusIndx, LN_EXISTS_FLAG ,nextSecArr, 
+                                      currEnt, snPos);
               return SUCCESS;
             }
 
@@ -294,9 +285,9 @@ uint8_t fat_SetNextEntry(FatDir *currDir, FatEntry *currEnt, BPB *bpb)
                                lnStr, &lnStrIndx);
 
               // update the currEnt members with values for the 'next' entry.
-              pvt_UpdateFatEntryState(lnStr, snPos + ENTRY_LEN, 
-                                      secNumInClus, clusIndx, lnFlags, 
-                                      secArr, currEnt, snPos);
+              pvt_UpdateFatEntryState(lnStr, snPos + ENTRY_LEN, secNumInClus,
+                                      clusIndx, LN_EXISTS_FLAG, secArr, 
+                                      currEnt, snPos);
               return SUCCESS;                          
             }                   
           }
@@ -309,8 +300,8 @@ uint8_t fat_SetNextEntry(FatDir *currDir, FatEntry *currEnt, BPB *bpb)
             attrByte = secArr[entPos + ATTR_BYTE_OFFSET];
 
             // update the currEnt members with values for the 'next' entry.
-            pvt_UpdateFatEntryState(lnDummyStr, entPos + ENTRY_LEN, 
-                                    secNumInClus, clusIndx, lnFlags, 
+            pvt_UpdateFatEntryState(lnDummyStr, entPos + ENTRY_LEN,
+                                    secNumInClus, clusIndx, !LN_EXISTS_FLAG, 
                                     secArr, currEnt, entPos);
             return SUCCESS;  
           }
@@ -409,7 +400,7 @@ uint8_t fat_SetDir(FatDir *dir, char *newDirStr, BPB *bpb)
   //
   do 
   {
-    err = fat_SetNextEntry(dir, ent, bpb);
+    err = fat_SetNextEntry(ent, bpb);
     if (err != SUCCESS) 
       return err;
     
@@ -505,7 +496,7 @@ uint8_t fat_PrintDir(FatDir *dir, uint8_t entFilt, BPB *bpb)
   // directory, dir, then print the entry and fields according to the entFilt
   // setting. Repeat until reaching END_OF_DIRECTORY is returned.
   //
-  while (fat_SetNextEntry(dir, ent, bpb) != END_OF_DIRECTORY)
+  while (fat_SetNextEntry(ent, bpb) != END_OF_DIRECTORY)
   { 
     // Only print hidden entries if the HIDDEN filter flag has been set.
     if (!(((ent->snEnt[ATTR_BYTE_OFFSET] & HIDDEN_ATTR) && !(entFilt & HIDDEN))
@@ -580,7 +571,7 @@ uint8_t fat_PrintFile(FatDir *dir, char *fileNameStr, BPB *bpb)
   do 
   {
     // get the next entry
-    err = fat_SetNextEntry (dir, ent, bpb);
+    err = fat_SetNextEntry (ent, bpb);
     if (err != SUCCESS) 
       return err;
     

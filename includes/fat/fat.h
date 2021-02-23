@@ -294,11 +294,9 @@ void fat_InitEntry(FatEntry *ent, BPB *bpb);
  *                                                  SET FAT ENTRY TO NEXT ENTRY 
  *                                      
  * Description : Updates the FatEntry instance, currEnt, to the next entry in 
- *               the current directory (currDir).
+ *               its directory.
  * 
- * Arguments   : currDir     Current directory. Pointer to a FatDir instance.
- * 
- *               currEnt     Current entry. Pointer to a FatEntry instance.
+ * Arguments   : currEnt     Current entry. Pointer to a FatEntry instance.
  * 
  *               bpb         Pointer to a valid instance of a BPB struct.
  *
@@ -306,7 +304,7 @@ void fat_InitEntry(FatEntry *ent, BPB *bpb);
  *               then the function was unable to update the FatEntry.
  * -----------------------------------------------------------------------------
  */
-uint8_t fat_SetNextEntry(FatDir *currDir, FatEntry *currEntry, BPB *bpb);
+uint8_t fat_SetNextEntry(FatEntry *currEntry, BPB *bpb);
 
 /*
  * ----------------------------------------------------------------------------
