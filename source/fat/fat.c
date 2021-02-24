@@ -28,10 +28,9 @@ static uint8_t  pvt_CheckName(const char *nameStr);
 static uint8_t  pvt_SetDirToParent(FatDir *dir, BPB *bpb);
 static uint32_t pvt_GetNextClusIndex(const uint32_t currClusIndx, BPB *bpb);
 static void     pvt_PrintEntFields(const uint8_t *byte, const uint8_t flags);
-static void     pvt_PrintShortName(const uint8_t *byte);
-static uint8_t  pvt_PrintFile(uint8_t *fileSec, BPB *bpb);
-static void pvt_LoadLongName(const int lnFirstEnt, const int lnLastEnt, 
-                             const uint8_t *secArr, char *lnStr);
+static uint8_t  pvt_PrintFile(uint8_t *snEnt, BPB *bpb);
+static void     pvt_LoadLongName(const int lnFirstEnt, const int lnLastEnt, 
+                                 const uint8_t *secArr, char *lnStr);
 static void     pvt_UpdateFatEntryState(char *lnStr, uint16_t entPos, 
                             uint8_t snEntSecNumInClus, uint32_t snEntClusIndx,
                             uint8_t lnFlags, uint8_t  *secArr, FatEntry *ent,
@@ -469,7 +468,7 @@ uint8_t fat_PrintDir(FatDir *dir, uint8_t entFilt, BPB *bpb)
       if ((entFilt & SHORT_NAME) == SHORT_NAME)
       {
         pvt_PrintEntFields(ent->snEnt, entFilt);
-        pvt_PrintShortName(ent->snEnt);
+        print_Str(ent->snStr);
       }
 
       // Print long names if the LONG_NAME filter flag is set.
@@ -631,7 +630,7 @@ static void pvt_UpdateFatEntryState(char *lnStr, uint16_t entPos,
   char sn[SN_STR_LEN] = {'\0'};
   char *snFill = sn;
   
-  // copy short name entry bytes into snEnt FatEntry member
+  // copy short name entry bytes into*snEnt FatEntry member
   for (uint8_t byteNum = 0; byteNum < ENTRY_LEN; byteNum++)
     ent->snEnt[byteNum] = secArr[snPos + byteNum];
   
@@ -1021,8 +1020,8 @@ static void pvt_PrintEntFields(const uint8_t *secArr, const uint8_t flags)
     fileSize <<= 8;
     fileSize |= secArr[28];
 
-    // Print spaces for formatting output. Add 1 for case when digitCount would start at 0
-    for (uint32_t digitCount = 1 + fileSize / div; digitCount < 10000000; digitCount *= 10)
+    // Print spaces for formatting output. Add 1 to prevent starting at 0.
+    for (uint32_t spaces = 1 + fileSize / div; spaces < 10000000; spaces *= 10)
       print_Str(" ");
 
     print_Dec(fileSize / div);
@@ -1041,103 +1040,46 @@ static void pvt_PrintEntFields(const uint8_t *secArr, const uint8_t flags)
 
 /*
  * ----------------------------------------------------------------------------
- *                                                   (PRIVATE) PRINT SHORT NAME
- * 
- * Description : Print the short name (8.3) of a FAT file or directory entry.
- * 
- * Arguments   : secArr     Pointer to an array holding the contents of the FAT
- *                          sector where the short name entry is found.
- *               
- *               flags      Determines if entry TYPE field will be printed.
- * 
- * Returns     : void
- * ----------------------------------------------------------------------------
- */
-static void pvt_PrintShortName(const uint8_t *secArr)
-{
-  char snStr[SN_NAME_STR_LEN] = {'\0'};
-  char extStr[SN_EXT_STR_LEN + 1] = {'\0'}; // adding 1 for '.' position
-
-  // If directory entry then assume no extension  
-  if (secArr[ATTR_BYTE_OFFSET] & DIR_ENTRY_ATTR)
-  {
-    // load short name chars in secArr into sn string array
-    for (uint8_t bytePos = 0; bytePos < 8; bytePos++)                                                     
-      snStr[bytePos] = secArr[bytePos];
-
-    // print directory short name
-    print_Str(snStr);
-  }
-
-  // file entries. must handle extension.
-  else 
-  {
-    // load name portion of short name into the snStr
-    for (uint8_t bytePos = 0; bytePos < 8; bytePos++)
-    {
-      snStr[bytePos] = secArr[bytePos];
-      if (snStr[bytePos] == ' ') 
-      { 
-        snStr[bytePos] = '\0'; 
-        break; 
-      }
-    }
-    // print short name string
-    print_Str(snStr);
-
-    // load extension from sector array. Extension chars begin at byte 7
-    strcpy(extStr, ".   ");
-    for (uint8_t bytePos = 1; bytePos < SN_EXT_STR_LEN; bytePos++) 
-      extStr[bytePos] = secArr[7 + bytePos];
-
-    // if extenstion exists, print it.
-    if (strcmp(extStr, ".   ")) 
-      print_Str(extStr);
-  }
-}
-
-/*
- * ----------------------------------------------------------------------------
  *                                                   (PRIVATE) PRINT A FAT FILE
  * 
  * Description : Performs the print file operation. This will output plain text
  *               to the screen.
  * 
- * Arguments   : fileSec     Pointer to array holding the contents of the FAT 
- *                           sector where the file-to-be-printed's short name 
- *                           entry is located.
+ * Arguments   :*snEnt     Pointer to array holding the contents of the FAT 
+ *                         sector where the file-to-be-printed's short name 
+ *                         entry is located.
  *               
- *               bpb         Pointer to a valid instance of a BPB struct.
+ *               bpb       Pointer to a valid instance of a BPB struct.
  * 
  * Returns     : END_OF_FILE (success) or FAILED_READ_SECTOR fat error flag.
  * ----------------------------------------------------------------------------
  */
-static uint8_t pvt_PrintFile(uint8_t *fileSec, BPB *bpb)
+static uint8_t pvt_PrintFile(uint8_t *snEnt, BPB *bpb)
 {
   //get FAT index for file's first cluster
-  uint32_t clus = fileSec[21];
+  uint32_t clus; 
+  clus = snEnt[21];
   clus <<= 8;
-  clus |= fileSec[20];
+  clus |= snEnt[20];
   clus <<= 8;
-  clus |= fileSec[27];
+  clus |= snEnt[27];
   clus <<= 8;
-  clus |= fileSec[26];
+  clus |= snEnt[26];
 
   // loop over clusters to read in and print file
   do
   {
     // loop over sectors in the cluster to read in and print file
-    for (uint32_t currSecNumInClus = 0; 
-         currSecNumInClus < bpb->secPerClus; 
-         currSecNumInClus++) 
+    for (uint32_t secNumInClus = 0; secNumInClus < bpb->secPerClus; 
+         secNumInClus++)
     {
       // calculate address of the sector on the physical disk to read in
-      uint32_t currSecNumPhys = currSecNumInClus + bpb->dataRegionFirstSector
-                              + (clus - 2) * bpb->secPerClus;
+      uint32_t secNumPhys = secNumInClus + bpb->dataRegionFirstSector
+                          + (clus - bpb->rootClus) * bpb->secPerClus;
 
-      // read disk sector in the sector array
-      uint8_t secArr[SECTOR_LEN];
-      if (FATtoDisk_ReadSingleSector(currSecNumPhys, secArr) 
+      // read disk sector into the sector array
+      uint8_t secArr[bpb->bytesPerSec];
+      if (FATtoDisk_ReadSingleSector(secNumPhys, secArr) 
           == FTD_READ_SECTOR_FAILED)  
         return FAILED_READ_SECTOR;
 
@@ -1148,17 +1090,17 @@ static uint8_t pvt_PrintFile(uint8_t *fileSec, BPB *bpb)
 
         // 
         // for output formatting. Currently using terminal that requires "\n\r"
-        // to go to the start of the next line. Therefore is '\n' is detected
+        // to go to the start of the next line. Therefore if '\n' is detected
         // then need to print "\n\r".
         //
         if (secArr[byteNum] == '\n') 
           print_Str ("\n\r");
         
-        // else just print the character directly to the screen if not 0. 
+        // else if not 0, just print the character directly to the screen.
         else if (secArr[byteNum] != 0) 
           usart_Transmit(secArr[byteNum]);
        
-        // else character is zero likely indicatin the eof.
+        // else character is zero. Possible indicatin of eof.
         else 
         {
           // assume eof and set flag
@@ -1168,15 +1110,14 @@ static uint8_t pvt_PrintFile(uint8_t *fileSec, BPB *bpb)
           for (byteNum++; byteNum < bpb->bytesPerSec; byteNum++)
           {
             // if any byte is not 0 then not at eof so reset eof to 0
-            if (secArr[byteNum] != 0) 
+            if (secArr[byteNum]) 
             { 
               byteNum--;
               eof = 0;
               break;
             }
           }
-         }
-        // if eof flag is set here the return. else continue.
+        }
         if (eof)
           return END_OF_FILE;
       }
