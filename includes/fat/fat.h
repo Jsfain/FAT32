@@ -234,7 +234,7 @@ FatDir;
  *               manually, but only by passing it to the FAT functions.
  * ----------------------------------------------------------------------------
  */
-typedef struct
+typedef struct 
 {
   char lnStr[LN_STR_LEN_MAX + 1];                // entry long name
   char snStr[13];                                // entry short name
@@ -249,7 +249,7 @@ typedef struct
   uint8_t  snEntSecNumInClus;  
   uint16_t entPos;             
   uint16_t snPos;
-}
+} 
 FatEntry;
 
 /*
@@ -272,13 +272,14 @@ FatEntry;
  * Returns     : void
  * ----------------------------------------------------------------------------
  */
-void fat_SetDirToRoot(FatDir *dir, BPB *bpb);
+void fat_SetDirToRoot(FatDir *dir, const BPB *bpb);
 
 /*
  * ----------------------------------------------------------------------------
  *                                                         INITIALIZE FAT ENTRY
  *                                      
- * Description : Initializes an entry of FatEntry.
+ * Description : Initializes an entry of FatEntry. After completing this should 
+ *               be set to the first entry of the ROOT directory.
  * 
  * Arguments   : ent     Pointer to the FatEntry instance to be initialized.
  *            
@@ -287,7 +288,7 @@ void fat_SetDirToRoot(FatDir *dir, BPB *bpb);
  * Returns     : void
  * ----------------------------------------------------------------------------
  */
-void fat_InitEntry(FatEntry *ent, BPB *bpb);
+void fat_InitEntry(FatEntry *ent, const BPB *bpb);
 
 /*
  * ----------------------------------------------------------------------------
@@ -304,7 +305,7 @@ void fat_InitEntry(FatEntry *ent, BPB *bpb);
  *               then the function was unable to update the FatEntry.
  * -----------------------------------------------------------------------------
  */
-uint8_t fat_SetNextEntry(FatEntry *currEntry, BPB *bpb);
+uint8_t fat_SetNextEntry(FatEntry *currEntry, const BPB *bpb);
 
 /*
  * ----------------------------------------------------------------------------
@@ -343,7 +344,7 @@ uint8_t fat_SetNextEntry(FatEntry *currEntry, BPB *bpb);
  *                  name.
  * ----------------------------------------------------------------------------
  */
-uint8_t fat_SetDir(FatDir *dir, char *newDirStr, BPB *bpb);
+uint8_t fat_SetDir(FatDir *dir, const char *newDirStr, const BPB *bpb);
 
 /*
  * ----------------------------------------------------------------------------
@@ -368,7 +369,7 @@ uint8_t fat_SetDir(FatDir *dir, char *newDirStr, BPB *bpb);
  *               argument. If not, then no entries will be printed.
  * ----------------------------------------------------------------------------
  */
-uint8_t fat_PrintDir(FatDir *dir, uint8_t entFld, BPB *bpb);
+uint8_t fat_PrintDir(const FatDir *dir, const uint8_t entFld, const BPB *bpb);
 
 /*
  * ----------------------------------------------------------------------------
@@ -392,7 +393,7 @@ uint8_t fat_PrintDir(FatDir *dir, uint8_t entFld, BPB *bpb);
  *               entry does not exist, in which case it must be a short name.
  * ----------------------------------------------------------------------------
  */
-uint8_t fat_PrintFile(FatDir *dir, char *fileNameStr, BPB *bpb);
+uint8_t fat_PrintFile(const FatDir *dir, const char *fileStr, const BPB *bpb);
 
 /*
  *-----------------------------------------------------------------------------

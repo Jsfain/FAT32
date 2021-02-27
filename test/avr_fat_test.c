@@ -130,7 +130,10 @@ int main(void)
     // sectors/blocks are located. This should only be set once here.
     //
     
-    BPB *bpbPtr = malloc(sizeof(BPB));
+    BPB *bpbPtr = (BPB *)malloc(sizeof(BPB));
+    if (bpbPtr == NULL)
+      print_Str("\nFailed to create pointer to BPB object\n");
+      
     err = fat_SetBPB (bpbPtr);
     if (err != BPB_VALID)
     {
