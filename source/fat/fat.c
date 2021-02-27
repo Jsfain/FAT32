@@ -24,21 +24,22 @@
  ******************************************************************************
  */
 
-static uint8_t  pvt_CheckName(const char nameStr[]);
-static uint8_t  pvt_SetDirToParent(FatDir *dir, const BPB *bpb);
-static uint32_t pvt_GetNextClusIndex(uint32_t currClusIndx, const BPB *bpb);
-static void     pvt_PrintEntFields(const uint8_t *byte, const uint8_t flags);
-static uint8_t  pvt_PrintFile(uint8_t snEnt[], const BPB *bpb);
-static void     pvt_LoadLongName(const int lnFirstEnt, const int lnLastEnt, 
-                                 const uint8_t secArr[], char lnStr[]);
 static void pvt_UpdateFatEntryMembers(FatEntry *ent,
                                       const char lnStr[], 
                                       const uint16_t entPos, 
                                       const uint8_t snEntSecNumInClus,
                                       const uint32_t snEntClusIndx,
-                                      const uint8_t lnFlags, 
                                       const uint8_t secArr[],
                                       const uint16_t snPos);
+static uint8_t  pvt_CheckName(const char nameStr[]);
+static uint8_t  pvt_SetDirToParent(FatDir *dir, const BPB *bpb);
+static uint32_t pvt_GetNextClusIndex(const uint32_t currClusIndx, 
+                                     const BPB *bpb);
+static void     pvt_PrintEntFields(const uint8_t *byte, const uint8_t flags);
+static uint8_t  pvt_PrintFile(uint8_t snEnt[], const BPB *bpb);
+static void     pvt_LoadLongName(const int lnFirstEnt, const int lnLastEnt, 
+                                 const uint8_t secArr[], char lnStr[]);
+
 
 // macros used by the local static (private) functions
 #define LEGAL   0
@@ -251,8 +252,7 @@ uint8_t fat_SetNextEntry(FatEntry *currEnt, const BPB *bpb)
               pvt_LoadLongName(LAST_ENTPOS_IN_SEC, entPos, secArr, lnStr);
             }
             pvt_UpdateFatEntryMembers(currEnt, lnStr, snPos + ENTRY_LEN, 
-                                      secNumInClus, clusIndx, LN_EXISTS_FLAG,
-                                      nextSecArr, snPos);
+                                    secNumInClus, clusIndx, nextSecArr, snPos);
             return SUCCESS;
           }
 
@@ -270,8 +270,7 @@ uint8_t fat_SetNextEntry(FatEntry *currEnt, const BPB *bpb)
             
             pvt_LoadLongName(snPos - ENTRY_LEN, entPos, secArr, lnStr);
             pvt_UpdateFatEntryMembers(currEnt, lnStr, snPos + ENTRY_LEN, 
-                                      secNumInClus, clusIndx, LN_EXISTS_FLAG,
-                                      secArr, snPos);
+                                      secNumInClus, clusIndx, secArr, snPos);
             return SUCCESS;                          
           }                   
         }
@@ -280,8 +279,7 @@ uint8_t fat_SetNextEntry(FatEntry *currEnt, const BPB *bpb)
         else
         {
           pvt_UpdateFatEntryMembers(currEnt, "", entPos + ENTRY_LEN, 
-                                    secNumInClus, clusIndx, !LN_EXISTS_FLAG,
-                                    secArr, entPos);
+                                    secNumInClus, clusIndx, secArr, entPos);
           return SUCCESS;  
         }
       }
@@ -635,7 +633,6 @@ static void pvt_UpdateFatEntryMembers(FatEntry *ent,
                                       const uint16_t entPos, 
                                       const uint8_t snEntSecNumInClus,
                                       const uint32_t snEntClusIndx,
-                                      const uint8_t lnFlags, 
                                       const uint8_t secArr[],
                                       const uint16_t snPos)
 {
@@ -669,8 +666,10 @@ static void pvt_UpdateFatEntryMembers(FatEntry *ent,
   ent->snPos = snPos;
 
   strcpy(ent->snStr, sn);
-  if (lnFlags & LN_EXISTS_FLAG)
+  // if long name is not empty load copy lnStr
+  if (strcmp(lnStr,""))
     strcpy(ent->lnStr, lnStr);
+  // else copy short name string into lnStr ent member
   else
     strcpy(ent->lnStr, sn);
 }

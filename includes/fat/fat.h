@@ -110,15 +110,6 @@
 
 /* 
  * ----------------------------------------------------------------------------
- *                                                       LONG NAME EXISTS FLAGS
- *
- * Description : Flag used by FAT functions to indicate if a long name exists.
- * ----------------------------------------------------------------------------
- */
-#define LN_EXISTS_FLAG         0x01
-
-/* 
- * ----------------------------------------------------------------------------
  *                                                              FAT ERROR FLAGS
  *
  * Description : Error Flags returned by various FAT functions.
