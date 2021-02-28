@@ -33,12 +33,13 @@ static void pvt_UpdateFatEntryMembers(FatEntry *ent,
                                       const uint16_t snPos);
 static uint8_t  pvt_CheckName(const char nameStr[]);
 static uint8_t  pvt_SetDirToParent(FatDir *dir, const BPB *bpb);
-static uint32_t pvt_GetNextClusIndex(const uint32_t currClusIndx, 
+static void     pvt_LoadLongName(const int lnFirstEnt, const int lnLastEnt, 
+                                 const uint8_t secArr[], char lnStr[]);
+static uint32_t pvt_GetNextClusIndex(const uint32_t currClusIndex, 
                                      const BPB *bpb);
 static void     pvt_PrintEntFields(const uint8_t *byte, const uint8_t flags);
 static uint8_t  pvt_PrintFile(uint8_t snEnt[], const BPB *bpb);
-static void     pvt_LoadLongName(const int lnFirstEnt, const int lnLastEnt, 
-                                 const uint8_t secArr[], char lnStr[]);
+
 
 
 // macros used by the local static (private) functions
@@ -542,7 +543,6 @@ uint8_t fat_PrintFile(const FatDir *dir, const char fileStr[], const BPB *bpb)
   // function, pvt_PrintFile() is called to print this file. If no matching 
   // file is found, then the loop will exit once END_OF_DIRECTORY is returned.
   //
-
   while ((err = fat_SetNextEntry(ent, bpb)) == SUCCESS) 
   { 
     // if entry is a directory, continue
@@ -552,9 +552,10 @@ uint8_t fat_PrintFile(const FatDir *dir, const char fileStr[], const BPB *bpb)
     // if matching file is found print its contents
     if (!strcmp(ent->lnStr, fileStr))
     {
+      print_Str("\n\n\r");
+      err = pvt_PrintFile(ent->snEnt, bpb); //END_OF_FILE or FAILED_READ_SECTOR
       free(ent);
-      //returns END_OF_FILE or FAILED_READ_SECTOR
-      return pvt_PrintFile(ent->snEnt, bpb);
+      return err;
     }
   }
 
@@ -666,11 +667,9 @@ static void pvt_UpdateFatEntryMembers(FatEntry *ent,
   ent->snPos = snPos;
 
   strcpy(ent->snStr, sn);
-  // if long name is not empty load copy lnStr
-  if (strcmp(lnStr,""))
+  if (strcmp(lnStr,""))                     // if long name is not empty
     strcpy(ent->lnStr, lnStr);
-  // else copy short name string into lnStr ent member
-  else
+  else                                      // else copy sn str into ln str
     strcpy(ent->lnStr, sn);
 }
 
@@ -732,9 +731,9 @@ static uint8_t pvt_SetDirToParent(FatDir *dir, const BPB *bpb)
 
   // absolute (physical) sector number on disk
   secNumPhys = bpb->dataRegionFirstSector 
-                 + (dir->fstClusIndx - bpb->rootClus) 
-                 * bpb->secPerClus;
-
+             + (dir->fstClusIndx - bpb->rootClus) 
+             * bpb->secPerClus;
+                
   // load secArr with disk sector at curreSecNumPhys
   if (FATtoDisk_ReadSingleSector(secNumPhys, secArr)
       == FTD_READ_SECTOR_FAILED)
@@ -752,36 +751,29 @@ static uint8_t pvt_SetDirToParent(FatDir *dir, const BPB *bpb)
   parentDirFirstClus <<= 8;
   parentDirFirstClus |= secArr[58];
 
-  // 
-  // if dir is already the root directory, do nothing, else if root directory 
-  // is the parent dir set FatDir members to the root directory, else set 
-  // FatDir members to the parent directory.
-  //
-  if (dir->fstClusIndx == bpb->rootClus); 
-  else if (parentDirFirstClus == 0)
+  if (dir->fstClusIndx == bpb->rootClus);   // current dir is root dir
+  else if (parentDirFirstClus == 0)         // parent dir is root dir
     fat_SetDirToRoot(dir, bpb);
-  else
+  else                                      // parent dir is a typical sub-dir
   {          
-    char tmpShortNamePath[PATH_STRING_LEN_MAX];
-    char tmpLongNamePath[PATH_STRING_LEN_MAX];
+    char tmpSNPath[PATH_STRING_LEN_MAX];
+    char tmpLNPath[PATH_STRING_LEN_MAX];
 
     // load current path member values to temp strings
-    strlcpy(tmpShortNamePath, dir->snPathStr, strlen(dir->snPathStr));
-    strlcpy(tmpLongNamePath,  dir->lnPathStr, strlen(dir->lnPathStr));
+    strlcpy(tmpSNPath, dir->snPathStr, strlen(dir->snPathStr));
+    strlcpy(tmpLNPath, dir->lnPathStr, strlen(dir->lnPathStr));
     
     // create pointer to location in temp strings holding the final '/'
-    char *shortNameLastDirInPath = strrchr(tmpShortNamePath, '/');
-    char *longNameLastDirInPath  = strrchr(tmpLongNamePath , '/');
+    char *snLastDirInPath = strrchr(tmpSNPath, '/');
+    char *lnLastDirInPath = strrchr(tmpLNPath, '/');
     
     // copy last directory in path string to the short/long name strings
-    strcpy(dir->snStr, shortNameLastDirInPath + 1);
-    strcpy(dir->lnStr, longNameLastDirInPath  + 1);
+    strcpy(dir->snStr, ++snLastDirInPath);
+    strcpy(dir->lnStr, ++lnLastDirInPath);
 
     // remove the last directory in path strings
-    strlcpy(dir->snPathStr, tmpShortNamePath,
-           (shortNameLastDirInPath + 2) - tmpShortNamePath);
-    strlcpy(dir->lnPathStr,  tmpLongNamePath,  
-           (longNameLastDirInPath  + 2) -  tmpLongNamePath);
+    strlcpy(dir->snPathStr, tmpSNPath, ++snLastDirInPath - tmpSNPath);
+    strlcpy(dir->lnPathStr, tmpLNPath, ++lnLastDirInPath - tmpLNPath);
 
     dir->fstClusIndx = parentDirFirstClus;
   }
@@ -820,14 +812,14 @@ static void pvt_LoadLongName(const int lnFirstEnt, const int lnLastEnt,
                              const uint8_t secArr[], char lnStr[])
 {
   // set lnStr to point to first null char in array.
-  for (; *lnStr; lnStr++)
+  for (; *lnStr; ++lnStr)
     ;
   
   // loop over the entries in the sector containing the long name
   for (int entPos = lnFirstEnt; entPos >= lnLastEnt; entPos -= ENTRY_LEN)
   {                                              
     //
-    // multiple loops over single entry to load the long name chars
+    // loops to load long name chars from a single entry.    
     // if char is zero or > 127 (out of ascii range) discard.
     //
     for (uint16_t byteNum = entPos + 1; byteNum < entPos + 11; byteNum++)
@@ -850,9 +842,9 @@ static void pvt_LoadLongName(const int lnFirstEnt, const int lnLastEnt,
  * 
  * Description : Finds and returns the next FAT cluster index.
  * 
- * Arguments   : currClusIndx     The current cluster's FAT index.
+ * Arguments   : currClusIndex     The current cluster's FAT index.
  *               
- *               bpb              Pointer to a valid instance of a BPB struct.
+ *               bpb               Pointer to a valid instance of a BPB struct.
  * 
  * Returns     : A file or dir's next FAT cluster index. If END_CLUSTER is 
  *               returned, the current cluster is the last of the file or dir.
@@ -862,27 +854,32 @@ static void pvt_LoadLongName(const int lnFirstEnt, const int lnLastEnt,
  *               data region.
  * ----------------------------------------------------------------------------
  */
-static uint32_t pvt_GetNextClusIndex(uint32_t currClusIndx, const BPB *bpb)
+static uint32_t pvt_GetNextClusIndex(const uint32_t currClusIndex, 
+                                     const BPB *bpb)
 {
-  uint8_t  bytesPerClusIndx = 4;
-  uint16_t numIndxdClusPerSecOfFat = bpb->bytesPerSec / bytesPerClusIndx;
-  uint32_t clusIndx = currClusIndx / numIndxdClusPerSecOfFat;
-  uint32_t clusIndxStartByte = 4 * (currClusIndx % numIndxdClusPerSecOfFat);
-  uint32_t fatSectorToRead = clusIndx + bpb->rsvdSecCnt;
-  uint8_t  sectorArr[bpb->bytesPerSec];
+  // calculate address of sector containing the current cluster index
+  const static uint8_t bytesPerIndex = 4;   // 4 bytes for Fat32
+  uint16_t fatIndexesPerSec = bpb->bytesPerSec / bytesPerIndex;
+  uint16_t clusIndexPosInSec = (uint16_t)(currClusIndex / fatIndexesPerSec);
+  uint32_t fatSectorToRead = clusIndexPosInSec + bpb->rsvdSecCnt;
   
-  FATtoDisk_ReadSingleSector(fatSectorToRead, sectorArr);
+  // load current cluster's index sector into secArr
+  uint8_t secArr[bpb->bytesPerSec];
+  FATtoDisk_ReadSingleSector(fatSectorToRead, secArr);
 
-  clusIndx  = 0;
-  clusIndx  = sectorArr[clusIndxStartByte + 3];
-  clusIndx <<= 8;
-  clusIndx |= sectorArr[clusIndxStartByte + 2];
-  clusIndx <<= 8;
-  clusIndx |= sectorArr[clusIndxStartByte + 1];
-  clusIndx <<= 8;
-  clusIndx |= sectorArr[clusIndxStartByte];
+  // load value in the cluster index. This will be the next cluster index.
+  uint32_t nextClusIndex;
+  uint16_t nextClusIndexFirstByteInSec = bytesPerIndex 
+                                       * (currClusIndex % fatIndexesPerSec);
+  nextClusIndex  = secArr[nextClusIndexFirstByteInSec + 3];
+  nextClusIndex <<= 8;
+  nextClusIndex |= secArr[nextClusIndexFirstByteInSec + 2];
+  nextClusIndex <<= 8;
+  nextClusIndex |= secArr[nextClusIndexFirstByteInSec + 1];
+  nextClusIndex <<= 8;
+  nextClusIndex |= secArr[nextClusIndexFirstByteInSec];
 
-  return clusIndx;
+  return nextClusIndex;
 }
 
 /*
