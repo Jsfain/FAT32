@@ -77,6 +77,7 @@
 // local function prototype
 uint32_t enterNumber();
 
+#define SD_INIT_ATTEMPTS 5
 
 int main(void)
 {
@@ -87,16 +88,15 @@ int main(void)
   spi_MasterInit();
 
   // SD card initialization
-  CTV *ctvPtr = malloc(sizeof(CTV));             // SD card type & version
+  CTV ctvPtr;                                    // SD card type & version
   uint32_t sdInitResp;                           // SD card init error response
 
-
   // Attempt SD card init up to 5 times.
-  for (uint8_t i = 0; i < 5; i++)
+  for (uint8_t i = 0; i < SD_INIT_ATTEMPTS; i++)
   {
     print_Str("\n\n\r >> SD Card Initialization Attempt "); 
     print_Dec(i);
-    sdInitResp = sd_InitModeSPI(ctvPtr);        // init SD card into SPI mode
+    sdInitResp = sd_InitModeSPI(&ctvPtr);        // init SD card into SPI mode
 
     if (sdInitResp != 0)
     {    
@@ -130,11 +130,8 @@ int main(void)
     // sectors/blocks are located. This should only be set once here.
     //
     
-    BPB *bpbPtr = (BPB *)malloc(sizeof(BPB));
-    if (bpbPtr == NULL)
-      print_Str("\nFailed to create pointer to BPB object\n");
-      
-    err = fat_SetBPB (bpbPtr);
+    BPB bpbPtr;
+    err = fat_SetBPB(&bpbPtr);
     if (err != BPB_VALID)
     {
       print_Str("\n\r fat_SetBPB() returned ");
@@ -148,8 +145,8 @@ int main(void)
     // the current working directory. The instance should be initialized to 
     // the root directory with fat_SetDirToRoot() prior to using anywhere else.
     //
-    FatDir *cwdPtr = malloc(sizeof(FatDir));
-    fat_SetDirToRoot (cwdPtr, bpbPtr);
+    FatDir cwdPtr;
+    fat_SetDirToRoot(&cwdPtr, &bpbPtr);
     
     // vars to implement cmd-line.
     const uint8_t cmdLineLenMax = 100;           // max char len of cmd/arg
@@ -161,7 +158,7 @@ int main(void)
     uint8_t lastArgFlag = 0;                     // indicates last arg
     char    *spacePtr;                  // for parsing inputStr into cmd & args
     uint8_t numOfChars = 0;                      // number of chars in inputStr
-    uint8_t fieldFlags = 0;     // specify which fields to print with 'ls' cmd.
+    uint8_t fieldFlags = 0;      // specify which fields to print with 'ls' cmd
     uint8_t quit = 0;                            // flag used to exit cmd-line       
 
     print_Str("\n\n\n\r");
@@ -180,8 +177,8 @@ int main(void)
       
       // print cmd prompt to screen with cwd
       print_Str("\n\r"); 
-      print_Str(cwdPtr->lnPathStr);
-      print_Str(cwdPtr->lnStr); 
+      print_Str(cwdPtr.lnPathStr);
+      print_Str(cwdPtr.lnStr); 
       print_Str (" > ");
       
       // ---------------------------------- Get and Parse Command and Arguments
@@ -235,7 +232,7 @@ int main(void)
         // ------------------------------- Command: "cd" (change directory)
         if ( !strcmp (cmdStr, "cd"))
         {   
-          err = fat_SetDir (cwdPtr, argStr, bpbPtr);
+          err = fat_SetDir (&cwdPtr, argStr, &bpbPtr);
           if (err != SUCCESS) 
             fat_PrintError (err);
         }
@@ -297,7 +294,7 @@ int main(void)
           print_Str(" NAME");
           print_Str("\n\r");
 
-          err = fat_PrintDir (cwdPtr, fieldFlags, bpbPtr);
+          err = fat_PrintDir (&cwdPtr, fieldFlags, &bpbPtr);
           if (err != END_OF_DIRECTORY) 
             fat_PrintError (err);
         }
@@ -305,7 +302,7 @@ int main(void)
         // ----------------------------- Command: "open" (print file to screen)
         else if (!strcmp(cmdStr, "open")) 
         { 
-          err = fat_PrintFile (cwdPtr, argStr, bpbPtr);
+          err = fat_PrintFile (&cwdPtr, argStr, &bpbPtr);
           if (err != END_OF_FILE) 
             fat_PrintError (err);
         }
@@ -317,15 +314,15 @@ int main(void)
         else if (!strcmp(cmdStr, "pwd"))
         {
           print_Str ("\n\rsnStr = "); 
-          print_Str (cwdPtr->snStr);
+          print_Str (cwdPtr.snStr);
           print_Str ("\n\rsnPathStr = "); 
-          print_Str (cwdPtr->snPathStr);
+          print_Str (cwdPtr.snPathStr);
           print_Str ("\n\rlnStr = "); 
-          print_Str (cwdPtr->lnStr);
+          print_Str (cwdPtr.lnStr);
           print_Str ("\n\rlnPathStr = "); 
-          print_Str (cwdPtr->lnPathStr);
+          print_Str (cwdPtr.lnPathStr);
           print_Str ("\n\rfstClusIndx = "); 
-          print_Dec (cwdPtr->fstClusIndx);
+          print_Dec (cwdPtr.fstClusIndx);
         }
 
         // --------------------------------------- Command: "q" (exit cmd-line)
@@ -390,7 +387,7 @@ int main(void)
         print_Str("\n\rBLOCK: ");
         print_Dec(blck);
         // SDHC is block addressable
-        if (ctvPtr->type == SDHC)
+        if (ctvPtr.type == SDHC)
           //sdErr = sd_printMultipleBlocks(startBlockNum, numOfBlocks);
           sdErr = sd_ReadSingleBlock(blck, blckArr);
         // SDSC is byte addressable

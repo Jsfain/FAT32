@@ -159,7 +159,6 @@
  */
 #define PATH_STR_LEN_MAX     100       // max length of path string
 #define LN_STR_LEN_MAX       100       // max length of long name string
-// short names
 #define SN_NAME_STR_LEN      9         // num bytes occupied by sn + null
 #define SN_EXT_STR_LEN       4         // num bytes occupied by sn ext + null
 #define SN_STR_LEN           13        // 8 + 3 (sn + ext) and '.' and null

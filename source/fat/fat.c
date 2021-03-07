@@ -24,13 +24,9 @@
  ******************************************************************************
  */
 
-static void pvt_UpdateFatEntryMembers(FatEntry *ent, 
-                                      const char lnStr[], 
-                                      const uint8_t secArr[],
-                                      const uint16_t entPos, 
-                                      const uint16_t snPos,
-                                      const uint8_t snEntSecNumInClus,
-                                      const uint32_t snEntClusIndx);
+static void pvt_UpdateFatEntryMembers(FatEntry *ent, const char lnStr[], 
+           const uint8_t secArr[], const uint16_t snPos, 
+           const uint8_t snEntSecNumInClus, const uint32_t snEntClusIndx);
 static uint8_t pvt_CheckName(const char nameStr[]);
 static uint8_t pvt_SetDirToParent(FatDir *dir, const BPB *bpb);
 static void pvt_LoadLongName(const int lnFirstEnt, 
@@ -100,7 +96,7 @@ void fat_InitEntry(FatEntry *ent, const BPB *bpb)
 
   // set rest of the FatEntry members to 0. 
   ent->snEntSecNumInClus = 0;
-  ent->entPos = 0;
+  //ent->entPos = 0;
   ent->snPos = 0;
 
   // Set the cluster index to point to the ROOT directory.
@@ -128,7 +124,7 @@ uint8_t fat_SetNextEntry(FatEntry *currEnt, const BPB *bpb)
   uint32_t clusIndx = currEnt->snEntClusIndx;
   uint16_t snPos = currEnt->snPos;
   uint8_t  secNumInClus = currEnt->snEntSecNumInClus;
-  uint16_t entPos = currEnt->entPos;
+  uint16_t entPos = snPos + ENTRY_LEN;
 
   // loop over clusters in the directory
   do 
@@ -253,7 +249,7 @@ uint8_t fat_SetNextEntry(FatEntry *currEnt, const BPB *bpb)
             }
 
             pvt_UpdateFatEntryMembers(currEnt, lnStr, nextSecArr, 
-                                      snPos + ENTRY_LEN, snPos, secNumInClus, 
+                                      snPos, secNumInClus, 
                                       clusIndx);
             return SUCCESS;
           }
@@ -272,7 +268,7 @@ uint8_t fat_SetNextEntry(FatEntry *currEnt, const BPB *bpb)
             
             pvt_LoadLongName(snPos - ENTRY_LEN, entPos, secArr, lnStr);
             pvt_UpdateFatEntryMembers(currEnt, lnStr, secArr, 
-                                      snPos + ENTRY_LEN, snPos, secNumInClus,
+                                      snPos, secNumInClus,
                                       clusIndx);
             return SUCCESS;                          
           }                   
@@ -281,7 +277,7 @@ uint8_t fat_SetNextEntry(FatEntry *currEnt, const BPB *bpb)
         // Long name does not exist. Use short name instead.
         else
         {
-          pvt_UpdateFatEntryMembers(currEnt, "", secArr, entPos + ENTRY_LEN,
+          pvt_UpdateFatEntryMembers(currEnt, "", secArr,
                                     entPos, secNumInClus, clusIndx);
 
           return SUCCESS;  
@@ -481,7 +477,6 @@ uint8_t fat_PrintDir(const FatDir *dir, const uint8_t entFlds, const BPB *bpb)
     }
   }
   // returns END_OF_DIRECTORY if successful. Any other value returned is error.
-  //free(ent);
   return err;
 }
 
@@ -616,7 +611,6 @@ void fat_PrintError (uint8_t err)
 static void pvt_UpdateFatEntryMembers(FatEntry *ent,
                                       const char lnStr[],
                                       const uint8_t secArr[],
-                                      const uint16_t entPos,
                                       const uint16_t snPos,
                                       const uint8_t snEntSecNumInClus,
                                       const uint32_t snEntClusIndx)
@@ -647,7 +641,6 @@ static void pvt_UpdateFatEntryMembers(FatEntry *ent,
   // copy rest to the FatEntry members
   ent->snEntSecNumInClus = snEntSecNumInClus;
   ent->snEntClusIndx = snEntClusIndx;
-  ent->entPos = entPos;
   ent->snPos = snPos;
 
   strcpy(ent->snStr, sn);
