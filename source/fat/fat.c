@@ -24,25 +24,16 @@
  ******************************************************************************
  */
 
-static void pvt_UpdateFatEntryMembers(FatEntry *ent, 
-                                      const char lnStr[], 
-                                      const uint8_t secArr[],
-                                      const uint16_t snPos,
-                                      const uint8_t snEntSecNumInClus,
-                                      const uint32_t snEntClusIndx);
+static void pvt_UpdateFatEntryMembers(FatEntry *ent, const char lnStr[], 
+                const uint8_t secArr[], const uint16_t snPos,
+                const uint8_t snEntSecNumInClus, const uint32_t snEntClusIndx);
 static uint8_t pvt_CheckName(const char nameStr[]);
 static uint8_t pvt_SetDirToParent(FatDir *dir, const BPB *bpb);
-static void pvt_LoadLongName(const int lnFirstEnt, 
-                             const int lnLastEnt, 
-                             const uint8_t secArr[], 
-                             char lnStr[]);
+static void pvt_LoadLongName(const int lnFirstEnt, const int lnLastEnt, 
+                             const uint8_t secArr[], char lnStr[]);
 static uint32_t pvt_GetNextClusIndex(const uint32_t clusIndex, const BPB *bpb);
 static void pvt_PrintEntFields(const uint8_t *byte, const uint8_t flags);
 static uint8_t pvt_PrintFile(const uint8_t snEnt[], const BPB *bpb);
-
-// macros used by the local static (private) functions
-#define LEGAL   0
-#define ILLEGAL 1
 
 /*
  ******************************************************************************
@@ -76,10 +67,10 @@ void fat_SetDirToRoot(FatDir *dir, const BPB *bpb)
 
 /*
  * ----------------------------------------------------------------------------
- *                                                 INITIALIZE FAT ENTRY TO ROOT
+ *                                                         INITIALIZE FAT ENTRY
  *                                      
- * Description : Initialize an instance of FatEntry to the first entry of the
- *               root directory.
+ * Description : Initializin an instance of a FatEntry struct will set it to 
+ *               the first entry of the root directory.
  * 
  * Arguments   : ent   - Pointer to the FatEntry instance to be initialized.           
  *               bpb   - Pointer to the BPB struct instance.
@@ -101,7 +92,7 @@ void fat_InitEntry(FatEntry *ent, const BPB *bpb)
   ent->snEntSecNumInClus = 0;
   ent->nextEntPos = 0;
 
-  // Set the cluster index to point to the ROOT directory.
+  // Set the cluster index to point to the root directory.
   ent->snEntClusIndx = bpb->rootClus;
 }
 
@@ -109,8 +100,8 @@ void fat_InitEntry(FatEntry *ent, const BPB *bpb)
  * ----------------------------------------------------------------------------
  *                                                  SET FAT ENTRY TO NEXT ENTRY 
  *                                      
- * Description : Updates current FatEntry instance so that it points to the 
- *               next entry in its directory.
+ * Description : Updates a FatEntry instance to point to the next entry in its
+ *               directory.
  * 
  * Arguments   : currEnt   - Pointer to a FatEntry instance. Its members will 
  *                           be updated to point to the next entry. 
@@ -123,23 +114,24 @@ void fat_InitEntry(FatEntry *ent, const BPB *bpb)
 uint8_t fat_SetNextEntry(FatEntry *currEnt, const BPB *bpb)
 {  
   //
-  // This section sets the initial values of the different nested loop
-  // counters for the first time they are entered in a function call. 
-  // These are set according to the state of the currEnt members.
+  // this section sets the initial values of the different nested loop
+  // counters for the first time they are entered during a single function 
+  // call. These are set according to the state of the currEnt members.
   //
 
   // index of the cluster where the previous short name entry was found
   uint32_t clusIndx = currEnt->snEntClusIndx;
-  // sector num in the cluster where the previous short name was found
+  // sector num in the cluster where the previous short name entry was found
   uint8_t  secNumInClus = currEnt->snEntSecNumInClus;
   // position of entry following previous short name entry in the sector
   uint16_t entPos = currEnt->nextEntPos;
 
   //
   // if previous short name entry occupied the last entry position of a sector
-  // then increment secNumInClus and entPos to 0 so that the search will begin
-  // on this function call at the first entry of the next sector. If the next 
-  // sector is beyond the cluster limit it will be handled in the nested loop.
+  // then increment secNumInClus and set entPos to 0 so that the search for the
+  // next entry will begin on this function call at the first entry of the next
+  // sector. For the case when the the next sector is beyond the cluster limit 
+  // it will be handled in the nested loops.
   //
   if (entPos == SECTOR_LEN)
   {
@@ -207,12 +199,11 @@ uint8_t fat_SetNextEntry(FatEntry *currEnt, const BPB *bpb)
             //
             // locate next sector. Depending on the number of the sector in the 
             // cluster, the next sector will either be in the next cluster or 
-            // it will be the next physical sector on the disk.
+            // it will be the next sector in the cluster and on the disk.
             //
-            // next sector is in the next cluster
-            if (secNumInClus == bpb->secPerClus - 1)   
+            if (secNumInClus == bpb->secPerClus - 1)  // next sec in next clus
             {
-              // calculate location of next sector in the next cluster
+              // calculate location of next sector in next clus on the disk
               secNumOnDisk = bpb->dataRegionFirstSector 
                            + (pvt_GetNextClusIndex(clusIndx, bpb)
                            - bpb->rootClus)
@@ -262,12 +253,11 @@ uint8_t fat_SetNextEntry(FatEntry *currEnt, const BPB *bpb)
 
               pvt_LoadLongName(LAST_ENTRY_POS_IN_SEC, entPos, secArr, lnStr);
             }
-
             pvt_UpdateFatEntryMembers(currEnt, lnStr, nextSecArr, snPos,
                                       secNumInClus, clusIndx);
             return SUCCESS;
           }
-          else               // Long and short name are in the current sector.
+          else          // Long and short name are in the current sector.
           {   
             // Verify snPos does not point to long name
             if ((secArr[snPos + ATTR_BYTE_OFFSET] & LN_ATTR_MASK) 
@@ -292,9 +282,9 @@ uint8_t fat_SetNextEntry(FatEntry *currEnt, const BPB *bpb)
           return SUCCESS;  
         }
       }
-      entPos = FIRST_ENTRY_POS_IN_SEC;      // reset counter for sector loop
+      entPos = FIRST_ENTRY_POS_IN_SEC;      // reset counter for entry loop
     }
-    secNumInClus = FIRST_SECTOR_POS_IN_CLUS;// reset counter for cluster loop
+    secNumInClus = FIRST_SECTOR_POS_IN_CLUS;// reset counter for sector loop
   }
   // get index of next cluster and continue looping if not last cluster
   while ((clusIndx = pvt_GetNextClusIndex(clusIndx, bpb)) != END_CLUSTER);
@@ -313,7 +303,7 @@ uint8_t fat_SetNextEntry(FatEntry *currEnt, const BPB *bpb)
  *                             new directory.             
  *               newDirStr   - Pointer to a string that specifies the name of 
  *                             the new directory.
- *               bpb        - Pointer to the BPB struct instance.
+ *               bpb         - Pointer to the BPB struct instance.
  * 
  * Returns     : A FAT Error Flag. If any value other than SUCCESS is returned 
  *               then the function was unable to update the FatEntry. 
@@ -321,11 +311,11 @@ uint8_t fat_SetNextEntry(FatEntry *currEnt, const BPB *bpb)
  * Notes       : 1) This function can only set the directory to a child or the
  *                  parent of the FatDir instance (dir) when the function is
  *                  called, or reset the instance to the root directory.
- *               2) Do not include any paths (relative or absolute) in the 
+ *               2) Paths (relative or absolute) should not be included in the 
  *                  newDirStr. newDirStr must be only be a directory name which
- *                  must be the name of a child directoy, or the parent, in the
- *                  current directory.
- *               3) If "." is passed as the newDirStr then the new directory
+ *                  must be the name of a child, or the parent, directory of
+ *                  the current directory.
+ *               3) If ".." is passed as the newDirStr then the new directory
  *                  will be set to the parent of the current directory.               
  *               4) newDirStr is case-sensitive.
  *               5) newDirStr must be a long name, unless a long name does not
@@ -334,15 +324,17 @@ uint8_t fat_SetNextEntry(FatEntry *currEnt, const BPB *bpb)
  */
 uint8_t fat_SetDir(FatDir *dir, const char newDirStr[], const BPB *bpb)
 {
-  uint8_t err;                              // for errors and loop conditon
+  // for function return errors. This is the loop cond. and the return value.
+  uint8_t err;                              
 
-  if (pvt_CheckName(newDirStr) == ILLEGAL)  // if newDirStr is illegal name
-    return INVALID_DIR_NAME;
+  if (pvt_CheckName(newDirStr)              // if newDirStr is illegal name
+      == INVALID_FILE_OR_DIR_NAME)  
+    return INVALID_FILE_OR_DIR_NAME;
   else if (!strcmp(newDirStr, "."))         // if newDirStr is current dir
     return SUCCESS;
   else if (!strcmp(newDirStr, ".."))        // if newDirStr is parent dir
     return pvt_SetDirToParent(dir, bpb);    // FAILED_READ_SECTOR or SUCCESS
-  else if (!strcmp(newDirStr, "~"))         // if newDirStr is root dir
+  else if (!strcmp(newDirStr, "~"))         // if newDirStr is "return to root"
   {
     fat_SetDirToRoot(dir, bpb);
     return SUCCESS;
@@ -351,7 +343,7 @@ uint8_t fat_SetDir(FatDir *dir, const char newDirStr[], const BPB *bpb)
   // 
   // Create and initialize a FatEntry instance. This will set the snEntClusIndx
   // member to the root directory and all other members to 0 or null strings, 
-  // then, update the snEntClusIndx to point to the first cluster index of the 
+  // then update the snEntClusIndx to point to the first cluster index of the 
   // FatDir instance (dir).
   //
   FatEntry ent;
@@ -372,28 +364,25 @@ uint8_t fat_SetDir(FatDir *dir, const char newDirStr[], const BPB *bpb)
     if (!(ent.snEnt[ATTR_BYTE_OFFSET] & DIR_ENTRY_ATTR))
       continue;
 
-    // enter if entry matches newDirStr 
+    // if entry matches newDirStr 
     if (!strcmp(ent.lnStr, newDirStr))
     {
       //
       // bytes 20, 21, 26 and 27 of a short name entry give the value of the
       // first cluster index in the FAT for that entry.
       //
-      dir->fstClusIndx = ent.snEnt[21];
+      dir->fstClusIndx = ent.snEnt[FST_CLUS_INDX_SNENT_BYTE_3];
       dir->fstClusIndx <<= 8;
-      dir->fstClusIndx |= ent.snEnt[20];
+      dir->fstClusIndx |= ent.snEnt[FST_CLUS_INDX_SNENT_BYTE_2];
       dir->fstClusIndx <<= 8;
-      dir->fstClusIndx |= ent.snEnt[27];
+      dir->fstClusIndx |= ent.snEnt[FST_CLUS_INDX_SNENT_BYTE_1];
       dir->fstClusIndx <<= 8;
-      dir->fstClusIndx |= ent.snEnt[26];
+      dir->fstClusIndx |= ent.snEnt[FST_CLUS_INDX_SNENT_BYTE_0];
       
-      // pointer used to locate end of newDirStr.
-      const char *endDirStr = newDirStr;
-
       // fill short name array with its characters from the entry
-      char sn[SN_NAME_STR_LEN] = {'\0'};                                    
-      for (uint8_t strPos = 0; endDirStr; ++endDirStr, ++strPos)
-        sn[strPos] = ent.snEnt[strPos];
+      char snStr[SN_NAME_STR_LEN + 1] = {'\0'};      
+      for (uint8_t strPos = 0; strPos < SN_NAME_STR_LEN; ++strPos)
+        snStr[strPos] = ent.snEnt[strPos];
 
       // Append current directory name to the short and long name paths
       strcat (dir->lnPathStr, dir->lnStr);
@@ -406,7 +395,7 @@ uint8_t fat_SetDir(FatDir *dir, const char newDirStr[], const BPB *bpb)
       
       if (dir->snStr[0] != '/') 
         strcat(dir->snPathStr, "/");
-      strcpy(dir->snStr, sn);
+      strcpy(dir->snStr, snStr);
 
       return SUCCESS;
     }
@@ -420,7 +409,8 @@ uint8_t fat_SetDir(FatDir *dir, const char newDirStr[], const BPB *bpb)
  *                                            PRINT DIRECTORY ENTRIES TO SCREEN
  *                                       
  * Description : Prints a list of file and directory entries within a directory
- *               (FatDir instance) along with any specified fields.
+ *               specified by a FatDir instance, along with any of its fields
+ *               requested.
  * 
  * Arguments   : dir        - Pointer to a FatDir instance. This directory's
  *                            entries will be printed to the screen.
@@ -432,7 +422,7 @@ uint8_t fat_SetDir(FatDir *dir, const char newDirStr[], const BPB *bpb)
  * Returns     : A FAT Error Flag. If any value other than END_OF_DIRECTORY is
  *               returned then there was an issue.
  *  
- * Notes       : 1) LONG_NAME and/or SHORT_NAME must be passed in the entFld
+ * Notes       : 1) LONG_NAME and/or SHORT_NAME must be passed in the entFlds
  *                  argument. If not, then no entries will be printed.
  *               2) If both LONG_NAME and SHORT_NAME are passed then both
  *                  the short and long names for each entry will be printed.
@@ -444,12 +434,13 @@ uint8_t fat_SetDir(FatDir *dir, const char newDirStr[], const BPB *bpb)
  */
 uint8_t fat_PrintDir(const FatDir *dir, const uint8_t entFlds, const BPB *bpb)
 {
-  uint8_t err;                              // for errors and loop conditon
+  // for function return errors. This is the loop cond. and the return value.
+  uint8_t err;
 
   // 
   // Create and initialize a FatEntry instance. This will set the snEntClusIndx
   // member to the root directory and all other members to 0 or null strings, 
-  // then, update the snEntClusIndx to point to the first cluster index of the 
+  // then update the snEntClusIndx to point to the first cluster index of the 
   // FatDir instance (dir).
   //
   FatEntry ent;
@@ -459,7 +450,7 @@ uint8_t fat_PrintDir(const FatDir *dir, const uint8_t entFlds, const BPB *bpb)
   // 
   // set the ent FatEntry instance to the next entry in the directory, then 
   // print the entry and fields according to entFlds. After all entries in the
-  // directory have been loaded, fat_SetNextEntry will return END_OF_DIRECTORY.
+  // dir have been loaded, fat_SetNextEntry will return END_OF_DIRECTORY.
   //
   while ((err = fat_SetNextEntry(&ent, bpb)) == SUCCESS)
   { 
@@ -468,7 +459,7 @@ uint8_t fat_PrintDir(const FatDir *dir, const uint8_t entFlds, const BPB *bpb)
       continue;
 
     // Do not print entry if it is the Volume ID entry
-    if  (ent.snEnt[ATTR_BYTE_OFFSET] & VOLUME_ID_ATTR)
+    if (ent.snEnt[ATTR_BYTE_OFFSET] & VOLUME_ID_ATTR)
       continue;
     
     // Print short names if the SHORT_NAME filter flag is set.
@@ -485,7 +476,7 @@ uint8_t fat_PrintDir(const FatDir *dir, const uint8_t entFlds, const BPB *bpb)
       print_Str(ent.lnStr);
     }
   }
-  // returns END_OF_DIRECTORY if successful. Any other value returned is error.
+  // return END_OF_DIRECTORY if successful. Any other value returned is error.
   return err;
 }
 
@@ -493,7 +484,7 @@ uint8_t fat_PrintDir(const FatDir *dir, const uint8_t entFlds, const BPB *bpb)
  * ----------------------------------------------------------------------------
  *                                                         PRINT FILE TO SCREEN
  *                                       
- * Description : Prints contents of any file entry to the screen. 
+ * Description : Prints the contents of any file entry to the screen. 
  * 
  * Arguments   : dir        - Pointer to a FatDir instance. This directory must
  *                            contain the entry for the file to be printed.
@@ -510,10 +501,11 @@ uint8_t fat_PrintDir(const FatDir *dir, const uint8_t entFlds, const BPB *bpb)
  */
 uint8_t fat_PrintFile(const FatDir *dir, const char fileStr[], const BPB *bpb)
 {
-  uint8_t err;                              // for errors and loop conditon
+  // for function return errors. This is the loop cond. and the return value.
+  uint8_t err;
     
-  if (pvt_CheckName(fileStr) == ILLEGAL)
-    return INVALID_FILE_NAME;
+  if (pvt_CheckName(fileStr) == INVALID_FILE_OR_DIR_NAME)
+    return INVALID_FILE_OR_DIR_NAME;
 
   // 
   // Create and initialize a FatEntry instance. This will set the snEntClusIndx
@@ -543,13 +535,11 @@ uint8_t fat_PrintFile(const FatDir *dir, const char fileStr[], const BPB *bpb)
     if (!strcmp(ent.lnStr, fileStr))
     {
       print_Str("\n\n\r");
-      err = pvt_PrintFile(ent.snEnt, bpb); //END_OF_FILE or FAILED_READ_SECTOR
+      err = pvt_PrintFile(ent.snEnt, bpb);  //END_OF_FILE or FAILED_READ_SECTOR
       return err;
     }
   }
-
-  // no matching file was found.
-  return err;
+  return err;                               // no matching file was found.
 }
 
 /*
@@ -573,14 +563,11 @@ void fat_PrintError (uint8_t err)
     case END_OF_DIRECTORY:
       print_Str("\n\rEND_OF_DIRECTORY");
       break;
-    case INVALID_FILE_NAME:
-      print_Str("\n\rINVALID_FILE_NAME");
+    case INVALID_FILE_OR_DIR_NAME:
+      print_Str("\n\rINVALID_FILE_OF_DIR_NAME");
       break;
     case FILE_NOT_FOUND:
       print_Str("\n\rFILE_NOT_FOUND");
-      break;
-    case INVALID_DIR_NAME:
-      print_Str("\n\rINVALID_DIR_NAME");
       break;
     case DIR_NOT_FOUND:
       print_Str("\n\rDIR_NOT_FOUND");
@@ -617,12 +604,9 @@ void fat_PrintError (uint8_t err)
  * Returns     : void
  * ----------------------------------------------------------------------------
  */
-static void pvt_UpdateFatEntryMembers(FatEntry *ent,
-                                      const char lnStr[],
-                                      const uint8_t secArr[],
-                                      const uint16_t snPos,
-                                      const uint8_t snEntSecNumInClus,
-                                      const uint32_t snEntClusIndx)
+static void pvt_UpdateFatEntryMembers(FatEntry *ent, const char lnStr[], 
+                const uint8_t secArr[], const uint16_t snPos,
+                const uint8_t snEntSecNumInClus, const uint32_t snEntClusIndx)
 {
   // top section will set these variables to assist loading of FatEntry members
   char sn[SN_STR_LEN] = {'\0'};
@@ -633,15 +617,15 @@ static void pvt_UpdateFatEntryMembers(FatEntry *ent,
     ent->snEnt[byteNum] = secArr[snPos + byteNum];
   
   // load short name characters into sn array
-  for (uint8_t byteNum = 0; byteNum < SN_NAME_STR_LEN - 1; byteNum++)
+  for (uint8_t byteNum = 0; byteNum < SN_NAME_STR_LEN; byteNum++)
     if (ent->snEnt[byteNum] != ' ')
       *snFill++ = ent->snEnt[byteNum];
 
   // if there is an extension add it to sn string here
-  if (ent->snEnt[SN_NAME_STR_LEN - 1] != ' ')
+  if (ent->snEnt[SN_NAME_STR_LEN] != ' ')
   {
     *snFill++ = '.';
-    for (uint8_t byteNum = SN_NAME_STR_LEN - 1;
+    for (uint8_t byteNum = SN_NAME_STR_LEN;
          byteNum < SN_STR_LEN - 2; byteNum++)
       if (ent->snEnt[byteNum] != ' ') 
         *snFill++ = ent->snEnt[byteNum];
@@ -668,32 +652,32 @@ static void pvt_UpdateFatEntryMembers(FatEntry *ent,
  * Arguments   : nameStr   - Pointer to the string to be verified as a legal 
  *                           FAT entry name.
  * 
- * Returns     : LEGAL or ILLEGAL
+ * Returns     : SUCCESS or INVALID_FILE_OR_DIR_NAME
  * -----------------------------------------------------------------------------
  */
 static uint8_t pvt_CheckName(const char nameStr[])
 {
   // check that long name is not too large for current settings
   if (strlen(nameStr) > LN_STR_LEN_MAX) 
-    return ILLEGAL;
+    return INVALID_FILE_OR_DIR_NAME;
   
   // illegal if empty string or begins with a space char
   if (strcmp(nameStr, "") == 0 || nameStr[0] == ' ') 
-    return ILLEGAL;
+    return INVALID_FILE_OR_DIR_NAME;
 
   // illegal if contains an illegal char. Arrary ends in null, treat as string
   char illCharsArr[] = {'\\','/',':','*','?','"','<','>','|','\0'};
   for (char *nameChar = (char *)nameStr; *nameChar; nameChar++)
     for (char *illChar = (char *)illCharsArr; *illChar; illChar++)
       if (*nameStr == *illChar)
-        return ILLEGAL;
+        return INVALID_FILE_OR_DIR_NAME;
 
   // illegal if all space characters
   for (; *nameStr; nameStr++)  
     if (*nameStr != ' ')
-      return LEGAL;  
+      return SUCCESS;  
   
-  return ILLEGAL;             
+  return INVALID_FILE_OR_DIR_NAME;             
 }
 
 /*
@@ -727,13 +711,13 @@ static uint8_t pvt_SetDirToParent(FatDir *dir, const BPB *bpb)
   // bytes 52, 53, 58,and 59 of the first sector of a directory contain the
   // value of the first FAT cluster index of its parent directory.
   //  
-  parentDirFirstClus = secArr[53];
+  parentDirFirstClus = secArr[FST_CLUS_INDX_SNENT_BYTE_3 + ENTRY_LEN];
   parentDirFirstClus <<= 8;
-  parentDirFirstClus |= secArr[52];
+  parentDirFirstClus |= secArr[FST_CLUS_INDX_SNENT_BYTE_2 + ENTRY_LEN];
   parentDirFirstClus <<= 8;
-  parentDirFirstClus |= secArr[59];
+  parentDirFirstClus |= secArr[FST_CLUS_INDX_SNENT_BYTE_1 + ENTRY_LEN];
   parentDirFirstClus <<= 8;
-  parentDirFirstClus |= secArr[58];
+  parentDirFirstClus |= secArr[FST_CLUS_INDX_SNENT_BYTE_0 + ENTRY_LEN];
 
   if (dir->fstClusIndx == bpb->rootClus);   // current dir is root dir
   else if (parentDirFirstClus == 0)         // parent dir is root dir

@@ -123,16 +123,15 @@
  * Description : Error Flags returned by various FAT functions.
  * ----------------------------------------------------------------------------
  */
-#define SUCCESS              0x00
-#define INVALID_FILE_NAME    0x01
-#define INVALID_DIR_NAME     0x02
-#define FILE_NOT_FOUND       0x04
-#define DIR_NOT_FOUND        0x08
-#define END_OF_FILE          0x10
-#define END_OF_DIRECTORY     0x20
-#define CORRUPT_FAT_ENTRY    0x40
+#define SUCCESS                   0x00
+#define INVALID_FILE_OR_DIR_NAME  0x01
+#define FILE_NOT_FOUND            0x04
+#define DIR_NOT_FOUND             0x08
+#define END_OF_FILE               0x10
+#define END_OF_DIRECTORY          0x20
+#define CORRUPT_FAT_ENTRY         0x40
 #ifndef FAILED_READ_SECTOR
-#define FAILED_READ_SECTOR   0x80      // also defined in fat_to_disk.h
+#define FAILED_READ_SECTOR        0x80 // also defined in fat_to_disk.h
 #endif//FAILED_READ_SECTOR
 
 /* 
@@ -164,7 +163,7 @@
  */
 #define PATH_STR_LEN_MAX     100       // max length of path string
 #define LN_STR_LEN_MAX       100       // max length of long name string
-#define SN_NAME_STR_LEN      9         // num bytes occupied by sn + null
+#define SN_NAME_STR_LEN      8         // num bytes occupied by sn + null
 #define SN_EXT_STR_LEN       4         // num bytes occupied by sn ext + null
 #define SN_STR_LEN           13        // 8 + 3 (sn + ext) and '.' and null
 
@@ -173,6 +172,12 @@
 
 // Value in the last FAT cluster index of a directory or file.
 #define END_CLUSTER            0x0FFFFFFF
+
+
+#define FST_CLUS_INDX_SNENT_BYTE_3  21
+#define FST_CLUS_INDX_SNENT_BYTE_2  20
+#define FST_CLUS_INDX_SNENT_BYTE_1  27
+#define FST_CLUS_INDX_SNENT_BYTE_0  26
 
 /*
  ******************************************************************************     
@@ -205,7 +210,7 @@ typedef struct
 {
   char lnStr[LN_STR_LEN_MAX + 1];      // directory long name
   char lnPathStr[PATH_STR_LEN_MAX + 1];// directory long name path
-  char snStr[SN_NAME_STR_LEN];         // directory short name
+  char snStr[SN_NAME_STR_LEN + 1];     // directory short name
   char snPathStr[PATH_STR_LEN_MAX];    // directory short name path
   uint32_t fstClusIndx;                // index of directory's first cluster
 } 
@@ -260,10 +265,10 @@ void fat_SetDirToRoot(FatDir *dir, const BPB *bpb);
 
 /*
  * ----------------------------------------------------------------------------
- *                                                 INITIALIZE FAT ENTRY TO ROOT
+ *                                                         INITIALIZE FAT ENTRY
  *                                      
- * Description : Initialize an instance of FatEntry to the first entry of the
- *               root directory.
+ * Description : Initializin an instance of a FatEntry struct will set it to 
+ *               the first entry of the root directory.
  * 
  * Arguments   : ent   - Pointer to the FatEntry instance to be initialized.           
  *               bpb   - Pointer to the BPB struct instance.
@@ -277,12 +282,12 @@ void fat_InitEntry(FatEntry *ent, const BPB *bpb);
  * ----------------------------------------------------------------------------
  *                                                  SET FAT ENTRY TO NEXT ENTRY 
  *                                      
- * Description : Updates current FatEntry instance to the next entry in its
- *               its directory.
+ * Description : Updates a FatEntry instance to point to the next entry in its
+ *               directory.
  * 
  * Arguments   : currEnt   - Pointer to a FatEntry instance. Its members will 
  *                           be updated to point to the next entry. 
- *               bpb        - Pointer to the BPB struct instance.
+ *               bpb       - Pointer to the BPB struct instance.
  *
  * Returns     : A FAT Error Flag. If any value other than SUCCESS is returned 
  *               then the function was unable to update the FatEntry.
@@ -300,7 +305,7 @@ uint8_t fat_SetNextEntry(FatEntry *currEntry, const BPB *bpb);
  *                             new directory.             
  *               newDirStr   - Pointer to a string that specifies the name of 
  *                             the new directory.
- *               bpb        - Pointer to the BPB struct instance.
+ *               bpb         - Pointer to the BPB struct instance.
  * 
  * Returns     : A FAT Error Flag. If any value other than SUCCESS is returned 
  *               then the function was unable to update the FatEntry. 
@@ -308,11 +313,11 @@ uint8_t fat_SetNextEntry(FatEntry *currEntry, const BPB *bpb);
  * Notes       : 1) This function can only set the directory to a child or the
  *                  parent of the FatDir instance (dir) when the function is
  *                  called, or reset the instance to the root directory.
- *               2) Do not include any paths (relative or absolute) in the 
+ *               2) Paths (relative or absolute) should not be included in the 
  *                  newDirStr. newDirStr must be only be a directory name which
- *                  must be the name of a child directoy, or the parent, in the
- *                  current directory.
- *               3) If "." is passed as the newDirStr then the new directory
+ *                  must be the name of a child, or the parent, directory of
+ *                  the current directory.
+ *               3) If ".." is passed as the newDirStr then the new directory
  *                  will be set to the parent of the current directory.               
  *               4) newDirStr is case-sensitive.
  *               5) newDirStr must be a long name, unless a long name does not
@@ -326,7 +331,8 @@ uint8_t fat_SetDir(FatDir *dir, const char newDirStr[], const BPB *bpb);
  *                                            PRINT DIRECTORY ENTRIES TO SCREEN
  *                                       
  * Description : Prints a list of file and directory entries within a directory
- *               (FatDir instance) along with any specified fields.
+ *               specified by a FatDir instance, along with any of its fields
+ *               requested.
  * 
  * Arguments   : dir        - Pointer to a FatDir instance. This directory's
  *                            entries will be printed to the screen.
@@ -338,14 +344,14 @@ uint8_t fat_SetDir(FatDir *dir, const char newDirStr[], const BPB *bpb);
  * Returns     : A FAT Error Flag. If any value other than END_OF_DIRECTORY is
  *               returned then there was an issue.
  *  
- * Notes       : 1) LONG_NAME and/or SHORT_NAME must be passed in the entFld
+ * Notes       : 1) LONG_NAME and/or SHORT_NAME must be passed in the entFlds
  *                  argument. If not, then no entries will be printed.
  *               2) If both LONG_NAME and SHORT_NAME are passed then both
  *                  the short and long names for each entry will be printed.
  *                  For any entry that does not have a long name, the short 
  *                  name is also stored in the long name string of the struct
  *                  and so the short name will effectively be printed twice -
- *                  once for the long name and once for the short name.
+ *                  Once for the long name and once for the short name.
  * ----------------------------------------------------------------------------
  */
 uint8_t fat_PrintDir(const FatDir *dir, const uint8_t entFlds, const BPB *bpb);
@@ -354,7 +360,7 @@ uint8_t fat_PrintDir(const FatDir *dir, const uint8_t entFlds, const BPB *bpb);
  * ----------------------------------------------------------------------------
  *                                                         PRINT FILE TO SCREEN
  *                                       
- * Description : Prints contents of any file entry to the screen. 
+ * Description : Prints the contents of any file entry to the screen. 
  * 
  * Arguments   : dir        - Pointer to a FatDir instance. This directory must
  *                            contain the entry for the file to be printed.
