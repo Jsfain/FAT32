@@ -35,9 +35,10 @@
 // values returned by FATtoDisk_ReadSingleSector(). Specify with FTD_ to
 // indicate that this is from the FATtoDisk files.
 //
-#define FTD_READ_SECTOR_SUCCESS        0
-#define FTD_READ_SECTOR_FAILED         1
-
+#define READ_SECTOR_SUCCESS        0
+#ifndef FAILED_READ_SECTOR
+#define FAILED_READ_SECTOR         0x08
+#endif//FAILED_READ_SECTOR
 /*
  ******************************************************************************
  *                            FUNCTION PROTOTYPES

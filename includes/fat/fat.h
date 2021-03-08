@@ -105,13 +105,16 @@
  *               implementation. anything other than 512 will not work. 
  * ----------------------------------------------------------------------------
  */
-#define ENTRY_LEN            32                // FAT entry byte length
+#define ENTRY_LEN                 32   // FAT entry byte length
 
 #ifndef SECTOR_LEN
-#define SECTOR_LEN           512               // must always be 512 here
+#define SECTOR_LEN                512  // must always be 512 here
 #endif//SECTOR_LEN
 
-#define LAST_ENTPOS_IN_SEC   SECTOR_LEN - ENTRY_LEN
+#define FIRST_SECTOR_POS_IN_CLUS  0
+#define FIRST_ENTRY_POS_IN_SEC    0
+#define LAST_ENTRY_POS_IN_SEC     SECTOR_LEN - ENTRY_LEN
+
 
 /* 
  * ----------------------------------------------------------------------------
@@ -128,7 +131,9 @@
 #define END_OF_FILE          0x10
 #define END_OF_DIRECTORY     0x20
 #define CORRUPT_FAT_ENTRY    0x40
-#define FAILED_READ_SECTOR   0x80
+#ifndef FAILED_READ_SECTOR
+#define FAILED_READ_SECTOR   0x80      // also defined in fat_to_disk.h
+#endif//FAILED_READ_SECTOR
 
 /* 
  * ----------------------------------------------------------------------------
@@ -227,12 +232,9 @@ typedef struct
   char lnStr[LN_STR_LEN_MAX + 1];      // entry long name
   char snStr[SN_STR_LEN];              // entry short name
   uint8_t snEnt[ENTRY_LEN];            // the 32 bytes of the short name entry
-  
-  // these members assist with locating the entry
   uint32_t snEntClusIndx;              // cluster index of the sn entry
   uint8_t  snEntSecNumInClus;          // sector number in cluster of sn entry
-  uint16_t entPos;                     // varies in where it points rel to sn
-  uint16_t snPos;                      // pos in sec of short name 
+  uint16_t nextEntPos;
 } 
 FatEntry;
 

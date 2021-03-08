@@ -166,9 +166,9 @@ uint8_t FATtoDisk_ReadSingleSector(uint32_t blckNum, uint8_t *blckArr)
 
   // Load data block into array by passing the array to the Read Block function
   if (sd_ReadSingleBlock(blckNum * addrMult, blckArr) == READ_SUCCESS)
-    return FTD_READ_SECTOR_SUCCESS; 
+    return READ_SECTOR_SUCCESS; 
   else
-    return FTD_READ_SECTOR_FAILED;
+    return FAILED_READ_SECTOR;
 };
 
 /*
