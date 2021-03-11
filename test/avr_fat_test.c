@@ -176,11 +176,11 @@ int main(void)
       numOfChars = 0;
       
       // print cmd prompt to screen with cwd
-      print_Str("\n\r"); 
+      print_Str("\n\r");
       print_Str(cwdPtr.lnPathStr);
-      print_Str(cwdPtr.lnStr); 
+      print_Str(cwdPtr.lnStr);
       print_Str (" > ");
-      
+
       // ---------------------------------- Get and Parse Command and Arguments
       inputChar = usart_Receive();
       while (inputChar != '\r')

@@ -327,9 +327,8 @@ uint8_t fat_SetDir(FatDir *dir, const char newDirStr[], const BPB *bpb)
   // for function return errors. This is the loop cond. and the return value.
   uint8_t err;                              
 
-  if (pvt_CheckName(newDirStr)              // if newDirStr is illegal name
-      == INVALID_FILE_OR_DIR_NAME)  
-    return INVALID_FILE_OR_DIR_NAME;
+  if (pvt_CheckName(newDirStr) == INVALID_NAME)  // if newDirStr is illegal
+    return INVALID_NAME;
   else if (!strcmp(newDirStr, "."))         // if newDirStr is current dir
     return SUCCESS;
   else if (!strcmp(newDirStr, ".."))        // if newDirStr is parent dir
@@ -380,8 +379,8 @@ uint8_t fat_SetDir(FatDir *dir, const char newDirStr[], const BPB *bpb)
       dir->fstClusIndx |= ent.snEnt[FST_CLUS_INDX_SNENT_BYTE_0];
       
       // fill short name array with its characters from the entry
-      char snStr[SN_NAME_STR_LEN + 1] = {'\0'};      
-      for (uint8_t strPos = 0; strPos < SN_NAME_STR_LEN; ++strPos)
+      char snStr[SN_NAME_CHAR_LEN + 1] = {'\0'};      
+      for (uint8_t strPos = 0; strPos < SN_NAME_CHAR_LEN; ++strPos)
         snStr[strPos] = ent.snEnt[strPos];
 
       // Append current directory name to the short and long name paths
@@ -389,11 +388,11 @@ uint8_t fat_SetDir(FatDir *dir, const char newDirStr[], const BPB *bpb)
       strcat (dir->snPathStr, dir->snStr);
 
       // Update dir to new dir name. If current dir != root dir append '/'
-      if (dir->lnStr[0] != '/') 
+      if (strcmp(dir->lnStr, "/"))
         strcat(dir->lnPathStr, "/"); 
       strcpy(dir->lnStr, newDirStr);
       
-      if (dir->snStr[0] != '/') 
+      if (strcmp(dir->snStr, "/"))
         strcat(dir->snPathStr, "/");
       strcpy(dir->snStr, snStr);
 
@@ -504,8 +503,8 @@ uint8_t fat_PrintFile(const FatDir *dir, const char fileStr[], const BPB *bpb)
   // for function return errors. This is the loop cond. and the return value.
   uint8_t err;
     
-  if (pvt_CheckName(fileStr) == INVALID_FILE_OR_DIR_NAME)
-    return INVALID_FILE_OR_DIR_NAME;
+  if (pvt_CheckName(fileStr) == INVALID_NAME)
+    return INVALID_NAME;
 
   // 
   // Create and initialize a FatEntry instance. This will set the snEntClusIndx
@@ -563,8 +562,8 @@ void fat_PrintError (uint8_t err)
     case END_OF_DIRECTORY:
       print_Str("\n\rEND_OF_DIRECTORY");
       break;
-    case INVALID_FILE_OR_DIR_NAME:
-      print_Str("\n\rINVALID_FILE_OF_DIR_NAME");
+    case INVALID_NAME:
+      print_Str("\n\rINVALID_NAME");
       break;
     case FILE_NOT_FOUND:
       print_Str("\n\rFILE_NOT_FOUND");
@@ -599,7 +598,19 @@ void fat_PrintError (uint8_t err)
  * Description : Sets the FatEntry instance struct members to the values of the 
  *               arguments passed in.
  * 
- * Arguments   : too many. see below.
+ * Arguments   : ent                 - ptr to FatEntry instance whose members 
+ *                                     will be updated.
+ *               lnStr               - ptr to array holding long name string.
+ *               secArr              - ptr to array holding the data of the 
+ *                                     sector that contains the short name
+ *                                     entry that will update ent.
+ *               snPos               - position in secArr of the first byte of
+ *                                     the short name entry.
+ *               snEntSecNumInClus   - Sector number where the short name is
+ *                                     located relative to the first sector of   
+ *                                     the cluster.
+ *               snEntClusIndx       - Fat cluster index where short name entry
+ *                                     is located.
  * 
  * Returns     : void
  * ----------------------------------------------------------------------------
@@ -608,76 +619,87 @@ static void pvt_UpdateFatEntryMembers(FatEntry *ent, const char lnStr[],
                 const uint8_t secArr[], const uint16_t snPos,
                 const uint8_t snEntSecNumInClus, const uint32_t snEntClusIndx)
 {
-  // top section will set these variables to assist loading of FatEntry members
-  char sn[SN_STR_LEN] = {'\0'};
-  char *snFill = sn;
-  
-  // copy short name entry bytes into*snEnt FatEntry member
-  for (uint8_t byteNum = 0; byteNum < ENTRY_LEN; byteNum++)
+  // copy short name entry bytes into *snEnt FatEntry member
+  for (uint8_t byteNum = 0; byteNum < ENTRY_LEN; ++byteNum)
     ent->snEnt[byteNum] = secArr[snPos + byteNum];
   
-  // load short name characters into sn array
-  for (uint8_t byteNum = 0; byteNum < SN_NAME_STR_LEN; byteNum++)
+  //
+  // The section parses the short name name + ext chars in the short name 
+  // entry of the sector and then loads them into the snStr FatEntry member as
+  // a string.
+  //
+
+  // vars to assist loading short name
+  char sn[SN_CHAR_LEN + 1] = {'\0'};        // for sn string. Add 1 for null
+  char *snPtr = sn;
+
+  // load short name characters into array. skip spaces.
+  for (uint8_t byteNum = 0; byteNum < SN_NAME_CHAR_LEN; ++byteNum)
     if (ent->snEnt[byteNum] != ' ')
-      *snFill++ = ent->snEnt[byteNum];
+      *snPtr++ = ent->snEnt[byteNum];
 
   // if there is an extension add it to sn string here
-  if (ent->snEnt[SN_NAME_STR_LEN] != ' ')
+  if (ent->snEnt[SN_NAME_CHAR_LEN] != ' ')
   {
-    *snFill++ = '.';
-    for (uint8_t byteNum = SN_NAME_STR_LEN;
-         byteNum < SN_STR_LEN - 2; byteNum++)
-      if (ent->snEnt[byteNum] != ' ') 
-        *snFill++ = ent->snEnt[byteNum];
+    *snPtr++ = '.';
+    // load extension chars into array. Skip spaces stop at end of ext chars.
+    for (uint8_t byteNum = SN_NAME_CHAR_LEN; 
+         byteNum < SN_CHAR_LEN - 1; ++byteNum)
+      if (ent->snEnt[byteNum] != ' ')
+        *snPtr++ = ent->snEnt[byteNum];
   }
+  strcpy(ent->snStr, sn);                   // load snStr FatEntry member.
 
-  // copy rest to the FatEntry members
+  // 
+  // load lnStr FatEntry member. If the lnStr function parameter is a non-empty
+  // string, then the lnStr FatEntry member will be loaded with lnStr param. If
+  // it is empty, then it will be loaded with the short name string.
+  //  
+  if (strcmp(lnStr,""))
+    strcpy(ent->lnStr, lnStr);
+  else
+    strcpy(ent->lnStr, ent->snStr);
+
+  // copy remaining parameters into FatEntry members.
   ent->snEntSecNumInClus = snEntSecNumInClus;
   ent->snEntClusIndx = snEntClusIndx;
   ent->nextEntPos = snPos + ENTRY_LEN;
-
-  strcpy(ent->snStr, sn);
-  if (strcmp(lnStr,""))                     // if long name is not empty
-    strcpy(ent->lnStr, lnStr);
-  else                                      // else copy sn str into ln str
-    strcpy(ent->lnStr, sn);
 }
 
 /*
  * ----------------------------------------------------------------------------
  *                                               (PRIVATE) CHECK FOR LEGAL NAME
  *  
- * Description : Checks whether a string is a valid/legal FAT entry name. 
+ * Description : Checks whether a string is a valid and legal FAT entry name. 
  * 
  * Arguments   : nameStr   - Pointer to the string to be verified as a legal 
  *                           FAT entry name.
  * 
- * Returns     : SUCCESS or INVALID_FILE_OR_DIR_NAME
+ * Returns     : SUCCESS or INVALID_NAME
  * -----------------------------------------------------------------------------
  */
 static uint8_t pvt_CheckName(const char nameStr[])
 {
   // check that long name is not too large for current settings
   if (strlen(nameStr) > LN_STR_LEN_MAX) 
-    return INVALID_FILE_OR_DIR_NAME;
+    return INVALID_NAME;
   
   // illegal if empty string or begins with a space char
   if (strcmp(nameStr, "") == 0 || nameStr[0] == ' ') 
-    return INVALID_FILE_OR_DIR_NAME;
+    return INVALID_NAME;
 
-  // illegal if contains an illegal char. Arrary ends in null, treat as string
-  char illCharsArr[] = {'\\','/',':','*','?','"','<','>','|','\0'};
-  for (char *nameChar = (char *)nameStr; *nameChar; nameChar++)
-    for (char *illChar = (char *)illCharsArr; *illChar; illChar++)
-      if (*nameStr == *illChar)
-        return INVALID_FILE_OR_DIR_NAME;
+  // illegal if contains an illegal char. Ends with null to treat as string.
+  const char illCharsArr[] = {'\\','/',':','*','?','"','<','>','|','\0'};
+  for (const char *namePtr = nameStr; *namePtr; ++namePtr)
+    for (const char *illPtr = illCharsArr; *illPtr;)
+      if (*nameStr == *illPtr++)
+        return INVALID_NAME;
 
   // illegal if all space characters
-  for (; *nameStr; nameStr++)  
-    if (*nameStr != ' ')
-      return SUCCESS;  
-  
-  return INVALID_FILE_OR_DIR_NAME;             
+  while (*nameStr)
+    if (*nameStr++ != ' ')
+      return SUCCESS;
+  return INVALID_NAME;
 }
 
 /*
@@ -690,27 +712,24 @@ static uint8_t pvt_CheckName(const char nameStr[])
  *                        this instance will be set to its parent directory.
  *                bpb   - Pointer to the BPB struct instance.
  * 
- *  Returns     : SUCCESS or FAILED_READ_SECTOR.
+ *  Returns     : SUCCESS or FAILED_READ_SECTOR
  * ----------------------------------------------------------------------------
  */
 static uint8_t pvt_SetDirToParent(FatDir *dir, const BPB *bpb)
 {
-  uint32_t parentDirFirstClus, secNumPhys;
+  uint32_t parentDirFirstClus, secNumOnDisk;
   uint8_t  secArr[bpb->bytesPerSec];
 
-  // absolute (physical) sector number on disk
-  secNumPhys = bpb->dataRegionFirstSector 
-             + (dir->fstClusIndx - bpb->rootClus) 
-             * bpb->secPerClus;
+  // sector number/address on disk
+  secNumOnDisk = bpb->dataRegionFirstSector 
+               + (dir->fstClusIndx - bpb->rootClus) 
+               * bpb->secPerClus;
                 
-  // load secArr with disk sector at curreSecNumPhys
-  if (FATtoDisk_ReadSingleSector(secNumPhys, secArr) == FAILED_READ_SECTOR)
+  // load secArr with disk sector at secNumOnDisk
+  if (FATtoDisk_ReadSingleSector(secNumOnDisk, secArr) == FAILED_READ_SECTOR)
    return FAILED_READ_SECTOR;
 
-  //
-  // bytes 52, 53, 58,and 59 of the first sector of a directory contain the
-  // value of the first FAT cluster index of its parent directory.
-  //  
+  // load first cluster index of the parent directory.
   parentDirFirstClus = secArr[FST_CLUS_INDX_SNENT_BYTE_3 + ENTRY_LEN];
   parentDirFirstClus <<= 8;
   parentDirFirstClus |= secArr[FST_CLUS_INDX_SNENT_BYTE_2 + ENTRY_LEN];
@@ -719,29 +738,34 @@ static uint8_t pvt_SetDirToParent(FatDir *dir, const BPB *bpb)
   parentDirFirstClus <<= 8;
   parentDirFirstClus |= secArr[FST_CLUS_INDX_SNENT_BYTE_0 + ENTRY_LEN];
 
-  if (dir->fstClusIndx == bpb->rootClus);   // current dir is root dir
+  if (dir->fstClusIndx == bpb->rootClus);   // current dir is root dir.
   else if (parentDirFirstClus == 0)         // parent dir is root dir
     fat_SetDirToRoot(dir, bpb);
-  else                                      // parent dir is a typical sub-dir
-  {          
-    char tmpSNPath[PATH_STR_LEN_MAX];
-    char tmpLNPath[PATH_STR_LEN_MAX];
+  else                                      // parent dir is a sub-dir
+  { 
+    // 
+    // The parent dir is the dir in the path string between the last two '/'
+    // chars. This section takes the parent directory substring from the path
+    // string and stores it in the name directory strings. It then replaces the
+    // '/' just before the parent substring in the path with a null effectively
+    // removing the parent directory from the path strings
+    // 
 
-    // load current path member values to temp strings
-    strlcpy(tmpSNPath, dir->snPathStr, strlen(dir->snPathStr));
-    strlcpy(tmpLNPath, dir->lnPathStr, strlen(dir->lnPathStr));
+    // this will replace the ending '/' char in paths with a null
+    strlcpy(dir->snPathStr, dir->snPathStr, strlen(dir->snPathStr));
+    strlcpy(dir->lnPathStr, dir->lnPathStr, strlen(dir->lnPathStr));
     
-    // create pointer to location in temp strings holding the final '/'
-    char *snLastDirInPath = strrchr(tmpSNPath, '/');
-    char *lnLastDirInPath = strrchr(tmpLNPath, '/');
+    // ptrs to locations in path strings holding '/' prior to parent dir
+    char *snLastDirInPathPtr = strrchr(dir->snPathStr, '/');
+    char *lnLastDirInPathPtr = strrchr(dir->lnPathStr, '/');
     
     // copy last directory in path string to the short/long name strings
-    strcpy(dir->snStr, ++snLastDirInPath);
-    strcpy(dir->lnStr, ++lnLastDirInPath);
+    strcpy(dir->snStr, ++snLastDirInPathPtr);
+    strcpy(dir->lnStr, ++lnLastDirInPathPtr);
 
-    // remove the last directory in path strings
-    strlcpy(dir->snPathStr, tmpSNPath, ++snLastDirInPath - tmpSNPath);
-    strlcpy(dir->lnPathStr, tmpLNPath, ++lnLastDirInPath - tmpLNPath);
+    // removes previous parent directory from the path
+    *snLastDirInPathPtr = '\0';
+    *lnLastDirInPathPtr = '\0';
 
     dir->fstClusIndx = parentDirFirstClus;
   }
@@ -752,7 +776,7 @@ static uint8_t pvt_SetDirToParent(FatDir *dir, const BPB *bpb)
  * ----------------------------------------------------------------------------
  *                               (PRIVATE) LOAD A LONG NAME ENTRY INTO A STRING 
  * 
- * Description : Loads characters of a long name into a string (char array).  
+ * Description : Loads characters of a long name into a C-string.  
  * 
  * Arguments   : lnFirstEnt   - Position of the lowest order entry of the long 
  *                              name in secArr[].

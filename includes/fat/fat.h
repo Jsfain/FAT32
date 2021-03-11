@@ -105,10 +105,10 @@
  *               implementation. anything other than 512 will not work. 
  * ----------------------------------------------------------------------------
  */
-#define ENTRY_LEN                 32   // FAT entry byte length
+#define ENTRY_LEN     32               // FAT entry byte length
 
 #ifndef SECTOR_LEN
-#define SECTOR_LEN                512  // must always be 512 here
+#define SECTOR_LEN    512              // must always be 512 here
 #endif//SECTOR_LEN
 
 #define FIRST_SECTOR_POS_IN_CLUS  0
@@ -123,15 +123,15 @@
  * Description : Error Flags returned by various FAT functions.
  * ----------------------------------------------------------------------------
  */
-#define SUCCESS                   0x00
-#define INVALID_FILE_OR_DIR_NAME  0x01
-#define FILE_NOT_FOUND            0x04
-#define DIR_NOT_FOUND             0x08
-#define END_OF_FILE               0x10
-#define END_OF_DIRECTORY          0x20
-#define CORRUPT_FAT_ENTRY         0x40
-#ifndef FAILED_READ_SECTOR
-#define FAILED_READ_SECTOR        0x80 // also defined in fat_to_disk.h
+#define SUCCESS                0x00
+#define INVALID_NAME           0x01
+#define FILE_NOT_FOUND         0x04
+#define DIR_NOT_FOUND          0x08
+#define END_OF_FILE            0x10
+#define END_OF_DIRECTORY       0x20
+#define CORRUPT_FAT_ENTRY      0x40
+#ifndef FAILED_READ_SECTOR     
+#define FAILED_READ_SECTOR     0x80 // also defined in fat_to_disk.h
 #endif//FAILED_READ_SECTOR
 
 /* 
@@ -143,15 +143,15 @@
  *               fat_PrintDir().
  * ----------------------------------------------------------------------------
  */
-#define SHORT_NAME           0x01
-#define LONG_NAME            0x02
-#define HIDDEN               0x04
-#define CREATION             0x08
-#define LAST_ACCESS          0x10
-#define LAST_MODIFIED        0x20
-#define TYPE                 0x40 
-#define FILE_SIZE            0x80
-#define ALL                  0xFF
+#define SHORT_NAME        0x01
+#define LONG_NAME         0x02
+#define HIDDEN            0x04
+#define CREATION          0x08
+#define LAST_ACCESS       0x10
+#define LAST_MODIFIED     0x20
+#define TYPE              0x40 
+#define FILE_SIZE         0x80
+#define ALL               0xFF
 
 /* 
  * ----------------------------------------------------------------------------
@@ -161,23 +161,30 @@
  *               character arrays associated with long / short names and paths.             
  * ----------------------------------------------------------------------------
  */
-#define PATH_STR_LEN_MAX     100       // max length of path string
-#define LN_STR_LEN_MAX       100       // max length of long name string
-#define SN_NAME_STR_LEN      8         // num bytes occupied by sn + null
-#define SN_EXT_STR_LEN       4         // num bytes occupied by sn ext + null
-#define SN_STR_LEN           13        // 8 + 3 (sn + ext) and '.' and null
+#define PATH_STR_LEN_MAX     100       // max len of path string + null
+#define LN_STR_LEN_MAX       100       // max len of ln string + null
 
-// Unit used when printing an entry's file size. Set to BYTE or KB 
-#define FS_UNIT         BYTE               
+//
+// when using these to define short name string array sizes, will need to add 1
+// for the null terminator.
+//
+#define SN_NAME_CHAR_LEN       8       // max num chars in name of sn
+#define SN_EXT_CHAR_LEN        3       // max num chars in extension of sn
+
+// add 1 for '.' short name / extension separator.
+#define SN_CHAR_LEN           SN_NAME_CHAR_LEN + SN_EXT_CHAR_LEN + 1      
+
+// unit used when printing an entry's file size. Set to BYTE or KB 
+#define FS_UNIT              BYTE               
 
 // Value in the last FAT cluster index of a directory or file.
-#define END_CLUSTER            0x0FFFFFFF
+#define END_CLUSTER          0x0FFFFFFF
 
 
-#define FST_CLUS_INDX_SNENT_BYTE_3  21
-#define FST_CLUS_INDX_SNENT_BYTE_2  20
-#define FST_CLUS_INDX_SNENT_BYTE_1  27
-#define FST_CLUS_INDX_SNENT_BYTE_0  26
+#define FST_CLUS_INDX_SNENT_BYTE_3     21
+#define FST_CLUS_INDX_SNENT_BYTE_2     20
+#define FST_CLUS_INDX_SNENT_BYTE_1     27
+#define FST_CLUS_INDX_SNENT_BYTE_0     26
 
 /*
  ******************************************************************************     
@@ -208,9 +215,9 @@
  */
 typedef struct
 {
-  char lnStr[LN_STR_LEN_MAX + 1];      // directory long name
-  char lnPathStr[PATH_STR_LEN_MAX + 1];// directory long name path
-  char snStr[SN_NAME_STR_LEN + 1];     // directory short name
+  char lnStr[LN_STR_LEN_MAX];          // directory long name
+  char lnPathStr[PATH_STR_LEN_MAX];    // directory long name path
+  char snStr[SN_NAME_CHAR_LEN + 1];    // directory short name. Add 1 for null
   char snPathStr[PATH_STR_LEN_MAX];    // directory short name path
   uint32_t fstClusIndx;                // index of directory's first cluster
 } 
@@ -234,8 +241,8 @@ FatDir;
  */
 typedef struct 
 {
-  char lnStr[LN_STR_LEN_MAX + 1];      // entry long name
-  char snStr[SN_STR_LEN];              // entry short name
+  char lnStr[LN_STR_LEN_MAX];          // entry long name
+  char snStr[SN_CHAR_LEN + 1];         // entry short name. Add 1 for null
   uint8_t snEnt[ENTRY_LEN];            // the 32 bytes of the short name entry
   uint32_t snEntClusIndx;              // cluster index of the sn entry
   uint8_t  snEntSecNumInClus;          // sector number in cluster of sn entry
