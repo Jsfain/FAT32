@@ -74,7 +74,7 @@
  * Notes       : bytes 0 to 10 are the 11 character short name, 8.3 format.
  * ----------------------------------------------------------------------------
  */
-//#define SHORT_NAME_CHARS                 0 to 10
+// SHORT_NAME_CHARS                        bytes 0 to 10
 #define ATTR_BYTE_OFFSET                   11
 //#define NTRES                            12    // reserved. unused. 
 #define CREATION_TIME_TENTH_BYTE_OFFSET    13

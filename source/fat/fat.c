@@ -370,13 +370,13 @@ uint8_t fat_SetDir(FatDir *dir, const char newDirStr[], const BPB *bpb)
       // bytes 20, 21, 26 and 27 of a short name entry give the value of the
       // first cluster index in the FAT for that entry.
       //
-      dir->fstClusIndx = ent.snEnt[FST_CLUS_INDX_SNENT_BYTE_3];
+      dir->fstClusIndx = ent.snEnt[FST_CLUS_INDX_BYTE_OFFSET_3];
       dir->fstClusIndx <<= 8;
-      dir->fstClusIndx |= ent.snEnt[FST_CLUS_INDX_SNENT_BYTE_2];
+      dir->fstClusIndx |= ent.snEnt[FST_CLUS_INDX_BYTE_OFFSET_2];
       dir->fstClusIndx <<= 8;
-      dir->fstClusIndx |= ent.snEnt[FST_CLUS_INDX_SNENT_BYTE_1];
+      dir->fstClusIndx |= ent.snEnt[FST_CLUS_INDX_BYTE_OFFSET_1];
       dir->fstClusIndx <<= 8;
-      dir->fstClusIndx |= ent.snEnt[FST_CLUS_INDX_SNENT_BYTE_0];
+      dir->fstClusIndx |= ent.snEnt[FST_CLUS_INDX_BYTE_OFFSET_0];
       
       // fill short name array with its characters from the entry
       char snStr[SN_NAME_CHAR_LEN + 1] = {'\0'};      
@@ -730,13 +730,13 @@ static uint8_t pvt_SetDirToParent(FatDir *dir, const BPB *bpb)
    return FAILED_READ_SECTOR;
 
   // load first cluster index of the parent directory.
-  parentDirFirstClus = secArr[FST_CLUS_INDX_SNENT_BYTE_3 + ENTRY_LEN];
+  parentDirFirstClus = secArr[FST_CLUS_INDX_BYTE_OFFSET_3 + ENTRY_LEN];
   parentDirFirstClus <<= 8;
-  parentDirFirstClus |= secArr[FST_CLUS_INDX_SNENT_BYTE_2 + ENTRY_LEN];
+  parentDirFirstClus |= secArr[FST_CLUS_INDX_BYTE_OFFSET_2 + ENTRY_LEN];
   parentDirFirstClus <<= 8;
-  parentDirFirstClus |= secArr[FST_CLUS_INDX_SNENT_BYTE_1 + ENTRY_LEN];
+  parentDirFirstClus |= secArr[FST_CLUS_INDX_BYTE_OFFSET_1 + ENTRY_LEN];
   parentDirFirstClus <<= 8;
-  parentDirFirstClus |= secArr[FST_CLUS_INDX_SNENT_BYTE_0 + ENTRY_LEN];
+  parentDirFirstClus |= secArr[FST_CLUS_INDX_BYTE_OFFSET_0 + ENTRY_LEN];
 
   if (dir->fstClusIndx == bpb->rootClus);   // current dir is root dir.
   else if (parentDirFirstClus == 0)         // parent dir is root dir
@@ -1080,13 +1080,13 @@ static uint8_t pvt_PrintFile(const uint8_t snEnt[], const BPB *bpb)
 {
   //get FAT index for file's first cluster
   uint32_t clus; 
-  clus = snEnt[FST_CLUS_INDX_SNENT_BYTE_3];
+  clus = snEnt[FST_CLUS_INDX_BYTE_OFFSET_3];
   clus <<= 8;
-  clus |= snEnt[FST_CLUS_INDX_SNENT_BYTE_2];
+  clus |= snEnt[FST_CLUS_INDX_BYTE_OFFSET_2];
   clus <<= 8;
-  clus |= snEnt[FST_CLUS_INDX_SNENT_BYTE_1];
+  clus |= snEnt[FST_CLUS_INDX_BYTE_OFFSET_1];
   clus <<= 8;
-  clus |= snEnt[FST_CLUS_INDX_SNENT_BYTE_0];
+  clus |= snEnt[FST_CLUS_INDX_BYTE_OFFSET_0];
 
   // loop over clusters to read in and print file
   do
