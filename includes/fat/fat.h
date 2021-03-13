@@ -180,11 +180,57 @@
 // Value in the last FAT cluster index of a directory or file.
 #define END_CLUSTER          0x0FFFFFFF
 
-
 #define FST_CLUS_INDX_SNENT_BYTE_3     21
 #define FST_CLUS_INDX_SNENT_BYTE_2     20
 #define FST_CLUS_INDX_SNENT_BYTE_1     27
 #define FST_CLUS_INDX_SNENT_BYTE_0     26
+
+
+#define LN_CHAR_RANGE_1_BEGIN      1
+#define LN_CHAR_RANGE_1_END       11
+#define LN_CHAR_RANGE_2_BEGIN     14
+#define LN_CHAR_RANGE_2_END       26
+#define LN_CHAR_RANGE_3_BEGIN     28
+#define LN_CHAR_RANGE_3_END       32
+
+#define LAST_STD_ASCII_CHAR 127   // valus of the last char in std ASCII char set.
+
+#define BYTES_PER_INDEX     4  // 4 bytes for FAT32
+
+
+#define CREATION_DATE_BYTE_OFFSET_1     17
+#define CREATION_DATE_BYTE_OFFSET_0     16
+#define CREATION_TIME_BYTE_OFFSET_1     15
+#define CREATION_TIME_BYTE_OFFSET_0     14
+
+#define LAST_ACCESS_DATE_BYTE_OFFSET_1  19
+#define LAST_ACCESS_DATE_BYTE_OFFSET_0  18
+
+#define WRITE_DATE_BYTE_OFFSET_1     25
+#define WRITE_DATE_BYTE_OFFSET_0     24
+#define WRITE_TIME_BYTE_OFFSET_1     23
+#define WRITE_TIME_BYTE_OFFSET_0     22
+
+#define FILE_SIZE_BYTE_OFFSET_3      31
+#define FILE_SIZE_BYTE_OFFSET_2      30
+#define FILE_SIZE_BYTE_OFFSET_1      29
+#define FILE_SIZE_BYTE_OFFSET_0      28
+
+
+#define MONTH_MASK    0x01E0
+#define DAY_MASK      0x001F
+#define YEAR_MASK     0xFE00
+#define HOUR_MASK     0xF800
+#define MIN_MASK      0x07E0
+#define SEC_MASK      0x001F
+
+#define MONTH_CALC(X)     (((X) & MONTH_MASK) >> 5)
+#define DAY_CALC(X)       ((X) & DAY_MASK)
+#define YEAR_CALC(X)      (1980 + (((X) & YEAR_MASK) >> 9))
+#define HOUR_CALC(X)      (((X) & HOUR_MASK) >> 11)
+#define MIN_CALC(X)       (((X) & MIN_MASK) >> 5)
+#define SEC_CALC(X)       (2 * ((X) & SEC_MASK))
+
 
 /*
  ******************************************************************************     

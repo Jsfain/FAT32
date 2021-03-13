@@ -776,30 +776,30 @@ static uint8_t pvt_SetDirToParent(FatDir *dir, const BPB *bpb)
  * ----------------------------------------------------------------------------
  *                               (PRIVATE) LOAD A LONG NAME ENTRY INTO A STRING 
  * 
- * Description : Loads characters of a long name into a C-string.  
+ * Description : Loads characters of a long name into a C-string array.  
  * 
  * Arguments   : lnFirstEnt   - Position of the lowest order entry of the long 
- *                              name in secArr[].
+ *                              name in secArr.
  *               lnLastEnt    - Position of the highest order entry of the long 
- *                              name in secArr[]. 
- *               secArr       - Pointer to array holding the contents of a 
- *                              single sector of a directory from a FAT-
- *                              formatted disk.
+ *                              name in secArr.
+ *               secArr       - Pointer to array holding contents of a single
+ *                              sector of a dir from a FAT-formatted disk.
  *               lnStr        - Pointer to a string array that will be loaded
- *                              with the long name characters.
- *               lnStrIndx    - Pointer updated by this function. Initial value
- *                              is the position in *lnStr where chars should 
- *                              begin loading.
+ *                              with the characters from a long name entry.
  * 
  * Returns     : void 
  * 
- * Notes       : Must called twice if long name crosses sector boundary.
+ * Notes       : Must be called twice if long name crosses sector boundary.
  * ----------------------------------------------------------------------------
  */
 static void pvt_LoadLongName(const int lnFirstEnt, const int lnLastEnt, 
                              const uint8_t secArr[], char lnStr[])
 {
-  // set lnStr to point to first null char in array.
+  //
+  // set lnStr to point to first null char in array. This will be position 0 
+  // except when function is called twice to load a long name that crosses 
+  // sector boundaries.
+  //
   for (; *lnStr; ++lnStr)
     ;
   
@@ -807,20 +807,23 @@ static void pvt_LoadLongName(const int lnFirstEnt, const int lnLastEnt,
   for (int entPos = lnFirstEnt; entPos >= lnLastEnt; entPos -= ENTRY_LEN)
   {                                              
     //
-    // loops to load long name chars from a single entry.    
-    // if char is zero or > 127 (out of ascii range) discard.
-    //
-    for (uint16_t byteNum = entPos + 1; byteNum < entPos + 11; byteNum++)
-      if (secArr[byteNum] > 0 && secArr[byteNum] <= 127)
+    // loops to load long name chars from a single entry. Skips any nulls and 
+    // any characters outside of the standard ascii range.
+    // 
+    for (uint16_t byteNum = entPos + LN_CHAR_RANGE_1_BEGIN; 
+         byteNum < entPos + LN_CHAR_RANGE_1_END; byteNum++)
+      if (secArr[byteNum] && secArr[byteNum] <= LAST_STD_ASCII_CHAR)
         *lnStr++ = secArr[byteNum];
 
-    for (uint16_t byteNum = entPos + 14; byteNum < entPos + 26; byteNum++)
-      if (secArr[byteNum] > 0 && secArr[byteNum] <= 127)
+    for (uint16_t byteNum = entPos + LN_CHAR_RANGE_2_BEGIN; 
+         byteNum < entPos + LN_CHAR_RANGE_2_END; byteNum++)
+      if (secArr[byteNum] && secArr[byteNum] <= LAST_STD_ASCII_CHAR)
         *lnStr++ = secArr[byteNum];
     
-    for (uint16_t byteNum = entPos + 28; byteNum < entPos + 32; byteNum++)
-      if (secArr[byteNum] > 0 && secArr[byteNum] <= 127)
-        *lnStr++ = secArr[byteNum];     
+    for (uint16_t byteNum = entPos + LN_CHAR_RANGE_3_BEGIN;
+         byteNum < entPos + LN_CHAR_RANGE_3_END; byteNum++)
+      if (secArr[byteNum] && secArr[byteNum] <= LAST_STD_ASCII_CHAR)
+        *lnStr++ = secArr[byteNum];    
   }
 }
 
@@ -839,41 +842,39 @@ static void pvt_LoadLongName(const int lnFirstEnt, const int lnLastEnt,
  * Notes       : The returned value locates the index in the FAT. The index is
  *               offset (typically by -2) from the actual cluster number in the
  *               data region. The root cluster is always cluster 0 in the data
- *               region, but its FAT index is 2 (typically) or higher.
+ *               region, but its FAT index is 2 or higher.
  * ----------------------------------------------------------------------------
  */
-static uint32_t pvt_GetNextClusIndex(const uint32_t clusIndex, const BPB *bpb)
+static uint32_t pvt_GetNextClusIndex(const uint32_t clusIndx, const BPB *bpb)
 {
   // calculate address of sector containing the current cluster index
-  const static uint8_t bytesPerIndex = 4;   // 4 bytes for Fat32
-  uint16_t fatIndexesPerSec = bpb->bytesPerSec / bytesPerIndex;
-  uint16_t clusIndexPosInSec = (uint16_t)(clusIndex / fatIndexesPerSec);
-  uint32_t fatSectorToRead = clusIndexPosInSec + bpb->rsvdSecCnt;
-  
+  uint16_t fatIndxsPerSec = bpb->bytesPerSec / BYTES_PER_INDEX;
+  uint32_t fatSectorToRead = (clusIndx / fatIndxsPerSec) + bpb->rsvdSecCnt;
+
   // load current cluster's index sector into secArr
   uint8_t secArr[bpb->bytesPerSec];
   FATtoDisk_ReadSingleSector(fatSectorToRead, secArr);
 
   // load value in current cluster index. Value is the next cluster index.
-  uint32_t nextClusIndex;
-  uint16_t nextClusIndexFirstByteInSec = bytesPerIndex 
-                                       * (clusIndex % fatIndexesPerSec);
-  nextClusIndex  = secArr[nextClusIndexFirstByteInSec + 3];
-  nextClusIndex <<= 8;
-  nextClusIndex |= secArr[nextClusIndexFirstByteInSec + 2];
-  nextClusIndex <<= 8;
-  nextClusIndex |= secArr[nextClusIndexFirstByteInSec + 1];
-  nextClusIndex <<= 8;
-  nextClusIndex |= secArr[nextClusIndexFirstByteInSec];
+  uint32_t nextClusIndx;
+  uint16_t nextClusIndxSecPos = BYTES_PER_INDEX * (clusIndx % fatIndxsPerSec);
 
-  return nextClusIndex;
+  nextClusIndx  = secArr[nextClusIndxSecPos + 3];
+  nextClusIndx <<= 8;
+  nextClusIndx |= secArr[nextClusIndxSecPos + 2];
+  nextClusIndx <<= 8;
+  nextClusIndx |= secArr[nextClusIndxSecPos + 1];
+  nextClusIndx <<= 8;
+  nextClusIndx |= secArr[nextClusIndxSecPos];
+
+  return nextClusIndx;
 }
 
 /*
  * ----------------------------------------------------------------------------
  *                                      (PRIVATE) PRINT THE FIELDS OF FAT ENTRY
  * 
- * Description : Prints a FatEntry instance's fields according to flags.
+ * Description : Prints a FatEntry instance's fields according to flags param.
  *
  * Arguments   : secArr   - Pointer to an array holding then 32 bit short name
  *                          entry to be printed. Field values are located here.
@@ -893,41 +894,51 @@ static void pvt_PrintEntFields(const uint8_t secArr[], const uint8_t flags)
     uint16_t createDate;
 
     // load create date and time
-    createDate = secArr[17];
+    createDate = secArr[CREATION_DATE_BYTE_OFFSET_1];
     createDate <<= 8;
-    createDate |= secArr[16];
-    createTime = secArr[15];
+    createDate |= secArr[CREATION_DATE_BYTE_OFFSET_0];
+    createTime = secArr[CREATION_TIME_BYTE_OFFSET_1];
     createTime <<= 8;
-    createTime |= secArr[14];
+    createTime |= secArr[CREATION_TIME_BYTE_OFFSET_0];
 
     // print month
     print_Str("    ");
-    if ((createDate & 0x01E0) >> 5 < 10) 
+    uint8_t month = MONTH_CALC(createDate);
+    if (month < 10)
       print_Str("0");    
-    print_Dec((createDate & 0x01E0) >> 5);
+    print_Dec(month);
     print_Str("/");
+
     // print day
-    if ((createDate & 0x001F) < 10)
+    uint8_t day = DAY_CALC(createDate);
+    if (day < 10)
       print_Str("0");
-    print_Dec(createDate & 0x001F);
+    print_Dec(day);
     print_Str("/");
+
     // print year
-    print_Dec(1980 + ((createDate & 0xFE00) >> 9));
+    print_Dec((uint16_t)YEAR_CALC(createDate));
     print_Str("  ");
+
     // print hours
-    if ((createTime & 0xF800) >> 11 < 10) 
+    uint8_t hour = HOUR_CALC(createTime);
+    if (hour < 10) 
       print_Str("0");
-    print_Dec((createTime & 0xF800) >> 11);
+    print_Dec(hour);
     print_Str(":");
+
     // print minutes
-    if ((createTime & 0x07E0) >> 5 < 10)
+    uint8_t min = MIN_CALC(createTime);
+    if (min < 10)
       print_Str("0");
-    print_Dec((createTime & 0x07E0) >> 5);
+    print_Dec(min);
     print_Str(":");
+
     // print seconds (resolution is 2 seconds).
-    if (2 * (createTime & 0x001F) < 10) 
+    uint8_t sec = SEC_CALC(createTime);
+    if (sec < 10) 
       print_Str("0");
-    print_Dec(2 * (createTime & 0x001F));
+    print_Dec(sec);
   }
 
   // Print last access date
@@ -936,23 +947,27 @@ static void pvt_PrintEntFields(const uint8_t secArr[], const uint8_t flags)
     uint16_t lastAccDate;
 
     // load last access date
-    lastAccDate = secArr[19];
+    lastAccDate = secArr[LAST_ACCESS_DATE_BYTE_OFFSET_1];
     lastAccDate <<= 8;
-    lastAccDate |= secArr[18];
+    lastAccDate |= secArr[LAST_ACCESS_DATE_BYTE_OFFSET_0];
 
     // print month
     print_Str("     ");
-    if ((lastAccDate & 0x01E0) >> 5 < 10)
+    uint8_t month = MONTH_CALC(lastAccDate);
+    if (month < 10)
       print_Str("0");
-    print_Dec((lastAccDate & 0x01E0) >> 5);
+    print_Dec(month);
     print_Str("/");
+
     // print day
-    if ((lastAccDate & 0x001F) < 10) 
+    uint8_t day = DAY_CALC(lastAccDate);
+    if (day < 10)
       print_Str("0");
-    print_Dec(lastAccDate & 0x001F);
+    print_Dec(day);
     print_Str("/");
+
     // print year
-    print_Dec(1980 + ((lastAccDate & 0xFE00) >> 9));
+    print_Dec((uint16_t)YEAR_CALC(lastAccDate));
   }
 
   // Print last modified date / time
@@ -962,42 +977,52 @@ static void pvt_PrintEntFields(const uint8_t secArr[], const uint8_t flags)
     uint16_t writeTime;
     
     // Load last modified write date and time
-    writeDate = secArr[25];
+    writeDate = secArr[WRITE_DATE_BYTE_OFFSET_1];
     writeDate <<= 8;
-    writeDate |= secArr[24];
+    writeDate |= secArr[WRITE_DATE_BYTE_OFFSET_0];
 
-    writeTime = secArr[23];
+    writeTime = secArr[WRITE_TIME_BYTE_OFFSET_1];
     writeTime <<= 8;
-    writeTime |= secArr[22];
+    writeTime |= secArr[WRITE_TIME_BYTE_OFFSET_0];
   
     // print month
     print_Str("     ");
-    if ((writeDate & 0x01E0) >> 5 < 10) 
+    uint8_t month = MONTH_CALC(writeDate);
+    if (month < 10) 
       print_Str("0");
-    print_Dec((writeDate & 0x01E0) >> 5);
+    print_Dec(month);
     print_Str("/");
+    
     // print day
-    if ((writeDate & 0x001F) < 10) 
+    uint8_t day = DAY_CALC(writeDate);
+    if (day < 10) 
       print_Str("0");
-    print_Dec(writeDate & 0x001F);
+    print_Dec(day);
     print_Str("/");
+
     // print year
-    print_Dec(1980 + ((writeDate & 0xFE00) >> 9));
+    print_Dec((uint16_t)YEAR_CALC(writeDate));
     print_Str("  ");
+
     // print hour
-    if ((writeTime & 0xF800) >> 11 < 10)
+    uint8_t hour = HOUR_CALC(writeTime);
+    if (hour < 10)
       print_Str("0");
-    print_Dec((writeTime & 0xF800) >> 11);
-    print_Str(":");   
-    // print minute   
-    if ((writeTime & 0x07E0) >> 5 < 10) 
-      print_Str("0");
-    print_Dec((writeTime & 0x07E0) >> 5);
+    print_Dec(hour);
     print_Str(":");
-    // print second
-    if (2 * (writeTime & 0x001F) < 10) 
+
+    // print minute
+    uint8_t min = MIN_CALC(writeTime);   
+    if (min < 10) 
       print_Str("0");
-    print_Dec(2 * (writeTime & 0x001F));
+    print_Dec(min);
+    print_Str(":");
+
+    // print second
+    uint8_t sec = SEC_CALC(writeTime);
+    if (sec < 10) 
+      print_Str("0");
+    print_Dec(sec);
   }
   
   print_Str("     ");
@@ -1008,13 +1033,13 @@ static void pvt_PrintEntFields(const uint8_t secArr[], const uint8_t flags)
     uint32_t fileSize;    
     
     // load file size
-    fileSize = secArr[31];
+    fileSize = secArr[FILE_SIZE_BYTE_OFFSET_3];
     fileSize <<= 8;
-    fileSize |= secArr[30];
+    fileSize |= secArr[FILE_SIZE_BYTE_OFFSET_2];
     fileSize <<= 8;
-    fileSize |= secArr[29];
+    fileSize |= secArr[FILE_SIZE_BYTE_OFFSET_1];
     fileSize <<= 8;
-    fileSize |= secArr[28];
+    fileSize |= secArr[FILE_SIZE_BYTE_OFFSET_0];
 
     // Print spaces for formatting output. Add 1 to prevent starting at 0.
     for (uint64_t sp = 1 + fileSize / FS_UNIT; sp < GB / FS_UNIT; sp *= 10)
@@ -1042,7 +1067,7 @@ static void pvt_PrintEntFields(const uint8_t secArr[], const uint8_t flags)
  * ----------------------------------------------------------------------------
  *                                                   (PRIVATE) PRINT A FAT FILE
  * 
- * Description : Performs print file operation. This will output the contents 
+ * Description : Performs 'print file' operation. This will output the contents
  *               of any file to the screen.
  * 
  * Arguments   : snEnt   - Pointer to 32 byte array holding the sn entry.
@@ -1055,13 +1080,13 @@ static uint8_t pvt_PrintFile(const uint8_t snEnt[], const BPB *bpb)
 {
   //get FAT index for file's first cluster
   uint32_t clus; 
-  clus = snEnt[21];
+  clus = snEnt[FST_CLUS_INDX_SNENT_BYTE_3];
   clus <<= 8;
-  clus |= snEnt[20];
+  clus |= snEnt[FST_CLUS_INDX_SNENT_BYTE_2];
   clus <<= 8;
-  clus |= snEnt[27];
+  clus |= snEnt[FST_CLUS_INDX_SNENT_BYTE_1];
   clus <<= 8;
-  clus |= snEnt[26];
+  clus |= snEnt[FST_CLUS_INDX_SNENT_BYTE_0];
 
   // loop over clusters to read in and print file
   do
@@ -1071,12 +1096,13 @@ static uint8_t pvt_PrintFile(const uint8_t snEnt[], const BPB *bpb)
          ++secNumInClus)
     {
       // calculate address of the sector on the physical disk
-      uint32_t secNumPhys = secNumInClus + bpb->dataRegionFirstSector
+      uint32_t secNumOnDisk = secNumInClus + bpb->dataRegionFirstSector
                           + (clus - bpb->rootClus) * bpb->secPerClus;
 
       // read disk sector into the sector array
       uint8_t secArr[bpb->bytesPerSec];
-      if (FATtoDisk_ReadSingleSector(secNumPhys, secArr) == FAILED_READ_SECTOR)
+      if (FATtoDisk_ReadSingleSector(secNumOnDisk, secArr) 
+          == FAILED_READ_SECTOR)
         return FAILED_READ_SECTOR;
 
       for (uint16_t byteNum = 0; byteNum < bpb->bytesPerSec; ++byteNum)
@@ -1087,13 +1113,13 @@ static uint8_t pvt_PrintFile(const uint8_t snEnt[], const BPB *bpb)
         // 
         // for output formatting. Currently using terminal that requires "\n\r"
         // to go to the start of the next line. Therefore if '\n' is detected
-        // then need to print "\n\r".
+        // need to print "\n\r".
         //
         if (secArr[byteNum] == '\n') 
           print_Str ("\n\r");
         
         // else if not 0, just print the character directly to the screen.
-        else if (secArr[byteNum] != 0) 
+        else if (secArr[byteNum])
           usart_Transmit(secArr[byteNum]);
        
         // else character is zero. Possible indicatin of eof.
