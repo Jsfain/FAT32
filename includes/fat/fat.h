@@ -22,7 +22,7 @@
  ******************************************************************************
  */
 
-// macros for some common file size units
+// common file sizes
 #ifndef BYTE
 #define BYTE  1
 #endif//BYTE 
@@ -39,11 +39,63 @@
 #define GB    1000000000
 #endif//GB
 
-//
-// The two sets of MACROS below (FAT ENTRY ATTRIBUTE and LONG NAME POSITIONS)
-// are flags and masks that directly correspond to bit and byte settings within 
-// a FAT entry.
-//
+/* 
+ * ----------------------------------------------------------------------------
+ *                                                ENTRY and SECTOR BYTE LENGTHS
+ *
+ * Description : Defines byte lengths of a FAT32 sector and directory entry.
+ *       
+ * Notes       : 1) ENTRY_LEN must always be 32.
+ *               2) SECTOR_LEN should match the bios parameter block's 'bytes 
+ *                  per sector' (BPS) field.
+ * 
+ * Warning     : Though the BPS field value can be different than 512, in this 
+ *               implementation, anything other than 512 will not work. 
+ * ----------------------------------------------------------------------------
+ */
+#define ENTRY_LEN                 32             // FAT entry byte length
+
+#ifndef SECTOR_LEN
+#define SECTOR_LEN                512            // must always be 512 here
+#endif//SECTOR_LEN
+
+#define FIRST_SEC_POS_IN_CLUS     0
+#define FIRST_ENT_POS_IN_SEC      0
+#define LAST_ENTRY_POS_IN_SEC     SECTOR_LEN - ENTRY_LEN
+
+/* 
+ * ----------------------------------------------------------------------------
+ *                                                       SHORT NAME ENTRY BYTES
+ *
+ * Description : These are the bytes of a 32 byte short name entry. Their 
+ *               values represent the byte offset relative to the first byte of
+ *               an entry.
+ * 
+ * Notes       : bytes 0 to 10 are the 11 character short name, 8.3 format.
+ * ----------------------------------------------------------------------------
+ */
+//#define SHORT_NAME_CHARS                 0 to 10
+#define ATTR_BYTE_OFFSET                   11
+//#define NTRES                            12    // reserved. unused. 
+#define CREATION_TIME_TENTH_BYTE_OFFSET    13
+#define CREATION_TIME_BYTE_OFFSET_0        14
+#define CREATION_TIME_BYTE_OFFSET_1        15
+#define CREATION_DATE_BYTE_OFFSET_0        16
+#define CREATION_DATE_BYTE_OFFSET_1        17
+#define LAST_ACCESS_DATE_BYTE_OFFSET_0     18
+#define LAST_ACCESS_DATE_BYTE_OFFSET_1     19
+#define FST_CLUS_INDX_BYTE_OFFSET_2        20
+#define FST_CLUS_INDX_BYTE_OFFSET_3        21
+#define WRITE_TIME_BYTE_OFFSET_0           22
+#define WRITE_TIME_BYTE_OFFSET_1           23
+#define WRITE_DATE_BYTE_OFFSET_0           24
+#define WRITE_DATE_BYTE_OFFSET_1           25
+#define FST_CLUS_INDX_BYTE_OFFSET_0        26
+#define FST_CLUS_INDX_BYTE_OFFSET_1        27
+#define FILE_SIZE_BYTE_OFFSET_0            28
+#define FILE_SIZE_BYTE_OFFSET_1            29
+#define FILE_SIZE_BYTE_OFFSET_2            30
+#define FILE_SIZE_BYTE_OFFSET_3            31
 
 /* 
  * ----------------------------------------------------------------------------
@@ -53,9 +105,8 @@
  *               a single 32 byte FAT entry. These settings are used to
  *               describe the entry type, access, etc... 
  * 
- * Notes       : If the 4 lowest bits/flags are set in the Attribute Byte of a 
- *               FAT entry, then the entry is part of a long name. To check,
- *               use LN_ATTR_MASK.
+ * Notes       : If the 4 lowest bits are set, then the entry is part of a long
+ *               name. To check, use LN_ATTR_MASK.
  * ----------------------------------------------------------------------------
  */
 #define READ_ONLY_ATTR       0x01
@@ -64,13 +115,50 @@
 #define VOLUME_ID_ATTR       0x08
 #define DIR_ENTRY_ATTR       0x10
 #define ARCHIVE_ATTR         0x20
-#define LN_ATTR_MASK         0x0F      // OR'd 4 lowest bits mean long name
+#define LN_ATTR_MASK         0x0F    // OR'd 4 lowest bits - entry is long name
 
-// position of attribute byte relative to first byte of a short name entry
-#define ATTR_BYTE_OFFSET     11
+/* 
+ * ----------------------------------------------------------------------------
+ *                                                       DATE TIME CALCULATIONS
+ *
+ * Description : The CALC macro functions are used to calculate the date/time 
+ *               values from the short name date/time byte fields (e.g. last 
+ *               access date). The mask macros are used to extract the
+ *               necessary bits from the date/time bytes to calculate the value
+ *               for the relevant field. 
+ * ----------------------------------------------------------------------------
+ */
+#define MONTH_MASK           0x01E0
+#define DAY_MASK             0x001F
+#define YEAR_MASK            0xFE00
+#define HOUR_MASK            0xF800
+#define MIN_MASK             0x07E0
+#define SEC_MASK             0x001F
 
-// If first byte of entry is set to this, then entry is marked for deletion. 
-#define DELETED_ENTRY_TOKEN  0xE5
+#define MONTH_CALC(X)        (((X) & MONTH_MASK) >> 5)
+#define DAY_CALC(X)          ((X) & DAY_MASK)
+#define YEAR_CALC(X)         (1980 + (((X) & YEAR_MASK) >> 9))
+#define HOUR_CALC(X)         (((X) & HOUR_MASK) >> 11)
+#define MIN_CALC(X)          (((X) & MIN_MASK) >> 5)
+#define SEC_CALC(X)          (2 * ((X) & SEC_MASK))
+
+/* 
+ * ----------------------------------------------------------------------------
+ *                                                        LONG NAME ENTRY BYTES
+ *
+ * Description : The chars of a long name found in a single 32-byte entry are 
+ *               found in three separate ranges of bytes. The values below
+ *               represent the start and end byte offsets of these three 
+ *               ranges. A long name may be distributed among multiple 32-byte
+ *               entries.
+ * ----------------------------------------------------------------------------
+ */
+#define LN_CHAR_RANGE_1_BEGIN      1
+#define LN_CHAR_RANGE_1_END       11
+#define LN_CHAR_RANGE_2_BEGIN     14
+#define LN_CHAR_RANGE_2_END       26
+#define LN_CHAR_RANGE_3_BEGIN     28
+#define LN_CHAR_RANGE_3_END       32
 
 /* 
  * ----------------------------------------------------------------------------
@@ -88,33 +176,28 @@
  *                  sequence of its associated long name entries).
  * ----------------------------------------------------------------------------
  */
-#define LN_LAST_ENTRY_FLAG   0x40  
-#define LN_ORD_MASK          0x3F
+#define LN_LAST_ENTRY_FLAG     0x40  
+#define LN_ORD_MASK            0x3F
 
 /* 
  * ----------------------------------------------------------------------------
- *                                                ENTRY and SECTOR BYTE LENGTHS
- *
- * Description : Defines the byte lengths of FAT32 sector and directory entry.
- *       
- * Notes       : 1) ENTRY_LEN must always be 32.
- *               2) SECTOR_LEN should match the bios parameter block's 'bytes 
- *                  per sector' (BPS) field.
- * 
- * Warning     : Though the BPS field value can be different than 512, in this 
- *               implementation. anything other than 512 will not work. 
+ *                                                    MISC BYTES, MASKS, TOKENS
  * ----------------------------------------------------------------------------
  */
-#define ENTRY_LEN     32               // FAT entry byte length
+// If the first byte of entry is set to this, then entry is marked for deletion 
+#define DELETED_ENTRY_TOKEN     0xE5
 
-#ifndef SECTOR_LEN
-#define SECTOR_LEN    512              // must always be 512 here
-#endif//SECTOR_LEN
+// Value in the last FAT cluster index of a directory or file.
+#define END_CLUSTER             0x0FFFFFFF
 
-#define FIRST_SECTOR_POS_IN_CLUS  0
-#define FIRST_ENTRY_POS_IN_SEC    0
-#define LAST_ENTRY_POS_IN_SEC     SECTOR_LEN - ENTRY_LEN
+// value of the last char in std ASCII char set.
+#define LAST_STD_ASCII_CHAR     127  
 
+// 4 bytes for FAT32
+#define BYTES_PER_INDEX         4  
+
+// unit used when printing an entry's file size. Set to BYTE or KB 
+#define FS_UNIT                 BYTE   
 
 /* 
  * ----------------------------------------------------------------------------
@@ -164,73 +247,12 @@
 #define PATH_STR_LEN_MAX     100       // max len of path string + null
 #define LN_STR_LEN_MAX       100       // max len of ln string + null
 
-//
-// when using these to define short name string array sizes, will need to add 1
-// for the null terminator.
-//
+// for the 8.3 format of a short name.
 #define SN_NAME_CHAR_LEN       8       // max num chars in name of sn
 #define SN_EXT_CHAR_LEN        3       // max num chars in extension of sn
 
-// add 1 for '.' short name / extension separator.
+// + 1 for '.' short name / extension separator.
 #define SN_CHAR_LEN           SN_NAME_CHAR_LEN + SN_EXT_CHAR_LEN + 1      
-
-// unit used when printing an entry's file size. Set to BYTE or KB 
-#define FS_UNIT              BYTE               
-
-// Value in the last FAT cluster index of a directory or file.
-#define END_CLUSTER          0x0FFFFFFF
-
-#define FST_CLUS_INDX_SNENT_BYTE_3     21
-#define FST_CLUS_INDX_SNENT_BYTE_2     20
-#define FST_CLUS_INDX_SNENT_BYTE_1     27
-#define FST_CLUS_INDX_SNENT_BYTE_0     26
-
-
-#define LN_CHAR_RANGE_1_BEGIN      1
-#define LN_CHAR_RANGE_1_END       11
-#define LN_CHAR_RANGE_2_BEGIN     14
-#define LN_CHAR_RANGE_2_END       26
-#define LN_CHAR_RANGE_3_BEGIN     28
-#define LN_CHAR_RANGE_3_END       32
-
-#define LAST_STD_ASCII_CHAR 127   // valus of the last char in std ASCII char set.
-
-#define BYTES_PER_INDEX     4  // 4 bytes for FAT32
-
-
-#define CREATION_DATE_BYTE_OFFSET_1     17
-#define CREATION_DATE_BYTE_OFFSET_0     16
-#define CREATION_TIME_BYTE_OFFSET_1     15
-#define CREATION_TIME_BYTE_OFFSET_0     14
-
-#define LAST_ACCESS_DATE_BYTE_OFFSET_1  19
-#define LAST_ACCESS_DATE_BYTE_OFFSET_0  18
-
-#define WRITE_DATE_BYTE_OFFSET_1     25
-#define WRITE_DATE_BYTE_OFFSET_0     24
-#define WRITE_TIME_BYTE_OFFSET_1     23
-#define WRITE_TIME_BYTE_OFFSET_0     22
-
-#define FILE_SIZE_BYTE_OFFSET_3      31
-#define FILE_SIZE_BYTE_OFFSET_2      30
-#define FILE_SIZE_BYTE_OFFSET_1      29
-#define FILE_SIZE_BYTE_OFFSET_0      28
-
-
-#define MONTH_MASK    0x01E0
-#define DAY_MASK      0x001F
-#define YEAR_MASK     0xFE00
-#define HOUR_MASK     0xF800
-#define MIN_MASK      0x07E0
-#define SEC_MASK      0x001F
-
-#define MONTH_CALC(X)     (((X) & MONTH_MASK) >> 5)
-#define DAY_CALC(X)       ((X) & DAY_MASK)
-#define YEAR_CALC(X)      (1980 + (((X) & YEAR_MASK) >> 9))
-#define HOUR_CALC(X)      (((X) & HOUR_MASK) >> 11)
-#define MIN_CALC(X)       (((X) & MIN_MASK) >> 5)
-#define SEC_CALC(X)       (2 * ((X) & SEC_MASK))
-
 
 /*
  ******************************************************************************     
@@ -243,20 +265,20 @@
  *                                                         FAT DIRECTORY STRUCT
  *
  * Description : Struct used to hold some parameters corresponding to a FAT
- *               directory.
+ *               directory. An instance of this struct can be used as the 
+ *               current working directory.
  *       
  * Notes       : 1) Any instance of this struct must first be initialized by 
  *                  passing it to fat_SetDirToRoot.
  *               2) Most FAT functions require an instance of this struct to be
  *                  previously set and passed to it.
- *               3) This is primarily used as a 'Current Working Directory'.
  * 
  * Warnings    : All members of an instance of this struct must correspond to
  *               the same valid FAT directory. If not, then unexpected results 
  *               will occur when trying to navigate and/or print directory 
  *               names, contents, entries, and files. As such, members of an 
  *               instance of this struct should only be set through the FAT
- *               FAT functions.
+ *               functions declared here.
  * ----------------------------------------------------------------------------
  */
 typedef struct
@@ -271,15 +293,15 @@ FatDir;
 
 /* 
  * ----------------------------------------------------------------------------
- *                                                         FAT DIRECTORY STRUCT
+ *                                                             FAT ENTRY STRUCT
  *
  * Description : Instances of this struct are used to locate entries within a 
  *               FAT directory.
  *       
- * Notes       : 1) Any instance of this struct should first be initialized by
- *                  passing it to fat_InitEntry.
- *               2) Most of the FAT functions require an instance of this
- *                  struct to passed to it.
+ * Notes       : Any instance of this struct should first be initialized by
+ *               passing it to fat_InitEntry, after which, fat_SetNextEntry
+ *               should be the only function that currently updates the 
+ *               instance.
  * 
  * Warnings    : Members of an instance of this struct should never be set
  *               manually, but only by passing it to the FAT functions.

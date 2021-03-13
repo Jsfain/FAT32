@@ -241,7 +241,7 @@ uint8_t fat_SetNextEntry(FatEntry *currEnt, const BPB *bpb)
                 return CORRUPT_FAT_ENTRY;
 
               // Call twice for both current and next sector.
-              pvt_LoadLongName(snPos - ENTRY_LEN, FIRST_ENTRY_POS_IN_SEC,
+              pvt_LoadLongName(snPos - ENTRY_LEN, FIRST_ENT_POS_IN_SEC,
                                nextSecArr, lnStr);
               pvt_LoadLongName(LAST_ENTRY_POS_IN_SEC, entPos, secArr, lnStr);
             }
@@ -282,9 +282,9 @@ uint8_t fat_SetNextEntry(FatEntry *currEnt, const BPB *bpb)
           return SUCCESS;  
         }
       }
-      entPos = FIRST_ENTRY_POS_IN_SEC;      // reset counter for entry loop
+      entPos = FIRST_ENT_POS_IN_SEC;      // reset counter for entry loop
     }
-    secNumInClus = FIRST_SECTOR_POS_IN_CLUS;// reset counter for sector loop
+    secNumInClus = FIRST_SEC_POS_IN_CLUS;// reset counter for sector loop
   }
   // get index of next cluster and continue looping if not last cluster
   while ((clusIndx = pvt_GetNextClusIndex(clusIndx, bpb)) != END_CLUSTER);
