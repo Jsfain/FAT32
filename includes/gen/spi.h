@@ -1,10 +1,12 @@
 /*
- * File    : SPI.H
- * Version : 0.0.0.1 
- * Author  : Joshua Fain
- * Target  : ATMega1280
- * License : MIT
- * Copyright (c) 2020
+ * File       : SPI.H
+ * Version    : 1.0 
+ * Target     : ATMega1280
+ * Compiler   : AVR-GCC 9.3.0
+ * Downloader : AVRDUDE 6.3
+ * License    : GNU GPLv3
+ * Author     : Joshua Fain
+ * Copyright (c) 2020, 2021
  * 
  * Interface for interacting with the ATMega's SPI port.
  */
@@ -37,6 +39,8 @@
 // Chip Select 1
 #define DD_SS1      DDB4
 #define SS1         PB4
+
+#define SPI_REG_BIT_LEN      8
 
 /*
  ******************************************************************************

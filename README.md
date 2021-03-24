@@ -116,4 +116,4 @@ Probably the best way to understand how to use this AVR-FAT module is to refer t
 
 
 ## License
-[MIT license](https://github.com/Jsfain/AVR-FAT/blob/master/LICENSE)
+[GNU GPLv3](https://github.com/Jsfain/AVR-FAT/blob/master/LICENSE)

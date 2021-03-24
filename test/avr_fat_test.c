@@ -2,15 +2,16 @@
  * 
  *                                 TEST for AVR-FAT MODULE
  *
- * File   : AVR_FAT_TEST.C
- * Author : Joshua Fain
- * Target : ATMega1280
- * License : MIT LICENSE
- * Copyright (c) 2020 Joshua Fain
- * 
+ * File       : AVR_FAT_TEST.C
+ * Author     : Joshua Fain
+ * Target     : ATMega1280
+ * Compiler   : AVR-GCC 9.3.0
+ * Downloader : AVRDUDE 6.3
+ * License    : GNU GPLv3
+ * Author     : Joshua Fain
+ * Copyright (c) 2020, 2021
  * 
  * Contains main(). Used to test the functionality of the the AVR-FAT module.
- * 
  * 
  * DESCRIPTION: 
  * Implements a simple command line-like interface to navigate and read a FAT 
@@ -18,7 +19,6 @@
  * a physical disk driver to access the raw data contents of a FAT32-formatted 
  * SD card. This SD card driver is included in the repo, but is not considered 
  * part of the AVR-FAT module.
- *
  *
  * COMMANDS:
  *  (1) cd <DIR>      : Change directory to the directory specified by <DIR>.
@@ -58,7 +58,6 @@
  * (10) Enter 'q' to exit the command-line. After exiting, the explicit FAT
  *      functionality however, there is included a raw data access section
  *      if you do use the AVR-SD card module along with the AVR-FAT module.
- * 
  */
 
 #include <string.h>

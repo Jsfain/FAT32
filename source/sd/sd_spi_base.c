@@ -1,10 +1,12 @@
 /*
- * File    : SD_SPI_BASE.C
- * Version : 0.0.0.1 
- * Author  : Joshua Fain
- * Target  : ATMega1280
- * License : MIT
- * Copyright (c) 2020-2021
+ * File       : SD_SPI_BASE.C
+ * Version    : 1.0
+ * Target     : ATMega1280
+ * Compiler   : AVR-GCC 9.3.0
+ * Downloader : AVRDUDE 6.3
+ * License    : GNU GPLv3
+ * Author     : Joshua Fain
+ * Copyright (c) 2020, 2021
  *  
  * Implementation of SD_SPI_BASE.H
  */
@@ -21,7 +23,7 @@
  ******************************************************************************
  */
 
-static uint8_t pvt_CRC7(uint64_t tca);
+static uint8_t pvt_CRC7(const uint64_t tca);
 
 /*
  ******************************************************************************
@@ -34,29 +36,37 @@ static uint8_t pvt_CRC7(uint64_t tca);
  *                                                       SD CARD INITIALIZATION
  *
  * Description : Implements the SD Card SPI mode initialization routine and 
- *               sets the members of the CTV instance. 
+ *               sets the members of the CTV (Card Type and Version) struct
+ *               instance. 
  *
- * Arguments   : ctv     ptr to a CTV instance whose members will be set here.
+ * Arguments   : ctv   - ptr to a CTV instance whose members will be set here.
  * 
- * Returns     : Initialization Error Response. This includes initialization 
- *               error flag in bits 8 to 19 and the most recent R1 response in
+ * Returns     : Initialization Error Response. This includes an Initialization
+ *               Error Flag in bits 8 to 19 and the most recent R1 response in
  *               the lowest byte.
+ * 
+ * Warnings    : A CTV instance should ONLY be set by this function.
  * ----------------------------------------------------------------------------
  */
-uint32_t sd_InitModeSPI(CTV* ctv)
+uint32_t sd_InitModeSPI(CTV *ctv)
 {
-  // R1 response is first byte returned by SD card in response to every command
-  uint8_t r1;                         
+  uint8_t r1;           // first byte ret by SD card in response to any cmd
 
-  // Wait at least 80 clock cycles for power up to complete.
-  for (uint8_t waitCnt = 0; waitCnt <= 10; waitCnt++)
-    sd_SendByteSPI(0xFF);
+  //
+  // if prevSuccessFlag is set, then initialization has previously completed 
+  // successfully so return. If not, proceed with rest of init function.
+  //
+  static uint8_t prevSuccessFlag;
+  if (prevSuccessFlag)
+    return OUT_OF_IDLE;
+
+  sd_WaitSendDummySPI(80);                 // wait 80 SPI CCs for power up
 
   //
   // Step 1: GO_IDLE_STATE (CMD0)
   //
   CS_SD_LOW;
-  sd_SendCommand(GO_IDLE_STATE, 0);
+  sd_SendCommand(GO_IDLE_STATE, 0);         // send with arg = 0
   r1 = sd_GetR1();
   CS_SD_HIGH;
   if (r1 != IN_IDLE_STATE) 
@@ -65,37 +75,35 @@ uint32_t sd_InitModeSPI(CTV* ctv)
   //
   // Step 2: SEND_IF_COND (CMD8)
   //
-  uint8_t r7[5];                            // R7 response only for CMD8
-  const uint8_t chkPtrn = 0xAA;             // check pattern is arbitrary value
-  const uint8_t voltSuppRng = 0x01;         // 2.7 to 3.6V
-  
+  uint8_t r7[R7_BYTE_LEN];                  // R7 response is only for CMD8
+
   CS_SD_LOW;
-  sd_SendCommand(SEND_IF_COND, (uint16_t)voltSuppRng << 8 | chkPtrn);
+  sd_SendCommand(SEND_IF_COND, SEND_IF_COND_ARG);
 
-  // Get R7 response. First R7 byte is the R1 response.
-  r7[0] = sd_GetR1();                      
-  r7[1] = sd_ReceiveByteSPI();
-  r7[2] = sd_ReceiveByteSPI();
-  r7[3] = sd_ReceiveByteSPI();
-  r7[4] = sd_ReceiveByteSPI();
-
+  // Get R7 response.
+  r7[R7_R1_RESP_BYTE] = sd_GetR1();              // First R7 byte is the R1 response
+  r7[R7_CMD_VERS_BYTE] = sd_ReceiveByteSPI();    // not used
+  r7[R7_RSRVD_BYTE] = sd_ReceiveByteSPI();       // not used
+  r7[R7_VOLT_RNG_ACPTD_BYTE] = sd_ReceiveByteSPI();
+  r7[R7_CHK_PTRN_ECHO_BYTE] = sd_ReceiveByteSPI();
   CS_SD_HIGH;
-  if (r7[0] == (ILLEGAL_COMMAND | IN_IDLE_STATE)) 
+  if (r7[R7_R1_RESP_BYTE] == (ILLEGAL_COMMAND | IN_IDLE_STATE)) 
     ctv->version = VERSION_1;
-  else if (r7[0] == IN_IDLE_STATE) 
+  else if (r7[R7_R1_RESP_BYTE] == IN_IDLE_STATE) 
   {
     ctv->version = VERSION_2;
-    if (r7[3] != voltSuppRng || r7[4] != chkPtrn)
-      return (FAILED_SEND_IF_COND | UNSUPPORTED_CARD_TYPE | r7[0]);
+    if (r7[R7_VOLT_RNG_ACPTD_BYTE] != VOLT_RANGE_SUPPORTED 
+        || r7[R7_CHK_PTRN_ECHO_BYTE] != CHECK_PATTERN)
+      return (FAILED_SEND_IF_COND | UNSUPPORTED_CARD_TYPE | r7[R7_R1_RESP_BYTE]);
   }
   else  
-    return (FAILED_SEND_IF_COND | r7[0]);
-
+    return (FAILED_SEND_IF_COND | r7[R7_R1_RESP_BYTE]);
+  
   //
   // Step 3: CRC_ON_OFF (CMD59)
   //
   CS_SD_LOW;
-  sd_SendCommand(CRC_ON_OFF, 0);           // 0 = OFF (default), 1 = ON
+  sd_SendCommand(CRC_ON_OFF, CRC_OFF_ARG);
   r1 = sd_GetR1();
   CS_SD_HIGH;
   if (r1 != IN_IDLE_STATE) 
@@ -104,107 +112,99 @@ uint32_t sd_InitModeSPI(CTV* ctv)
   //
   // Step 4: SD_SEND_OP_COND (ACMD41)
   //
+  // The argument of SD_SEND_OP_COND indicates card capacity supported by the 
+  // host. This is determined by the setting of macro HOST_CAPACITY_SUPPORT.
+  // Since SD_SEND_OP_COND is an ACMD type, the APP_CMD, must first be sent to
+  // signal to the SD card that the next command is type ACMD. This process of
+  // send APP_CMD then SD_SEND_OP_COND repeats until the R1 response to 
+  // SD_SEND_OP_COND signals the card is no longer in the idle state or timeout
+  // limit has been reached.
+  //
   uint8_t  timeout = 0;
-  uint32_t acmd41Arg = 0;      // ACMD41 arg depends on card type host supports
-  if (HOST_CAPACITY_SUPPORT == SDHC)
-    acmd41Arg = 0x40000000;
-
-  //
-  // Send SD_SEND_OP_COND with acmd41arg argument to indicate to the card the
-  // card capacity the host supports (SDHC or SDSC). Since SD_SEND_OP_COND is 
-  // an ACMD type command, the command, APP_CMD, must first be sent to signal 
-  // to the SD card that the next command is of type ACMD. This process of send
-  // APP_CMD then SD_SEND_OP_COND continues to repeat until the R1 response to 
-  // SD_SEND_OP_COND signals the card is no longer in the idle state.
-  //
   do
   {
     CS_SD_LOW;
-    sd_SendCommand(APP_CMD, 0);      // send APP_CMD before ACMD type commands.
+    sd_SendCommand(APP_CMD, 0);             // arg is 0 for this command
     r1 = sd_GetR1();
     CS_SD_HIGH;
     if (r1 != IN_IDLE_STATE) 
       return (FAILED_APP_CMD | r1);
     CS_SD_LOW;
-    sd_SendCommand(SD_SEND_OP_COND, acmd41Arg);      // ACMD41  
+    sd_SendCommand(SD_SEND_OP_COND, ACMD41_HCS_ARG);
     r1 = sd_GetR1();
     CS_SD_HIGH;
     if (r1 > IN_IDLE_STATE)
       return (FAILED_SD_SEND_OP_COND | r1);
-    if (timeout++ >= 0xFE && r1 > 0)
+    if (++timeout >= TIMEOUT_LIMIT && r1 != OUT_OF_IDLE)
       return (FAILED_SD_SEND_OP_COND | OUT_OF_IDLE_TIMEOUT | r1);
   }
   while (r1 & IN_IDLE_STATE);
 
-
   //
   // Step 5: READ_OCR (CMD 58)
-  // The final init step is to read CCS bit of the OCR.
+  // The final init step is to read Card Capacity Support bit (CCS) of the OCR
   //
 
   // OCR Variables
-  uint8_t  ocr, ccs, uhsii, co2t, s18a;     
-  uint16_t vRngAcptd;
+  uint8_t  ocr;
+  uint16_t vra;                             // OCR voltage range accepted
   
   CS_SD_LOW;
-  sd_SendCommand(READ_OCR, 0);
+  sd_SendCommand(READ_OCR, 0);              // arg is 0 for this command
   r1 = sd_GetR1();
   if (r1 != OUT_OF_IDLE)
     return (FAILED_READ_OCR | r1);
-  ocr = sd_ReceiveByteSPI(); 
+
+  ocr = sd_ReceiveByteSPI();                // load MSByte of OCR
 
   // power up status
-  if (ocr >> 7 != 1)
+  if (!(ocr & POWER_UP_BIT_MASK))
   {
     CS_SD_HIGH;
     return (POWER_UP_NOT_COMPLETE | r1);
   }
   
-  // Only CCS is needed to complete initialization.
-  ccs   = (ocr & 0x40) >> 6;
-  uhsii = (ocr & 0x20) >> 5;
-  co2t  = (ocr & 0x10) >> 3;
-  s18a  = (ocr & 0x01);
-  vRngAcptd = sd_ReceiveByteSPI();
-  vRngAcptd <<= 1;
-  vRngAcptd |= sd_ReceiveByteSPI() >> 7;
-  
-  if (ccs == 1)
+  // CCS is needed to set card type.
+  if (ocr & CCS_BIT_MASK)
     ctv->type = SDHC;
   else 
     ctv->type = SDSC;
 
-  if (uhsii != 0 ||                         // UHSII not supported
-      co2t  != 0 ||                         // Over 2TB not supported
-      s18a  != 0 ||                         // Switch to 1.8V not supported
-      vRngAcptd != 0x1FF)                   // 2.7 to 3.6V supported.
+  // load two bytes for the vra
+  vra = sd_ReceiveByteSPI();
+  vra <<= 8;
+  vra |= sd_ReceiveByteSPI();
+
+  if (ocr & (UHSII_BIT_MASK | CO2T_BIT_MASK | S18A_BIT_MASK) 
+      || vra != VRA_OCR_MASK)
   {
     CS_SD_HIGH;
     return (FAILED_READ_OCR | UNSUPPORTED_CARD_TYPE | r1);
   }
+
+  // Initialization success
   CS_SD_HIGH;
-  
-  return 0;                                 // Initialization succeded
+  prevSuccessFlag = 1;
+  return OUT_OF_IDLE;
 }
 
 /*
  * ----------------------------------------------------------------------------
  *                                                                    SEND BYTE
  * 
- * Description : Sends a single byte to the SD card via the SPI port.
+ * Description : Sends a single 8-bit byte to the SD card via the SPI port.
  * 
- * Arguments   : byte     8-bits that will be sent to the SD Card via SPI.
+ * Arguments   : byte   - 8-bit byte to be sent to the SD Card via SPI.
  * 
  * Returns     : void
  * 
  * Notes       : 1) Call as many times as required to send the complete data 
  *                  packet, token, command, etc...
- * 
- *               2) This, and sd_ReceiveByteSPI(), are the SPI interfacing 
- *                  functions.
+ *               2) This function and sd_ReceiveByteSPI(), are the only direct
+ *                  SPI interfacing functions in the SD card module.
  * ----------------------------------------------------------------------------
  */
-void sd_SendByteSPI(uint8_t byte)
+void sd_SendByteSPI(const uint8_t byte)
 {
   spi_MasterTransmit(byte);
 }
@@ -213,7 +213,7 @@ void sd_SendByteSPI(uint8_t byte)
  * ----------------------------------------------------------------------------
  *                                                                 RECEIVE BYTE
  * 
- * Description : Receives/returns single byte from the SD card via SPI port.
+ * Description : Receives and returns single byte from the SD card via SPI.
  * 
  * Arguments   : void
  * 
@@ -221,15 +221,14 @@ void sd_SendByteSPI(uint8_t byte)
  * 
  * Notes       : 1) Call as many times as necessary to get the complete data
  *                  packet, token, error response, etc... from the SD card.
- * 
- *               2) This, and sd_SendByteSPI(), are the SPI interfacing 
- *                  functions.
+ *               2) This function and sd_SendByteSPI(), are the only direct
+ *                  SPI interfacing functions in the SD card module.
  * ----------------------------------------------------------------------------
  */
 uint8_t sd_ReceiveByteSPI(void)
 {
-  sd_SendByteSPI(0xFF);
-  return spi_MasterReceive();
+  sd_SendByteSPI(DMY_TKN);             // send dummy byte to initiate response
+  return spi_MasterReceive();          // return SD card's response
 }
 
 /*
@@ -238,32 +237,28 @@ uint8_t sd_ReceiveByteSPI(void)
  * 
  * Description : Send a command and argument to the SD Card.
  * 
- * Arguments   : cmd     SD Card command. See sd_spi_cmds.h.
- * 
- *               arg     32-bit argument to be sent with the SD command.
+ * Arguments   : cmd   - SD Card command. See sd_spi_car.h.
+ *               arg   - 32-bit argument to be sent with the SD command.
  * 
  * Returns     : void
  * ----------------------------------------------------------------------------
  */
-void sd_SendCommand(uint8_t cmd, uint32_t arg)
+void sd_SendCommand(const uint8_t cmd, const uint32_t arg)
 {
-  // Found forcing some delay between commands can improves stability.
-  for (uint8_t waitCnt = 0; waitCnt < 10; waitCnt++)
-    sd_SendByteSPI(0xFF);
-  
+  // Found forcing some delay between commands can improve stability/behavrior.
+  sd_WaitSendDummySPI(80);
+                           
+  // 
+  // Construct the command / argument packet to be sent to the SD card. The
+  // form, from MSB to LSB is:
+  // TX_CMD (2b) | CMD (6b) | ARG (32b) | CRC7 (7b) | STOP_BIT (1b)
   //
-  // Prepare the command to be sent. Total of 48 bits. The structure of a 
-  // command from MSB --> LSB is:
-  // TRANSMIT (2b) = 0b01 | CMD (6b) | ARG (32b) | CRC7 (7b) | STOP (1b) = 0b1
-  //
-  uint64_t tcacs = 0;                       // full tx, cmd, arg, crc, stop                          
+  uint64_t tcacs = (uint64_t)(TX_CMD_BITS | cmd) << 40;   // load tx and cmd
+  tcacs |= (uint64_t)arg << 8;
+  tcacs |= pvt_CRC7(tcacs);
+  tcacs |= STOP_BIT;
 
-  tcacs |= (uint64_t)(0x40 | cmd) << 40;    // tx and cmd
-  tcacs |= (uint64_t)arg << 8;              // arg
-  tcacs |= pvt_CRC7(tcacs);                 // crc7
-  tcacs |= 1;                               // stop bit
-
-  // Send command to SD Card via SPI port
+  // Send cmd / arg to SD Card via SPI port. 8-bits at a time.
   sd_SendByteSPI ((uint8_t)(tcacs >> 40));
   sd_SendByteSPI ((uint8_t)(tcacs >> 32));
   sd_SendByteSPI ((uint8_t)(tcacs >> 24));
@@ -283,24 +278,20 @@ void sd_SendCommand(uint8_t cmd, uint32_t arg)
  * 
  * Returns     : R1 response flag(s). See SD_SPI_BASE.H.
  * 
- * Notes       : 1) Always call immediately after sd_SendCommand().
- *               
- *               2) Pass the return value to sd_PrintR1() to print the value.
- * 
- *               3) R1_TIMEOUT is returned if the SD Card did not return an R1
- *                  response. 
+ * Notes       : 1) always call immediately after sd_SendCommand().
+ *               2) pass the return value to sd_PrintR1() to print R1 response.
+ *               3) if R1_TIMEOUT is returned, then the SD Card did not return
+ *                  a response.
  * ----------------------------------------------------------------------------
  */
 uint8_t sd_GetR1(void)
 {
   uint8_t r1;
-  uint8_t timeout = 0;
-
-  while ((r1 = sd_ReceiveByteSPI()) == 0xFF)
-  {
-    if(timeout++ >= 0xFF) 
-    return R1_TIMEOUT;
-  }
+  
+  // loop until SPDR has new values (i.e != dummy token or TO limit reached.
+  for (uint8_t timeout = 0; (r1 = sd_ReceiveByteSPI()) == DMY_TKN; ++timeout)
+    if(timeout >= TIMEOUT_LIMIT) 
+      return R1_TIMEOUT;
   return r1;
 }
 
@@ -310,12 +301,12 @@ uint8_t sd_GetR1(void)
  * 
  * Description : Prints the R1 response flag(s) returned by sd_GetR1().
  * 
- * Arguments   : r1     The R1 response flag(s) byte returned by sd_GetR1().
+ * Arguments   : r1   - The R1 response flag(s) byte returned by sd_GetR1().
  * 
  * Returns     : void
  * ----------------------------------------------------------------------------
  */
-void sd_PrintR1(uint8_t r1)
+void sd_PrintR1(const uint8_t r1)
 {
   if (r1 & R1_TIMEOUT)
     print_Str (" R1_TIMEOUT,");
@@ -341,22 +332,23 @@ void sd_PrintR1(uint8_t r1)
  * ----------------------------------------------------------------------------
  *                                          PRINT INITIALIZATION RESPONSE FLAGS
  * 
- * Description : Prints Initialization Error Flag portion of the 
- *               sd_spiModeInit() response.
+ * Description : Prints Initialization Error Flag portion of the response 
+ *               returned by sd_InitModeSPI.
  * 
- * Arguments   : initResp     The Initialization Error Response returned by the
- *                            initialization routine, sd_spiModeInit().
+ * Arguments   : initResp   - The Initialization Error Response returned by the
+ *                            initialization routine, sd_InitModeSPI.
  * 
  * Returns     : void
  * 
- * Notes       : This will only interpret bits 8 to 19 of the sd_spiModeInit() 
- *               function's returned value. The entire returned value can be 
- *               passed to this function without issue. Bits 0 to 7 correspond
- *               to the R1 Response portion of the Initialization Response. To 
- *               read the R1 portion pass initResp to sd_PrintR1().
+ * Notes       : This will only interpret bits 8 to 19 of the sd_InitModeSPI 
+ *               function's returned value. Though the entire returned value
+ *               can be passed to the function, bits 0 to 7 will be ignored
+ *               as these are the R1 Response portion of the Initialization
+ *               Response. To read the R1 portion of initResp, pass it to 
+ *               sd_PrintR1().
  * ----------------------------------------------------------------------------
  */
-void sd_PrintInitError(uint32_t initResp)
+void sd_PrintInitError(const uint32_t initResp)
 {
   if (initResp & FAILED_GO_IDLE_STATE)
     print_Str (" FAILED_GO_IDLE_STATE,");
@@ -381,6 +373,24 @@ void sd_PrintInitError(uint32_t initResp)
 }
 
 /*
+ * ----------------------------------------------------------------------------
+ *                                              WAIT SPECIFIED SPI CLOCK CYCLES
+ * 
+ * Description : Used to wait a specified number of SPI clock cycles. While
+ *               doing so, it sends all 1's (DMY_TKN) on the SPI port.
+ * 
+ * Arguments   : clckCycles   - min num of clock cycles to wait.
+ * 
+ * Returns     : void
+ * ----------------------------------------------------------------------------
+ */
+void sd_WaitSendDummySPI(const uint16_t clckCycles)
+{
+  for (uint8_t waitCnt = 0; waitCnt < clckCycles / SPI_REG_BIT_LEN; ++waitCnt)
+    sd_SendByteSPI(DMY_TKN);
+}
+
+/*
  ******************************************************************************
  *                        "PRIVATE" FUNCTIONS DEFINITIONS
  ******************************************************************************
@@ -392,14 +402,14 @@ void sd_PrintInitError(uint32_t initResp)
  * 
  * Description : Used by sd_SendCommand() to calculate the CRC7 for a command.
  * 
- * Arguments   : tca     The tx/cmd/arg bits used to calculate the CRC7.
+ * Arguments   : tca   - the tx/cmd/arg bits used to calculate the CRC7.
  * 
  * Returns     : calculated CRC7 to be sent with the SD command. 
  * ----------------------------------------------------------------------------
  */
-static uint8_t pvt_CRC7(uint64_t tca)
+static uint8_t pvt_CRC7(const uint64_t tca)
 {
-  // to test if division will take place during a given iteration.
+  // to test if division will take place during a given calc iteration.
   uint64_t test = 0x800000000000; 
   
   //
@@ -412,7 +422,7 @@ static uint8_t pvt_CRC7(uint64_t tca)
   uint64_t result = tca;
 
   // calculate CRC7. 
-  for (int cnt = 0; cnt < 40; cnt++)
+  for (uint8_t calc = 0; calc < 40; ++calc)
   {
     if (result & test)
       result ^= divisor;
