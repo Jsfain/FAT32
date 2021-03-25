@@ -29,17 +29,17 @@
 #define BYTE  1
 #endif//BYTE 
 
-#ifndef KB
-#define KB    1000
-#endif//KB
+#ifndef KILO
+#define KILO    1000
+#endif//KILO
 
-#ifndef MB
-#define MB    1000000
+#ifndef MEGA
+#define MEGA    1000000
 #endif//MB
 
-#ifndef GB
-#define GB    1000000000
-#endif//GB
+#ifndef GIGA
+#define GIGA    1000000000
+#endif//GIGA
 
 /* 
  * ----------------------------------------------------------------------------
@@ -79,7 +79,7 @@
 // SHORT_NAME_CHARS                        bytes 0 to 10
 #define ATTR_BYTE_OFFSET                   11
 //#define NTRES                            12    // reserved. unused. 
-#define CREATION_TIME_TENTH_BYTE_OFFSET    13
+#define CREATION_TIME_TENTH_BYTE_OFFSET    13    // not currently used
 #define CREATION_TIME_BYTE_OFFSET_0        14
 #define CREATION_TIME_BYTE_OFFSET_1        15
 #define CREATION_DATE_BYTE_OFFSET_0        16

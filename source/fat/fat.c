@@ -13,7 +13,7 @@
 
 #include <string.h>
 #include <stdlib.h>
-#include <avr/io.h>
+//#include <avr/io.h>
 #include "fat_bpb.h"
 #include "fat.h"
 #include "prints.h"
@@ -857,17 +857,18 @@ static uint32_t pvt_GetNextClusIndex(const uint32_t clusIndx, const BPB *bpb)
   uint8_t secArr[bpb->bytesPerSec];
   FATtoDisk_ReadSingleSector(fatSectorToRead, secArr);
 
-  // load value in current cluster index. Value is the next cluster index.
-  uint32_t nextClusIndx;
-  uint16_t nextClusIndxSecPos = BYTES_PER_INDEX * (clusIndx % fatIndxsPerSec);
-
-  nextClusIndx  = secArr[nextClusIndxSecPos + 3];
-  nextClusIndx <<= 8;
-  nextClusIndx |= secArr[nextClusIndxSecPos + 2];
-  nextClusIndx <<= 8;
-  nextClusIndx |= secArr[nextClusIndxSecPos + 1];
-  nextClusIndx <<= 8;
-  nextClusIndx |= secArr[nextClusIndxSecPos];
+  // Value at the current cluster index is the index of the next cluster.
+  uint32_t nextClusIndx = 0;
+  uint16_t posNextClusIndxInSec = BYTES_PER_INDEX 
+                                  * (clusIndx % fatIndxsPerSec);
+ 
+  // load the index of the next cluster.
+  for (uint8_t offset = BYTES_PER_INDEX - 1; offset > 0; --offset)
+  {
+    nextClusIndx |= secArr[posNextClusIndxInSec + offset];
+    nextClusIndx <<= 8;
+  }
+  nextClusIndx |= secArr[posNextClusIndxInSec];
 
   return nextClusIndx;
 }
@@ -1026,7 +1027,6 @@ static void pvt_PrintEntFields(const uint8_t secArr[], const uint8_t flags)
       print_Str("0");
     print_Dec(sec);
   }
-  
   print_Str("     ");
 
   // Print file size in bytes
@@ -1044,12 +1044,12 @@ static void pvt_PrintEntFields(const uint8_t secArr[], const uint8_t flags)
     fileSize |= secArr[FILE_SIZE_BYTE_OFFSET_0];
 
     // Print spaces for formatting output. Add 1 to prevent starting at 0.
-    for (uint64_t sp = 1 + fileSize / FS_UNIT; sp < GB / FS_UNIT; sp *= 10)
+    for (uint64_t sp = 1 + fileSize / FS_UNIT; sp < GIGA / FS_UNIT; sp *= 10)
       print_Str(" ");
 
     // print file size and selected units
     print_Dec(fileSize / FS_UNIT);
-    if (FS_UNIT == KB)                               
+    if (FS_UNIT == KILO)                               
       print_Str("KB  ");
     else  
       print_Str("B  ");
@@ -1058,7 +1058,7 @@ static void pvt_PrintEntFields(const uint8_t secArr[], const uint8_t flags)
   // print entry type
   if (TYPE & flags)
   {
-    if (secArr[11] & DIR_ENTRY_ATTR) 
+    if (secArr[ATTR_BYTE_OFFSET] & DIR_ENTRY_ATTR) 
       print_Str(" <DIR>   ");
     else 
       print_Str(" <FILE>  ");
