@@ -84,20 +84,19 @@ uint32_t FATtoDisk_FindBootSector(void);
 /* 
  * ----------------------------------------------------------------------------
  *                                                 READ SINGLE SECTOR FROM DISK
- *                                         
- * Description : This function must be implemented in order to load the 
- *               contents of a FAT sector located at a specified address on a 
- *               physical disk to an array.
+ *                                       
+ * Description : Loads the contents of the sector/block at the specified 
+ *               address on the SD card into the array, blckArr.
+ *
+ * Arguments   : blkNum    - Block number address of the sector/block on the SD
+ *                           card that should be read into blkArr.
  * 
- * Arguments   : addr     Address of the sector on the physical disk that will
- *                        be read into the array, *arr.
+ *               blkArr    - Pointer to the array that will be loaded with the 
+ *                           contents of the sector/block on the SD card at 
+ *                           block specified by blkNum.
  * 
- *               arr   -  Pointer to the array is to be loaded with the
- *                        contents the FAT sector at address, addr, on the 
- *                        physical disk.
- * 
- * Returns     : 0 sector is successfully loaded into the array.
- *               1 if there is a failure to load the array with the sector.
+ * Returns     : READ_SECTOR_SUCCES if successful.
+ *               READ_SECTOR_FAILED if failure.
  * ----------------------------------------------------------------------------
  */
 uint8_t FATtoDisk_ReadSingleSector(uint32_t blkNum, uint8_t blkArr[]);

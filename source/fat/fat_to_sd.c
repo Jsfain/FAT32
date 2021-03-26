@@ -176,7 +176,9 @@ uint8_t FATtoDisk_ReadSingleSector(uint32_t blkNum, uint8_t blkArr[])
  * Description : Determines and returns the SD card type. The card type is used
  *               determine if the SD card is block or byte addressable.
  * 
- * Returns     : SD card type - SDSC or SDHC.
+ * Arguments   : void
+ * 
+ * Returns     : SD card type - SDSC or SDHC, or GET_CARD_TYPE_ERROR.
  * ----------------------------------------------------------------------------
  */
 

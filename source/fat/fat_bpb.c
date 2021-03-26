@@ -29,113 +29,95 @@
  *                                                       SET BPB STRUCT MEMBERS 
  *                                         
  * Description : Gets values of the Bios Parameter Block / Boot Sector fields 
- *               from a FAT32 volume and sets the corresponding members of an
+ *               from a FAT volume and sets the corresponding members of an
  *               instance of the BPB struct accordingly.
  * 
- * Arguments   : bpb     Pointer to an instance of a BPB struct. This function
+ * Arguments   : bpb   - Pointer to an instance of a BPB struct. This function
  *                       will set the members of this instance.
  * 
  * Returns     : Boot Sector Error Flag. If any value other than BPB_VALID is
  *               returned then setting the BPB instance failed. To print, pass
- *               to the returned value to fat_PrintErrorBPB().
+ *               the returned value to fat_PrintErrorBPB().
  * 
  * Notes       : A valid BPB struct instance is a required argument of many 
  *               functions that access the FAT volume, therefore this function 
  *               should be called first, before implementing any other parts of
  *               the FAT module.
  * 
- * Limitation  : Only works if Boot Sector, which contains the BPB, is sector 0 
- *               on the physical disk. 
+ * Limitation  : Currently will only work if Boot Sector is block 0 on SD Card.
  * ----------------------------------------------------------------------------
  */
 uint8_t fat_SetBPB(BPB *bpb)
 {
-  // array to hold contents of the Boot Sector, which contains the BPB.
-  uint8_t BootSector[SECTOR_LEN];    
-  uint8_t err;
+  uint8_t bootSecArr[SECTOR_LEN], err; 
 
   // Locate boot sector address on the disk. 
-  bpb->bootSecAddr = FATtoDisk_FindBootSector();
-  if (bpb->bootSecAddr != FAILED_FIND_BOOT_SECTOR)
+  uint32_t bootSecAddr = FATtoDisk_FindBootSector();
+  if (bootSecAddr != FAILED_FIND_BOOT_SECTOR)
   {
-    // load the from boot sector into the BootSector array.
-    err = FATtoDisk_ReadSingleSector(bpb->bootSecAddr, BootSector);
-    if (err == 1) 
+    // load data from boot sector into bootSecArr.
+    err = FATtoDisk_ReadSingleSector(bootSecAddr, bootSecArr);
+    if (err == FAILED_READ_SECTOR) 
       return FAILED_READ_BPB;
   }
   else
     return BPB_NOT_FOUND;
   
-  //
-  // The last 2 bytes of the Boot Sector are signature bytes. The values of
-  // of these must be 0x55 and 0xAA.
-  //
-  if (BootSector[SECTOR_LEN - 2] == 0x55 && BootSector[SECTOR_LEN - 1] == 0xAA)
+  // 
+  // Confirm the sector loaded is the Boot Sector by checking the signature
+  // bytes - the last two bytes of sector. If true, then begin loading the 
+  // necessary BPB field values into their respective BPB struct members.
+  // 
+  if (bootSecArr[SECTOR_LEN - 2] == BS_SIGN_1 
+      && bootSecArr[SECTOR_LEN - 1] == BS_SIGN_2)
   {
-    // bytes 11 and 12 of BS / BPB contain the Bytes Per Sector value.
-    bpb->bytesPerSec = BootSector[12];      
+    bpb->bytesPerSec = bootSecArr[BYTES_PER_SEC_POS_MSB];      
     bpb->bytesPerSec <<= 8;                 
-    bpb->bytesPerSec |= BootSector[11];
+    bpb->bytesPerSec |= bootSecArr[BYTES_PER_SEC_POS_LSB];
     
-    // currently Bytes Per Sector must 512 (=SECTOR_LEN).
+    // Bytes Per Sector must be the same as SECTOR_LEN
     if (bpb->bytesPerSec != SECTOR_LEN)
       return INVALID_BYTES_PER_SECTOR;
 
-    // byte 13 of the BS / BPB is the Sectors Per Cluster value
-    bpb->secPerClus = BootSector[13];
-    
-    // Only numbers listed below are valid for the Sectors Per Cluster value.
-    if (   bpb->secPerClus != 1  && bpb->secPerClus != 2 
-        && bpb->secPerClus != 4  && bpb->secPerClus != 8  
-        && bpb->secPerClus != 16 && bpb->secPerClus != 32
-        && bpb->secPerClus != 64 && bpb->secPerClus != 128)
-    {
+    bpb->secPerClus = bootSecArr[SEC_PER_CLUS_POS];
+
+    // check that secPerClus is a valid value.   
+    if (!CHK_VLD_SEC_PER_CLUS(bpb->secPerClus))
       return INVALID_SECTORS_PER_CLUSTER;
-    }
-
-    // bytes 14 and 15 of the BS / BPB are the Reserved Sector Count
-    bpb->rsvdSecCnt = BootSector[15];
+    
+    // number of reserved sectors
+    bpb->rsvdSecCnt = bootSecArr[RSVD_SEC_CNT_POS_MSB];
     bpb->rsvdSecCnt <<= 8;
-    bpb->rsvdSecCnt |= BootSector[14];
+    bpb->rsvdSecCnt |= bootSecArr[RSVD_SEC_CNT_POS_LSB];
 
-    // byte 16 of the BS / BPB give the total number of FAT in the volume
-    bpb->numOfFats = BootSector[16];
+    // number of FATs
+    bpb->numOfFats = bootSecArr[NUM_FATS_POS];
 
-    //
-    // bytes 36 to 39 of the BS / BPB give the size of a single FAT in a FAT32
-    // volume. The size is the total sector count required by a single FAT.
-    //
-    bpb->fatSize32 =  BootSector[39];
+    // Size of a single FAT
+    bpb->fatSize32 =  bootSecArr[FAT32_SIZE_POS4];
     bpb->fatSize32 <<= 8;
-    bpb->fatSize32 |= BootSector[38];
+    bpb->fatSize32 |= bootSecArr[FAT32_SIZE_POS3];
     bpb->fatSize32 <<= 8;
-    bpb->fatSize32 |= BootSector[37];
+    bpb->fatSize32 |= bootSecArr[FAT32_SIZE_POS2];
     bpb->fatSize32 <<= 8;
-    bpb->fatSize32 |= BootSector[36];
+    bpb->fatSize32 |= bootSecArr[FAT32_SIZE_POS1];
 
-    // 
-    // bytes 44 to 47 of the BS / BPB give the cluster number of the root dir
-    // in the FAT32 volume. This value is the index of the cluster in the FAT.
-    // The value should be 2 or the first usable (not bad) cluster available
-    // after that.
-    //
-    bpb->rootClus =  BootSector[47];
+    // Root directory cluster index
+    bpb->rootClus =  bootSecArr[ROOT_CLUS_POS4];
     bpb->rootClus <<= 8;
-    bpb->rootClus |= BootSector[46];
+    bpb->rootClus |= bootSecArr[ROOT_CLUS_POS3];
     bpb->rootClus <<= 8;
-    bpb->rootClus |= BootSector[45];
+    bpb->rootClus |= bootSecArr[ROOT_CLUS_POS2];
     bpb->rootClus <<= 8;
-    bpb->rootClus |= BootSector[44];
+    bpb->rootClus |= bootSecArr[ROOT_CLUS_POS1];
 
     //
-    // The absolute physical disk's sector number/address corresponding to the
-    // first sector of the FAT32 volume's Data Region. Since the first cluster
-    // of the Data Region is the Root Directory, this value points to the 
-    // absolute physical sector number of the Root Directory. The value is
-    // calculated from BPB parameter values.
+    // The disk's sector address corresponding to the first sector of the FAT32
+    // volume's Data Region. Since the first cluster of the Data Region is the 
+    // Root Directory, this value points to the sector number of the Root Dir.
     //
-    bpb->dataRegionFirstSector = bpb->bootSecAddr + bpb->rsvdSecCnt 
-                                  + (bpb->numOfFats * bpb->fatSize32);
+    bpb->dataRegionFirstSector = bootSecAddr + bpb->rsvdSecCnt 
+                               + bpb->numOfFats * bpb->fatSize32;
     return BPB_VALID;
   }
   else 

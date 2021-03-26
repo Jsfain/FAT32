@@ -112,6 +112,7 @@ Probably the best way to understand how to use this AVR-FAT module is to refer t
 3. I made this for fun to pass the time during quarantine. That is all. Feel free to use it however you wish, but no guarantees are made regarding its operability.
 4. Currently only read operations are provided by the module; there are no options to modify the contents of the FAT volume. This means that no files or directories nor any of their property fields can purposely be created or modified, nor can any FAT parameters be modified (i.e. boot sector/BPB, FAT, FSInfo, etc...). Even so, things can happen. See (1) above.
 5. Though the AVR-FAT module is designed to operate independent of the physical disk layer, as long as the required interfacing functions are implemented correctly, this module has only been tested using FAT32-formatted 2GB and 4GB SD Cards using the AVR-SDCard module as the physical disk layer.
+6. In its current state, the module will only work if the boot sector is in block 0 on the SD Card. This is a limitation of the current implementation of sd_SetBPB.
 
 
 
