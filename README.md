@@ -99,7 +99,7 @@ Probably the best way to understand how to use this AVR-FAT module is to refer t
       fat_PrintError (err);
     }
 
-    // print the contents of the file, *File A*, to a terminal. This file must
+    // print the contents of the file, "File A", to a terminal. This file must
     // be in the directory pointed to by cwd. Here this directory should be 
     // "Child Directory A".
     err = fat_PrintFile (&cwd, "File A", &bpb);
