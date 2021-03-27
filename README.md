@@ -91,7 +91,7 @@ Probably the best way to understand how to use this AVR-FAT module is to refer t
       fat_PrintError(err);
     }
 
-    // set *cwd* to a child of the root direcotry, i.e. "Child Directory A".
+    // set cwd to a child of the root direcotry, i.e. "Child Directory A".
     err = fat_SetDir (&cwd, "Child Directory A", &bpb);
     if (err != SUCCESS) 
     {
