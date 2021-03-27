@@ -7,10 +7,10 @@ To provide the capability to read directories and files from a FAT32 formatted v
 
 
 ## Technology
-* TARGET     : ATmega1280. Should be easily portable to other AVR targets with correct PORT reassignments, provided sufficient resources available, but have not tried this.
-* LANGUAGE   : C
-* COMPILER   : AVR-GCC 9.3.0
-* DOWNLOADER : AVRDUDE 6.3
+* Target     : ATmega1280. Should be easily portable to other AVR targets with correct PORT reassignments, provided sufficient resources available, but have not tried this.
+* Language   : C
+* Compiler   : AVR-GCC 9.3.0
+* Downloader : AVRDUDE 6.3
 * Compiler and downloader used are available with the [AVR-Toolchain from Homebrew](https://github.com/osx-cross/homebrew-avr).
 
 
