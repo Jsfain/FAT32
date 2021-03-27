@@ -63,7 +63,7 @@
 #include "sd_spi_rwe.h"
 #include "fat_bpb.h"
 #include "fat.h"
-#include "fat_to_disk.h"
+#include "fat_to_disk_if.h"
 
 #define SD_CARD_INIT_ATTEMPTS_MAX      5  
 #define CMD_LINE_MAX_CHAR              100  // max num of chars of a cmd/arg

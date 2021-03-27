@@ -11,14 +11,14 @@
  * Implementation of FATtoDISK.H.
  */
 
-#include <stdint.h>
+#include <avr/io.h>
 #include "spi.h"
 #include "prints.h"
 #include "sd_spi_base.h"
 #include "sd_spi_rwe.h"
 #include "fat_bpb.h"
 #include "fat.h"
-#include "fat_to_disk.h"
+#include "fat_to_disk_if.h"
 
 /*
  ******************************************************************************

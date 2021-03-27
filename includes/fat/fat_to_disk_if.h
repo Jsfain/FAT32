@@ -1,5 +1,5 @@
 /*
- * File       : FATtoDISK.H
+ * File       : FAT_TO_DISK_IF.H
  * Version    : 2.0
  * Target     : ATMega1280
  * Compiler   : AVR-GCC 9.3.0
@@ -12,8 +12,8 @@
  * to interface with a physical disk.
  */
 
-#ifndef FATTOSD_H
-#define FATTOSD_H
+#ifndef FAT_TO_DISK_IF_H
+#define FAT_TO_DISK_IF_H
 
 /*
  ******************************************************************************
@@ -101,4 +101,4 @@ uint32_t FATtoDisk_FindBootSector(void);
  */
 uint8_t FATtoDisk_ReadSingleSector(uint32_t blkNum, uint8_t blkArr[]);
 
-#endif //FATTOSD_H
+#endif //FAT_TO_DISK_IF_
