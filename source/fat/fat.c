@@ -26,14 +26,14 @@
  */
 
 static void pvt_UpdateFatEntryMembers(FatEntry *ent, const char lnStr[], 
-                const uint8_t secArr[], const uint16_t snPos,
-                const uint8_t snEntSecNumInClus, const uint32_t snEntClusIndx);
+                const uint8_t secArr[], uint16_t snPos,
+                uint8_t snEntSecNumInClus, uint32_t snEntClusIndx);
 static uint8_t pvt_CheckName(const char nameStr[]);
 static uint8_t pvt_SetDirToParent(FatDir *dir, const BPB *bpb);
-static void pvt_LoadLongName(const int lnFirstEnt, const int lnLastEnt, 
+static void pvt_LoadLongName(int lnFirstEnt, int lnLastEnt, 
                              const uint8_t secArr[], char lnStr[]);
-static uint32_t pvt_GetNextClusIndex(const uint32_t clusIndex, const BPB *bpb);
-static void pvt_PrintEntFields(const uint8_t *byte, const uint8_t flags);
+static uint32_t pvt_GetNextClusIndex(uint32_t clusIndex, const BPB *bpb);
+static void pvt_PrintEntFields(const uint8_t *byte, uint8_t flags);
 static uint8_t pvt_PrintFile(const uint8_t snEnt[], const BPB *bpb);
 
 /*
@@ -432,7 +432,7 @@ uint8_t fat_SetDir(FatDir *dir, const char newDirStr[], const BPB *bpb)
  *                  Once for the long name and once for the short name.
  * ----------------------------------------------------------------------------
  */
-uint8_t fat_PrintDir(const FatDir *dir, const uint8_t entFlds, const BPB *bpb)
+uint8_t fat_PrintDir(const FatDir *dir, uint8_t entFlds, const BPB *bpb)
 {
   // for function return errors. This is the loop cond. and the return value.
   uint8_t err;
@@ -617,8 +617,8 @@ void fat_PrintError (uint8_t err)
  * ----------------------------------------------------------------------------
  */
 static void pvt_UpdateFatEntryMembers(FatEntry *ent, const char lnStr[], 
-                const uint8_t secArr[], const uint16_t snPos,
-                const uint8_t snEntSecNumInClus, const uint32_t snEntClusIndx)
+                const uint8_t secArr[], uint16_t snPos,
+                uint8_t snEntSecNumInClus, uint32_t snEntClusIndx)
 {
   // copy short name entry bytes into *snEnt FatEntry member
   for (uint8_t byteNum = 0; byteNum < ENTRY_LEN; ++byteNum)
@@ -793,7 +793,7 @@ static uint8_t pvt_SetDirToParent(FatDir *dir, const BPB *bpb)
  * Notes       : Must be called twice if long name crosses sector boundary.
  * ----------------------------------------------------------------------------
  */
-static void pvt_LoadLongName(const int lnFirstEnt, const int lnLastEnt, 
+static void pvt_LoadLongName(int lnFirstEnt, int lnLastEnt,
                              const uint8_t secArr[], char lnStr[])
 {
   //
@@ -846,7 +846,7 @@ static void pvt_LoadLongName(const int lnFirstEnt, const int lnLastEnt,
  *               region, but its FAT index is 2 or higher.
  * ----------------------------------------------------------------------------
  */
-static uint32_t pvt_GetNextClusIndex(const uint32_t clusIndx, const BPB *bpb)
+static uint32_t pvt_GetNextClusIndex(uint32_t clusIndx, const BPB *bpb)
 {
   // calculate address of sector containing the current cluster index
   uint16_t fatIndxsPerSec = bpb->bytesPerSec / BYTES_PER_INDEX;
@@ -885,7 +885,7 @@ static uint32_t pvt_GetNextClusIndex(const uint32_t clusIndx, const BPB *bpb)
  * Returns     : void 
  * ----------------------------------------------------------------------------
  */
-static void pvt_PrintEntFields(const uint8_t secArr[], const uint8_t flags)
+static void pvt_PrintEntFields(const uint8_t secArr[], uint8_t flags)
 {
   print_Str ("\n\r");
 
@@ -1150,4 +1150,3 @@ static uint8_t pvt_PrintFile(const uint8_t snEnt[], const BPB *bpb)
   
   return END_OF_FILE;
 }
-

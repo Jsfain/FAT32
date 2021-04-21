@@ -431,7 +431,7 @@ uint8_t fat_SetDir(FatDir *dir, const char newDirStr[], const BPB *bpb);
  *                  Once for the long name and once for the short name.
  * ----------------------------------------------------------------------------
  */
-uint8_t fat_PrintDir(const FatDir *dir, const uint8_t entFlds, const BPB *bpb);
+uint8_t fat_PrintDir(const FatDir *dir, uint8_t entFlds, const BPB *bpb);
 
 /*
  * ----------------------------------------------------------------------------
