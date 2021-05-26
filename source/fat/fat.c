@@ -367,10 +367,7 @@ uint8_t fat_SetDir(FatDir *dir, const char newDirStr[], const BPB *bpb)
     // if entry matches newDirStr 
     if (!strcmp(ent.lnStr, newDirStr))
     {
-      //
-      // bytes 20, 21, 26 and 27 of a short name entry give the value of the
-      // first cluster index in the FAT for that entry.
-      //
+      // get value of the first cluster index in the FAT for that entry.
       dir->fstClusIndx = ent.snEnt[FST_CLUS_INDX_BYTE_OFFSET_3];
       dir->fstClusIndx <<= 8;
       dir->fstClusIndx |= ent.snEnt[FST_CLUS_INDX_BYTE_OFFSET_2];
