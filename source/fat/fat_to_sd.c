@@ -74,7 +74,7 @@ uint32_t FATtoDisk_FindBootSector(void)
   sd_SendCommand(READ_MULTIPLE_BLOCK, FBS_SEARCH_START_BLOCK * addrMult); 
   if (sd_GetR1() != OUT_OF_IDLE)
   {
-    CS_SD_HIGH
+    CS_SD_HIGH;
     return FAILED_FIND_BOOT_SECTOR;
   }
 

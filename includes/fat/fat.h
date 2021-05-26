@@ -24,9 +24,9 @@
  ******************************************************************************
  */
 
-// common file sizes
+// for common file sizes
 #ifndef BYTE
-#define BYTE  1
+#define BYTE    1
 #endif//BYTE 
 
 #ifndef KILO

@@ -57,7 +57,6 @@
 #include <string.h>
 #include <stdint.h>
 #include "usart0.h"
-#include "spi.h"
 #include "prints.h"
 #include "sd_spi_base.h"
 #include "sd_spi_rwe.h"
@@ -88,7 +87,6 @@ int main(void)
 {
   // Initializat usart and spi ports.
   usart_Init();
-  spi_MasterInit();
 
   //
   // SD card initialization
