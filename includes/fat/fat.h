@@ -302,8 +302,7 @@ FatDir;
  *       
  * Notes       : Any instance of this struct should first be initialized by
  *               passing it to fat_InitEntry, after which, fat_SetNextEntry
- *               should be the only function that currently updates the 
- *               instance.
+ *               should be the only function that updates the instance.
  * 
  * Warnings    : Members of an instance of this struct should never be set
  *               manually, but only by passing it to the FAT functions.

@@ -11,12 +11,11 @@
  * Implementation of FAT.H
  */
 
-#include <string.h>
 #include <avr/io.h>
+#include <string.h>
+#include "prints.h"
 #include "fat_bpb.h"
 #include "fat.h"
-#include "prints.h"
-#include "usart0.h"
 #include "fat_to_disk_if.h"
 
 /*
@@ -1109,17 +1108,19 @@ static uint8_t pvt_PrintFile(const uint8_t snEnt[], const BPB *bpb)
         uint8_t eof = 0;
 
         // 
-        // for output formatting. Currently using terminal that requires "\n\r"
-        // to go to the start of the next line. Therefore if '\n' is detected
-        // need to print "\n\r".
+        // for output formatting. Currently reads are NOT text mode, so "\n\r"
+        // is not automatically printed when "\n" is present by itself.
         //
         if (secArr[byteNum] == '\n') 
           print_Str ("\n\r");
         
         // else if not 0, just print the character directly to the screen.
         else if (secArr[byteNum])
-          usart_Transmit(secArr[byteNum]);
-       
+        {
+          // two byte array for single char string, to use print_Str.
+          char str[2] = {secArr[byteNum], '\0'};
+          print_Str(str);
+        }
         // else character is zero. Possible indicatin of eof.
         else 
         {
