@@ -1,9 +1,6 @@
 /*
  * File       : SD_SPI_RWE.H
  * Version    : 1.0
- * Target     : ATMega1280
- * Compiler   : AVR-GCC 9.3.0
- * Downloader : AVRDUDE 6.3
  * License    : GNU GPLv3
  * Author     : Joshua Fain
  * Copyright (c) 2020, 2021
@@ -11,9 +8,9 @@
  * Implementation of SD_SPI_RWE.H
  */
 
-#include <avr/io.h>
+#include <stdint.h>
+#include "avr_spi.h"
 #include "prints.h"
-#include "spi.h"
 #include "sd_spi_base.h"
 #include "sd_spi_rwe.h"
 

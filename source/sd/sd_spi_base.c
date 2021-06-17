@@ -1,19 +1,17 @@
 /*
  * File       : SD_SPI_BASE.C
  * Version    : 1.0
- * Target     : ATMega1280
- * Compiler   : AVR-GCC 9.3.0
- * Downloader : AVRDUDE 6.3
  * License    : GNU GPLv3
  * Author     : Joshua Fain
  * Copyright (c) 2020, 2021
- *  
- * Implementation of SD_SPI_BASE.H
+ * 
+ * SD_SPI_BASE.C declares the basic functions required to access an SD card in 
+ * SPI mode.
  */
 
-#include <avr/io.h>
+#include <stdint.h>
+#include "avr_spi.h"
 #include "prints.h"
-#include "spi.h"
 #include "sd_spi_base.h"
 
 /*
@@ -57,11 +55,11 @@ uint32_t sd_InitModeSPI(CTV *ctv)
   CS_SD_DDR |= 1 << CS_SD_DD;              // set CS to output and high 
   CS_SD_HIGH;                              // (disabled) before enabling SPI.
 
-  spi_MasterInit();                        // initialize SPI port.
+  spi_MasterInit();                        // initialize SPI port master mode.
 
   //
   // if prevSuccessFlag is set, then initialization has previously completed 
-  // successfully so return. If not, proceed with rest of init function.
+  // successfully so return. If not, proceed with rest of init.
   //
   static uint8_t prevSuccessFlag;
   if (prevSuccessFlag)
@@ -203,8 +201,6 @@ uint32_t sd_InitModeSPI(CTV *ctv)
  * 
  * Arguments   : byte   - 8-bit byte to be sent to the SD Card via SPI.
  * 
- * Returns     : void
- * 
  * Notes       : 1) Call as many times as required to send the complete data 
  *                  packet, token, command, etc...
  *               2) This function and sd_ReceiveByteSPI(), are the only direct
@@ -221,8 +217,6 @@ void sd_SendByteSPI(uint8_t byte)
  *                                                                 RECEIVE BYTE
  * 
  * Description : Receives and returns single byte from the SD card via SPI.
- * 
- * Arguments   : void
  * 
  * Returns     : 8-bit byte received from the SD card.
  * 
@@ -246,8 +240,6 @@ uint8_t sd_ReceiveByteSPI(void)
  * 
  * Arguments   : cmd   - SD Card command. See sd_spi_car.h.
  *               arg   - 32-bit argument to be sent with the SD command.
- * 
- * Returns     : void
  * ----------------------------------------------------------------------------
  */
 void sd_SendCommand(uint8_t cmd, uint32_t arg)
@@ -281,8 +273,6 @@ void sd_SendCommand(uint8_t cmd, uint32_t arg)
  * Description : Gets the R1 response from the SD card after it has been sent 
  *               an SD command.
  * 
- * Arguments   : void
- * 
  * Returns     : R1 response flag(s). See SD_SPI_BASE.H.
  * 
  * Notes       : 1) always call immediately after sd_SendCommand().
@@ -309,8 +299,6 @@ uint8_t sd_GetR1(void)
  * Description : Prints the R1 response flag(s) returned by sd_GetR1().
  * 
  * Arguments   : r1   - The R1 response flag(s) byte returned by sd_GetR1().
- * 
- * Returns     : void
  * ----------------------------------------------------------------------------
  */
 void sd_PrintR1(uint8_t r1)
@@ -344,8 +332,6 @@ void sd_PrintR1(uint8_t r1)
  * 
  * Arguments   : initResp   - The Initialization Error Response returned by the
  *                            initialization routine, sd_InitModeSPI.
- * 
- * Returns     : void
  * 
  * Notes       : This will only interpret bits 8 to 19 of the sd_InitModeSPI 
  *               function's returned value. Though the entire returned value
@@ -387,8 +373,6 @@ void sd_PrintInitError(uint32_t initResp)
  *               doing so, it sends all 1's (DMY_TKN) on the SPI port.
  * 
  * Arguments   : clckCycles   - min num of clock cycles to wait.
- * 
- * Returns     : void
  * ----------------------------------------------------------------------------
  */
 void sd_WaitSendDummySPI(uint16_t clckCycles)

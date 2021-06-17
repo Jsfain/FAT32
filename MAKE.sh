@@ -9,11 +9,11 @@ fatDir=source/fat
 #directory for avr-sdcard source files
 sdDir=source/sd
 
-#directory for avr-general source files
-genDir=source/gen
+#directory for avr-io source files
+ioDir=source/avrio
 
-#directory for source files
-sourceDir=source
+#directory for helper files
+hlprDir=source/hlpr
 
 #directory for test files
 testDir=test
@@ -24,7 +24,7 @@ mkdir -p -v $buildDir
 
 t=0.25
 # -g = debug, -Os = Optimize Size
-Compile=(avr-gcc -Wall -g -Os -I "includes/fat" -I "includes/sd" -I "includes/gen" -mmcu=atmega1280 -c -o)
+Compile=(avr-gcc -Wall -g -Os -I "includes/fat" -I "includes/sd" -I "includes/avrio" -I "includes/hlpr" -mmcu=atmega1280 -c -o)
 Link=(avr-gcc -Wall -g -mmcu=atmega1280 -o)
 IHex=(avr-objcopy -j .text -j .data -O ihex)
 
@@ -85,22 +85,22 @@ else
 fi
 
 
-echo -e "\n\r>> COMPILE: "${Compile[@]}" "$buildDir"/spi.o "$genDir"/spi.c"
-"${Compile[@]}" $buildDir/spi.o $genDir/spi.c
+echo -e "\n\r>> COMPILE: "${Compile[@]}" "$buildDir"/avr_spi.o "$ioDir"/avr_spi.c"
+"${Compile[@]}" $buildDir/avr_spi.o $ioDir/avr_spi.c
 status=$?
 sleep $t
 if [ $status -gt 0 ]
 then
-    echo -e "error compiling SPI.C"
+    echo -e "error compiling AVR_SPI.C"
     echo -e "program exiting with code $status"
     exit $status
 else
-    echo -e "Compiling SPI.C successful"
+    echo -e "Compiling AVR_SPI.C successful"
 fi
 
 
-echo -e "\n\r>> COMPILE: "${Compile[@]}" "$buildDir"/prints.o "$genDir"/prints.c"
-"${Compile[@]}" $buildDir/prints.o $genDir/prints.c
+echo -e "\n\r>> COMPILE: "${Compile[@]}" "$buildDir"/prints.o "$hlprDir"/prints.c"
+"${Compile[@]}" $buildDir/prints.o $hlprDir/prints.c
 status=$?
 sleep $t
 if [ $status -gt 0 ]
@@ -113,17 +113,17 @@ else
 fi
 
 
-echo -e "\n\r>> COMPILE: "${Compile[@]}" "$buildDir"/usart0.o "$genDir"/usart0.c"
-"${Compile[@]}" $buildDir/usart0.o $genDir/usart0.c
+echo -e "\n\r>> COMPILE: "${Compile[@]}" "$buildDir"/avr_usart.o "$ioDir"/avr_usart.c"
+"${Compile[@]}" $buildDir/avr_usart.o $ioDir/avr_usart.c
 status=$?
 sleep $t
 if [ $status -gt 0 ]
 then
-    echo -e "error compiling USART0.C"
+    echo -e "error compiling AVR_USART.C"
     echo -e "program exiting with code $status"
     exit $status
 else
-    echo -e "Compiling USART0.C successful"
+    echo -e "Compiling AVR_USART.C successful"
 fi
 
 
@@ -155,8 +155,8 @@ else
 fi
 
 
-echo -e "\n\r>> LINK: "${Link[@]}" "$buildDir"/avr_fat_test.elf "$buildDir"/avr_fat_test.o  "$buildDir"/spi.o "$buildDir"/sd_spi_base.o "$buildDir"/sd_spi_rwe.o "$buildDir"/usart0.o "$buildDir"/prints.o "$buildDir"/fat_bpb.o "$buildDir"/fat.o "$buildDir"/fat_to_sd.o"
-"${Link[@]}" $buildDir/avr_fat_test.elf $buildDir/avr_fat_test.o $buildDir/spi.o $buildDir/sd_spi_base.o $buildDir/sd_spi_rwe.o $buildDir/usart0.o $buildDir/prints.o $buildDir/fat.o $buildDir/fat_bpb.o $buildDir/fat_to_sd.o
+echo -e "\n\r>> LINK: "${Link[@]}" "$buildDir"/avr_fat_test.elf "$buildDir"/avr_fat_test.o  "$buildDir"/avr_spi.o "$buildDir"/sd_spi_base.o "$buildDir"/sd_spi_rwe.o "$buildDir"/avr_usart.o "$buildDir"/prints.o "$buildDir"/fat_bpb.o "$buildDir"/fat.o "$buildDir"/fat_to_sd.o"
+"${Link[@]}" $buildDir/avr_fat_test.elf $buildDir/avr_fat_test.o $buildDir/avr_spi.o $buildDir/sd_spi_base.o $buildDir/sd_spi_rwe.o $buildDir/avr_usart.o $buildDir/prints.o $buildDir/fat.o $buildDir/fat_bpb.o $buildDir/fat_to_sd.o
 status=$?
 sleep $t
 if [ $status -gt 0 ]

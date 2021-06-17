@@ -13,7 +13,7 @@
 
 #include <avr/io.h>
 #include "prints.h"
-#include "spi.h"
+#include "avr_spi.h"
 #include "sd_spi_base.h"
 #include "sd_spi_rwe.h"
 #include "fat_bpb.h"
