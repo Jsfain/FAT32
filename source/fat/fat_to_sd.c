@@ -1,9 +1,6 @@
 /*
  * File       : FATtoSD.C
  * Version    : 2.0
- * Target     : ATMega1280
- * Compiler   : AVR-GCC 9.3.0
- * Downloader : AVRDUDE 6.3
  * License    : GNU GPLv3
  * Author     : Joshua Fain
  * Copyright (c) 2020, 2021
@@ -11,7 +8,7 @@
  * Implementation of FATtoDISK.H.
  */
 
-#include <avr/io.h>
+#include <stdint.h>
 #include "prints.h"
 #include "avr_spi.h"
 #include "sd_spi_base.h"

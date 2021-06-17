@@ -55,7 +55,7 @@
  */
 
 #include <string.h>
-#include <stdint.h>
+#include <avr/io.h>
 #include "avr_usart.h"
 #include "prints.h"
 #include "sd_spi_base.h"

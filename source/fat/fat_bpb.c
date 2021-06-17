@@ -1,9 +1,6 @@
 /*
  * File       : FAT_BPB.C
  * Version    : 2.0
- * Target     : ATMega1280
- * Compiler   : AVR-GCC 9.3.0
- * Downloader : AVRDUDE 6.3
  * License    : GNU GPLv3
  * Author     : Joshua Fain
  * Copyright (c) 2020, 2021
@@ -11,8 +8,8 @@
  * Implementation of FAT_BPB.H
  */
 
+#include <stdint.h>
 #include <string.h>
-#include <avr/io.h>
 #include "prints.h"
 #include "fat_bpb.h"
 #include "fat_to_disk_if.h"
