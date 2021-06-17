@@ -1,16 +1,13 @@
 /*
  * File       : FAT.H
  * Version    : 2.0
- * Target     : ATMega1280
- * Compiler   : AVR-GCC 9.3.0
- * Downloader : AVRDUDE 6.3
  * License    : GNU GPLv3
  * Author     : Joshua Fain
  * Copyright (c) 2020, 2021
  * 
- * Interface for navigating / accessing contents of a FAT32 formatted volume
- * using an AVR microconstroller. These only provide READ access to the 
- * volume's contents. No WRITE/ERASE access is currently implemented.
+ * Interface providing macros, structs, and functions for navigating/accessing 
+ * the contents of a FAT32 formatted volume. These only provide READ access to 
+ * the volume's contents. No WRITE/ERASE access is currently implemented.
  */
 
 #ifndef FAT_H

@@ -1,15 +1,13 @@
 /*
  * File       : FAT_TO_DISK_IF.H
  * Version    : 2.0
- * Target     : ATMega1280
- * Compiler   : AVR-GCC 9.3.0
- * Downloader : AVRDUDE 6.3
  * License    : GNU GPLv3
  * Author     : Joshua Fain
  * Copyright (c) 2020, 2021
  *
- * This file provides prototypes for functions required by the AVR-FAT module 
- * to interface with a physical disk.
+ * This file provides macros and function prototypes required by the FAT32 
+ * module to interface with a physical disk driver. These functions must be 
+ * implemented in a order for the FAT32 module to function.
  */
 
 #ifndef FAT_TO_DISK_IF_H
