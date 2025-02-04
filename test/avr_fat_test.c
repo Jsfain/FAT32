@@ -57,9 +57,11 @@
 #include <string.h>
 #include <avr/io.h>
 #include "avr_usart.h"
+//#include "avr_spi.h"
 #include "prints.h"
 #include "sd_spi_base.h"
 #include "sd_spi_rwe.h"
+#include "sd_spi_print.h"
 #include "fat_bpb.h"
 #include "fat.h"
 #include "fat_to_disk_if.h"
@@ -85,33 +87,35 @@ static uint32_t enterBlockNumber();
 
 int main(void)
 {
-  // Initializat usart and spi ports.
+  // Initializat usart. Required for any printing to terminal.
   usart_Init();
 
+
   //
-  // SD card initialization
+  // SD card initialization hosting the FAT volume.
   //
-  CTV ctv;          
   uint32_t sdInitResp;
+  CTV ctv;          
+
 
   // Loop will continue until SD card init succeeds or max attempts reached.
   for (uint8_t att = 0; att < SD_CARD_INIT_ATTEMPTS_MAX; ++att)
   {
     print_Str("\n\n\r >> SD Card Initialization Attempt "); 
     print_Dec(att);
-    sdInitResp = sd_InitModeSPI(&ctv);      // init SD Card
+    sdInitResp = sd_InitSpiMode(&ctv);      // init SD Card
 
     if (sdInitResp != OUT_OF_IDLE)          // Fail to init if not OUT_OF_IDLE
     {    
       print_Str(": FAILED TO INITIALIZE SD CARD."
-                " Initialization Error Response: "); 
-      sd_PrintInitError(sdInitResp);
+                " SD Card Initialization Error Response: "); 
+      sd_PrintInitErrorResponse(sdInitResp);
       print_Str(" R1 Response: "); 
       sd_PrintR1(sdInitResp);
     }
     else
     {   
-      print_Str(": SD CARD INITIALIZATION SUCCESSFUL");
+      print_Str(": SD Card Initialization Successful");
       break;
     }
   }
@@ -387,11 +391,11 @@ int main(void)
 
     #endif // SD_CARD_READ_DATA
   }   
-  
-  // Something else to do. Print user-entered chars to screen.
+
+  //Something else to do. Print user-entered chars to screen.
   while(1)
     usart_Transmit (usart_Receive());
-  
+
   return 0;
 }
 

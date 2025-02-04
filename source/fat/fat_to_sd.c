@@ -67,11 +67,11 @@ uint32_t FATtoDisk_FindBootSector(void)
     addrMult = BLOCK_LEN;
   
   // Send the READ MULTIPLE BLOCK command and confirm R1 Response is good.
-  CS_SD_LOW;
+  CS_ASSERT;
   sd_SendCommand(READ_MULTIPLE_BLOCK, FBS_SEARCH_START_BLOCK * addrMult); 
   if (sd_GetR1() != OUT_OF_IDLE)
   {
-    CS_SD_HIGH;
+    CS_DEASSERT;
     return FAILED_FIND_BOOT_SECTOR;
   }
 
@@ -86,10 +86,10 @@ uint32_t FATtoDisk_FindBootSector(void)
     // loop until the 'Start Block Token' has been received from the SD card,
     // which indicates data from requested block is about to be sent.
     //
-    for (uint16_t timeout = 0; sd_ReceiveByteSPI() != START_BLOCK_TKN;)
-      if (++timeout >= TIMEOUT_LIMIT)
+    for (uint16_t attempt = 0; sd_ReceiveByteSPI() != START_BLOCK_TKN;)
+      if (++attempt >= MAX_CR_ATT)
       {
-        CS_SD_HIGH;
+        CS_DEASSERT;
         print_Str("\n\rSTART_TOKEN_TIMEOUT");
         return FAILED_FIND_BOOT_SECTOR;
       }
@@ -111,7 +111,7 @@ uint32_t FATtoDisk_FindBootSector(void)
       // Boot Sector has been found!
       sd_SendCommand(STOP_TRANSMISSION, 0); // stop sending data blocks.
       sd_ReceiveByteSPI();                  // R1B resp. Don't care.
-      CS_SD_HIGH;
+      CS_DEASSERT;
       return blkNum;                        // return success!
     }
   }
@@ -119,7 +119,7 @@ uint32_t FATtoDisk_FindBootSector(void)
   // FAILED to find BS in the set block range.
   sd_SendCommand(STOP_TRANSMISSION, 0);     // stop sending data blocks.
   sd_ReceiveByteSPI();                      // R1B resp. Don't care.
-  CS_SD_HIGH;
+  CS_DEASSERT;
   return FAILED_FIND_BOOT_SECTOR;           // return failed token
 }
 
@@ -183,24 +183,24 @@ static uint8_t pvt_GetCardType(void)
 {
   uint8_t cardType;
 
-  CS_SD_LOW;
+  CS_ASSERT;
   sd_SendCommand(SEND_CSD, 0);
   if (sd_GetR1() != OUT_OF_IDLE) 
   { 
-    CS_SD_HIGH; 
+    CS_DEASSERT; 
     return GET_CARD_TYPE_ERROR;             // R1 error. Failed to get the CSD
   }
 
   // Get CSD version to determine if card is SDHC or SDSC
-  for (uint16_t timeout = 0; ; ++timeout)
+  for (uint16_t attempt = 0; ; ++attempt)
   {
-    if (timeout >= TIMEOUT_LIMIT)           // if timeout is reached
+    if (attempt >= MAX_CR_ATT)           // if max attempt exceeded
     { 
       // Read in rest of CSD bytes, though not used.
       for(int byteNum = 0; byteNum < CSD_BYTE_LEN - 1; ++byteNum) 
         sd_ReceiveByteSPI();
-      CS_SD_HIGH;
-      return GET_CARD_TYPE_ERROR;           // timeout fail                             
+      CS_DEASSERT;
+      return GET_CARD_TYPE_ERROR;           // max attempt limit fail                             
     }
 
     uint8_t resp = sd_ReceiveByteSPI();
@@ -219,6 +219,6 @@ static uint8_t pvt_GetCardType(void)
   // Read in rest of CSD, though not used.
   for(int byteNum = 0; byteNum < CSD_BYTE_LEN - 1; ++byteNum) 
     sd_ReceiveByteSPI();
-  CS_SD_HIGH;
+  CS_DEASSERT;
   return cardType;                          // success
 }
