@@ -3,7 +3,7 @@
  * Version    : 2.0
  * License    : GNU GPLv3
  * Author     : Joshua Fain
- * Copyright (c) 2020, 2021
+ * Copyright (c) 2020 - 2025
  * 
  * Interface for accessing and storing the values of the boot sector / bios 
  * parameter block of a FAT32 formatted volume.
@@ -22,7 +22,7 @@
  * ----------------------------------------------------------------------------
  *                                                                SECTOR LENGTH
  *
- * Description : The expected byte lenght of FAT32 sector. 
+ * Description : The expected byte length of FAT32 sector. 
  *       
  * Notes       : (1) Value must match the BPB's 'bytes per sector field
  *               (2) This value should be set to 512 for the current
@@ -148,6 +148,6 @@ uint8_t fat_SetBPB(BPB *bpb);
  * Returns     : void
  * ----------------------------------------------------------------------------
  */
-void fat_PrintErrorBPB(uint8_t err);
+//void fat_PrintErrorBPB(uint8_t err);
 
 #endif // FAT_BPB_H

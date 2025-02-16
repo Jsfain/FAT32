@@ -6,8 +6,9 @@
  * Copyright (c) 2020, 2021
  *
  * This file provides macros and function prototypes required by the FAT32 
- * module to interface with a physical disk driver. These functions must be 
- * implemented in a order for the FAT32 module to function.
+ * module to interface with a disk driver handling the function of accessing a
+ * a FAT32 formatted disk itself. These functions must be implemented in order 
+ * for the FAT32 module to function.
  */
 
 #ifndef FAT_TO_DISK_IF_H
@@ -20,11 +21,11 @@
  */
 
 //
-// If FATtoDisk_FindBootSector is successful it will return the physical 
-// location of the boot sector (i.e. it's block/sector address on the disk).
-// If the boot sector is not found it should return the value of
-// FAILED_FIND_BOOT_SECTOR. This is set to the highest possible 32-bit integer
-// because the boot sector is never expected to be found here.
+// If FATtoDisk_FindBootSector is successful it should return the location of 
+// the boot sector on the disk, i.e. it's block/sector address on the disk. If
+// the boot sector is NOT found it should return this value. This is set to the
+// highest possible 32-bit integer since the boot sector should never be 
+// expected to be found here.
 // 
 #define FAILED_FIND_BOOT_SECTOR        0xFFFFFFFF
 
@@ -66,11 +67,11 @@
  *                                                             FIND BOOT SECTOR
  *                                 
  * Description : Finds the address of the boot sector on the FAT32-formatted 
- *               SD card. This function is used by fat_SetBPB from fat_bpb.c(h)
+ *               disk. This function is required by fat_SetBPB in fat_bpb.c.
  * 
  * Arguments   : void
  * 
- * Returns     : Address of the boot sector on the SD card.
+ * Returns     : Address of the boot sector on the disk.
  * 
  * Notes       : The search for the boot sector will begin at
  *               FBS_SEARCH_START_BLOCK, and search a total of 
