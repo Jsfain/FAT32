@@ -43,7 +43,7 @@ void usart_Init(void)
  * ----------------------------------------------------------------------------
  *                                                                USART RECEIVE
  *                                         
- * Description : Receive a character via USART on the AVR target device.
+ * Description : Receive a character via USART.
  * 
  * Returns     : character received by the USART, i.e. value in UDR0.
  * ----------------------------------------------------------------------------
@@ -75,4 +75,21 @@ void usart_Transmit(uint8_t data)
   
   // load data into usart buffer to transmit it.
   UDR0 = data;
+}
+
+/*
+ * ----------------------------------------------------------------------------
+ *                                                   USART RECEIVE BUFFER FLUSH
+ *                                         
+ * Description : Flush the USART receive buffer.
+ * ----------------------------------------------------------------------------
+ */
+void usart_Flush(void)
+{
+  //
+  // Poll RX complete flag until no longer set while continuously reading
+  // contents of UDR0, to effectively flush data register contents.
+  //
+  while (UCSR0A & (1 << RXC0))
+    UDR0;
 }

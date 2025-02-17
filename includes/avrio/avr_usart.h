@@ -66,4 +66,25 @@ uint8_t usart_Receive(void);
  */
 void usart_Transmit(uint8_t data);
 
+
+/*
+ * ----------------------------------------------------------------------------
+ *                                                               USART TRANSMIT
+ *                                       
+ * Description : Returns the immediate contents of the eturn
+ * 
+ * Arguments   : data - data to send via USART.
+ * ----------------------------------------------------------------------------
+ */
+void usart_ReadDataRegister(uint8_t data);
+
+/*
+ * ----------------------------------------------------------------------------
+ *                                                   USART RECEIVE BUFFER FLUSH
+ *                                         
+ * Description : Flush the USART receive buffer.
+ * ----------------------------------------------------------------------------
+ */
+void usart_Flush(void);
+
 #endif //AVR_USART_H

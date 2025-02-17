@@ -9,17 +9,11 @@
  */
 
 #include <stdint.h>
-#include <avr/io.h>
 #include "prints.h"
-#include "avr_spi.h"
-#include "sd_spi_interface.h"
 #include "sd_spi_base.h"
 #include "sd_spi_rwe.h"
 #include "sd_spi_print.h"
-#include "fat_bpb.h"
-#include "fat.h"
 #include "fat_to_disk_if.h"
-
 
 /*
  ******************************************************************************
@@ -117,7 +111,10 @@ uint32_t FATtoDisk_FindBootSector(void)
     sd_ReceiveByteSPI(); 
     sd_ReceiveByteSPI(); 
 
-    // confirm JMP BOOT and BOOT SIGNATURE bytes those of a FAT boot sector.    
+    //
+    // Check if JUMP BOOT bytes present. If yes, confirm the BOOT SIGNATURE
+    // bytes also present. If yes, this is BPB so return this block number.      
+    //
     if ((blckArr[0] == JMP_BOOT_1A && blckArr[2] == JMP_BOOT_3A) ||
          blckArr[0] == JMP_BOOT_1B)
           if (blckArr[BLOCK_LEN - 2] == BS_SIGN_1 &&

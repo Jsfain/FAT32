@@ -53,14 +53,13 @@
  * (10) Enter 'q' to exit the command-line. If the SD_CARD_READ_DATA macro is
  *      set then there an SD Card raw data access section will also be entered.
  */
-
+#include <stdint.h>
 #include <string.h>
-#include <avr/io.h>
 #include "avr_usart.h"
 #include "prints.h"
-#include "fat_print.h"
 #include "fat_bpb.h"
 #include "fat.h"
+#include "fat_print.h"
 
 //
 // setting this to 1 enables the SD Card Raw Data block read and prints section
@@ -289,10 +288,9 @@ int main(void)
         print_Str ("\n\rInvalid command\n\r");
     }
     print_Str ("\n\r");
-
-    // ensure USART0 Data Register, URD0, is cleared.
-    for (int k = 0; k < 10; k++) 
-      UDR0; 
+  
+    // Flush Usart Data Register
+    usart_Flush();
   }
   while (!quitCL);
   // END of COMMAND-LINE TEST                
