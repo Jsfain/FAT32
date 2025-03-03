@@ -23,10 +23,10 @@
  *                                                       SET BPB STRUCT MEMBERS 
  *                                         
  * Description : Gets values of the Bios Parameter Block / Boot Sector fields 
- *               from a FAT volume and sets the corresponding members of an
- *               instance of the BPB struct accordingly.
+ *               from a FAT volume and sets the corresponding members of the
+ *               BPB struct's instance accordingly.
  * 
- * Arguments   : bpb   - Pointer to an instance of a BPB struct. This function
+ * Arguments   : bpb   - Pointer to an BPB struct's instance. This function
  *                       will set the members of this instance.
  * 
  * Returns     : Boot Sector Error Flag. If any value other than BPB_VALID is
@@ -35,8 +35,8 @@
  * 
  * Notes       : A valid BPB struct instance is a required argument of many 
  *               functions that access the FAT volume, therefore this function 
- *               should be called first, before implementing any other parts of
- *               the FAT module.
+ *               should be called first before calling any other parts of the 
+ *               FAT module.
  * 
  * Limitation  : Currently will only work if Boot Sector is block 0 on SD Card.
  * ----------------------------------------------------------------------------

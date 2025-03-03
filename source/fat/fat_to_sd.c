@@ -10,10 +10,10 @@
 
 #include <stdint.h>
 #include "prints.h"
+#include "fat_to_disk_if.h"
 #include "sd_spi_base.h"
 #include "sd_spi_rwe.h"
 #include "sd_spi_print.h"
-#include "fat_to_disk_if.h"
 
 /*
  ******************************************************************************
@@ -24,7 +24,7 @@
 //
 // global static varible for the CARD TYPE VERSION struct defined in 
 // SD_SPI_BASE. This is set from FindBootSector function below, during SD card
-// initialization but it's also needed in the read disk sector function.
+// initialization but is also needed in the read disk sector function.
 //
 static CTV ctv;
 
@@ -34,6 +34,12 @@ static void pvt_SDCardInit(CTV *cardTypeVers);
 // The number of times the module can attempt to initialize the SD card.
 #define SD_CARD_INIT_ATTEMPTS_MAX      5    // set to any value <= 255.
 
+//
+// These macros are used by FATtoDisk_FindBootSector to specify the range of 
+// blocks over which to search for the boot sector.
+//
+#define BS_SEARCH_START_BLOCK         0    // specifies starting block
+#define BS_MAX_NUM_BLKS_SEARCH_MAX    50   // specifies number of blocks
 
 /*
  ******************************************************************************
@@ -47,16 +53,17 @@ static void pvt_SDCardInit(CTV *cardTypeVers);
  *                                 
  * Description : Finds the address of the boot sector on the FAT32-formatted 
  *               SD card. This function is required by fat_SetBPB in fat_bpb.c.
- *               This version searches for the block containing the Jump Boot
- *               and Boot Signature bits and returns this block number.
+ *               This is implemented by performing a search for the block 
+ *               containing the Jump Boot and Boot Signature bits and returns 
+ *               this block address. 
  * 
  * Arguments   : void
  * 
  * Returns     : Address of the boot sector on the SD card.
  * 
- * Notes       : The search for the boot sector will begin at
- *               FBS_SEARCH_START_BLOCK, and search a total of 
- *               FBS_MAX_NUM_BLKS_SEARCH_MAX blocks. 
+ * Notes       : The boot sector search will begin at BS_SEARCH_START_BLOCK,
+ *               and search a total of BS_MAX_NUM_BLKS_SEARCH_MAX blocks. 
+ *               These macros are defined here in this file. 
  * ----------------------------------------------------------------------------
  */
 uint32_t FATtoDisk_FindBootSector(void)
@@ -77,7 +84,7 @@ uint32_t FATtoDisk_FindBootSector(void)
   
   // Send the READ MULTIPLE BLOCK command and confirm R1 Response is good.
   CS_ASSERT;
-  sd_SendCommand(READ_MULTIPLE_BLOCK, FBS_SEARCH_START_BLOCK * addrMult); 
+  sd_SendCommand(READ_MULTIPLE_BLOCK, BS_SEARCH_START_BLOCK * addrMult); 
   if (sd_GetR1() != OUT_OF_IDLE)
   {
     CS_DEASSERT;
@@ -85,8 +92,8 @@ uint32_t FATtoDisk_FindBootSector(void)
   }
 
   // loop to search for the boot sector and set blkNum to its address.
-  for (uint32_t blkNum = FBS_SEARCH_START_BLOCK * addrMult;
-       blkNum < FBS_SEARCH_START_BLOCK + FBS_MAX_NUM_BLKS_SEARCH_MAX;
+  for (uint32_t blkNum = BS_SEARCH_START_BLOCK * addrMult;
+       blkNum < BS_SEARCH_START_BLOCK + BS_MAX_NUM_BLKS_SEARCH_MAX;
        ++blkNum)
   {   
     uint8_t  blckArr[BLOCK_LEN];            // to hold the block data bytes

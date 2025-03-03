@@ -5,10 +5,10 @@
  * Author     : Joshua Fain
  * Copyright (c) 2020, 2021
  *
- * This file provides macros and function prototypes required by the FAT32 
- * module to interface with a disk driver handling the function of accessing a
- * a FAT32 formatted disk itself. These functions must be implemented in order 
- * for the FAT32 module to function.
+ * This file provides the required macros and function prototypes required by 
+ * the FAT32 module to interface with a disk driver that must handle the actual
+ * accessing of a FAT32 formatted disk. These functions must be implemented in 
+ * order for the FAT32 module to function.
  */
 
 #ifndef FAT_TO_DISK_IF_H
@@ -21,20 +21,13 @@
  */
 
 //
-// If FATtoDisk_FindBootSector is successful it should return the location of 
+// If FATtoDisk_FindBootSector is successful it should return the address of 
 // the boot sector on the disk, i.e. it's block/sector address on the disk. If
 // the boot sector is NOT found it should return this value. This is set to the
 // highest possible 32-bit integer since the boot sector should never be 
-// expected to be found here.
+// expected to be found at this address.
 // 
 #define FAILED_FIND_BOOT_SECTOR        0xFFFFFFFF
-
-//
-// These macros are used by FATtoDisk_FindBootSector to specify the range of 
-// blocks over which to search for the boot sector.
-//
-#define FBS_SEARCH_START_BLOCK         0    // specifies starting block
-#define FBS_MAX_NUM_BLKS_SEARCH_MAX    50   // specifies number of blocks
 
 // values that can be returned by FATtoDisk_ReadSingleSector. 
 #define READ_SECTOR_SUCCESS     0     
@@ -72,10 +65,6 @@
  * Arguments   : void
  * 
  * Returns     : Address of the boot sector on the disk.
- * 
- * Notes       : The search for the boot sector will begin at
- *               FBS_SEARCH_START_BLOCK, and search a total of 
- *               FBS_MAX_NUM_BLKS_SEARCH_MAX blocks. 
  * ----------------------------------------------------------------------------
  */
 uint32_t FATtoDisk_FindBootSector(void);

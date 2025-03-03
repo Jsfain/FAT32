@@ -24,7 +24,7 @@
  *
  * Description : The expected byte length of FAT32 sector. 
  *       
- * Notes       : (1) Value must match the BPB's 'bytes per sector field
+ * Notes       : (1) Value must match the BPB struct's 'bytesPerSec' field
  *               (2) This value should be set to 512 for the current
  *                   implementation to work.
  * ----------------------------------------------------------------------------

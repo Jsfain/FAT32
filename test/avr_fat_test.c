@@ -68,7 +68,6 @@
 //
 #define SD_CARD_READ_DATA              0
 
-
 #if SD_CARD_READ_DATA
 
 // required SPI includes if running the raw data SD read by exiting the CL. 
@@ -268,8 +267,8 @@ int main(void)
       else if (!strcmp(cmdStr, "pwd"))
       {
         print_Str("\n\r");
-        print_Str (cwd.lnPathStr);
-        print_Str (cwd.lnStr);
+        print_Str(cwd.lnPathStr);
+        print_Str(cwd.lnStr);
       }
 
       //
@@ -277,7 +276,7 @@ int main(void)
       //
       else if (cmdStr[0] == 'q') 
       { 
-        print_Str ("\n\rquit\n\r"); 
+        print_Str("\n\rquit\n\r"); 
         quitCL = 1; 
       }
       
@@ -285,9 +284,9 @@ int main(void)
       // Invalid Command
       //
       else
-        print_Str ("\n\rInvalid command\n\r");
+        print_Str("\n\rInvalid command\n\r");
     }
-    print_Str ("\n\r");
+    print_Str("\n\r");
   
     // Flush Usart Data Register
     usart_Flush();
@@ -364,7 +363,7 @@ int main(void)
 
   //Something else to do. Print user-entered chars to screen.
   while(1)
-    usart_Transmit (usart_Receive());
+    usart_Transmit(usart_Receive());
 
   return 0;
 }
