@@ -3,7 +3,7 @@
  * Version    : 2.0
  * License    : GNU GPLv3
  * Author     : Joshua Fain
- * Copyright (c) 2020, 2021
+ * Copyright (c) 2020 - 2025
  *
  * This file provides the required macros and function prototypes required by 
  * the FAT32 module to interface with a disk driver that must handle the actual
@@ -29,7 +29,7 @@
 // 
 #define FAILED_FIND_BOOT_SECTOR        0xFFFFFFFF
 
-// values that can be returned by FATtoDisk_ReadSingleSector. 
+// values that can be returned by FATtoDisk_ReadSector. 
 #define READ_SECTOR_SUCCESS     0     
 #ifndef FAILED_READ_SECTOR
 #define FAILED_READ_SECTOR      0x08        // This should be defined in fat.h
@@ -41,13 +41,13 @@
 
 //
 // The first three bytes to the boot sector are the JUMP BOOT bytes. These can
-// either be, where X is 'don't care':
+// be either of the following (X is 'don't care'):
 //   (1) type A : [0] = 0xEB [1] = X [2] = 0x90 OR
 //   (2) type B : [0] = 0xE9 [1] = X [2] = X
 //
-#define JMP_BOOT_1A     0xEB
-#define JMP_BOOT_3A     0x90
-#define JMP_BOOT_1B     0xE9
+#define JMP_BOOT_1A     0xEB                // type A byte 1
+#define JMP_BOOT_3A     0x90                // type A byte 3
+#define JMP_BOOT_1B     0xE9                // type B byte 1
 
 /*
  ******************************************************************************
@@ -87,6 +87,6 @@ uint32_t FATtoDisk_FindBootSector(void);
  *               READ_SECTOR_FAILED if failure.
  * ----------------------------------------------------------------------------
  */
-uint8_t FATtoDisk_ReadSingleSector(uint32_t blkNum, uint8_t blkArr[]);
+uint8_t FATtoDisk_ReadSector(uint32_t blkNum, uint8_t blkArr[]);
 
 #endif //FAT_TO_DISK_IF_

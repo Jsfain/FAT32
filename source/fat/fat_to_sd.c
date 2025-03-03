@@ -160,7 +160,7 @@ uint32_t FATtoDisk_FindBootSector(void)
  *               READ_SECTOR_FAILED if failure.
  * ----------------------------------------------------------------------------
  */
-uint8_t FATtoDisk_ReadSingleSector(uint32_t blkNum, uint8_t blkArr[])
+uint8_t FATtoDisk_ReadSector(uint32_t blkNum, uint8_t blkArr[])
 {
   //
   // For SD cards, addressing is determined by the card type. If the card type 

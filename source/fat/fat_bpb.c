@@ -50,7 +50,7 @@ uint8_t fat_SetBPB(BPB *bpb)
   if (bootSecAddr != FAILED_FIND_BOOT_SECTOR)
   {
     // load data from boot sector into bootSecArr.
-    err = FATtoDisk_ReadSingleSector(bootSecAddr, bootSecArr);
+    err = FATtoDisk_ReadSector(bootSecAddr, bootSecArr);
     if (err == FAILED_READ_SECTOR) 
       return FAILED_READ_BPB;
   }
