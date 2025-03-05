@@ -1,16 +1,16 @@
 /*
- * File       : FATtoSD.C
+ * File       : FAT_SD_IF.C
  * Version    : 2.0
  * License    : GNU GPLv3
  * Author     : Joshua Fain
  * Copyright (c) 2020 - 2025
  * 
- * Implementation of FATtoDISK.H to access an FAT formatted SD card.
+ * Implementation of FAT_DISK_IF.H to access an FAT formatted SD card.
  */
 
 #include <stdint.h>
 #include "prints.h"
-#include "fat_to_disk_if.h"
+#include "fat_disk_if.h"
 #include "sd_spi_base.h"
 #include "sd_spi_rwe.h"
 #include "sd_spi_print.h"
@@ -35,7 +35,7 @@ static void pvt_SDCardInit(CTV *cardTypeVers);
 #define SD_CARD_INIT_ATTEMPTS_MAX      5    // set to any value <= 255.
 
 //
-// These macros are used by FATtoDisk_FindBootSector to specify the range of 
+// Used by FATtoDisk_FindBootSector to specify the range of 
 // blocks over which to search for the boot sector.
 //
 #define BS_SEARCH_START_BLOCK         0    // specifies starting block
@@ -66,7 +66,7 @@ static void pvt_SDCardInit(CTV *cardTypeVers);
  *               These macros are defined here in this file. 
  * ----------------------------------------------------------------------------
  */
-uint32_t FATtoDisk_FindBootSector(void)
+uint32_t fatDisk_FindBootSector(void)
 {
   // Initialize the FAT formatted SD card 
   pvt_SDCardInit(&ctv);
@@ -147,20 +147,20 @@ uint32_t FATtoDisk_FindBootSector(void)
  *                                                 READ SINGLE SECTOR FROM DISK
  *                                       
  * Description : Loads the contents of the sector/block at the specified 
- *               address on the SD card into the array, blckArr.
+ *               address on the SD card into array, blckArr.
  *
- * Arguments   : blkNum    - Block number address of the sector/block on the SD
+ * Arguments   : blkNum    - Block number/address of the sector/block on the SD
  *                           card that should be read into blkArr.
  * 
  *               blkArr    - Pointer to the array that will be loaded with the 
- *                           contents of the sector/block on the SD card at 
+ *                           contents of the sector/block on the SD card at the
  *                           block specified by blkNum.
  * 
  * Returns     : READ_SECTOR_SUCCES if successful.
- *               READ_SECTOR_FAILED if failure.
+ *               FAILED_READ_SECTOR if failure.
  * ----------------------------------------------------------------------------
  */
-uint8_t FATtoDisk_ReadSector(uint32_t blkNum, uint8_t blkArr[])
+uint8_t fatDisk_ReadSector(uint32_t blkNum, uint8_t blkArr[])
 {
   //
   // For SD cards, addressing is determined by the card type. If the card type 

@@ -10,7 +10,7 @@
 
 #include <stdint.h>
 #include "fat_bpb.h"
-#include "fat_to_disk_if.h"
+#include "fat_disk_if.h"
 
 /*
  ******************************************************************************
@@ -46,11 +46,11 @@ uint8_t fat_SetBPB(BPB *bpb)
   uint8_t bootSecArr[SECTOR_LEN], err; 
 
   // Locate boot sector address on the disk. 
-  uint32_t bootSecAddr = FATtoDisk_FindBootSector();
+  uint32_t bootSecAddr = fatDisk_FindBootSector();
   if (bootSecAddr != FAILED_FIND_BOOT_SECTOR)
   {
     // load data from boot sector into bootSecArr.
-    err = FATtoDisk_ReadSector(bootSecAddr, bootSecArr);
+    err = fatDisk_ReadSector(bootSecAddr, bootSecArr);
     if (err == FAILED_READ_SECTOR) 
       return FAILED_READ_BPB;
   }

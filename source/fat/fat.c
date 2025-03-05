@@ -13,7 +13,7 @@
 #include "prints.h"
 #include "fat_bpb.h"
 #include "fat.h"
-#include "fat_to_disk_if.h"
+#include "fat_disk_if.h"
 
 /*
  ******************************************************************************
@@ -155,7 +155,7 @@ uint8_t fat_SetNextEntry(FatEntry *currEnt, const BPB *bpb)
       
       // create and load array with data bytes from the disk sector
       uint8_t secArr[bpb->bytesPerSec];  
-      if (FATtoDisk_ReadSector(secNumOnDisk, secArr) 
+      if (fatDisk_ReadSector(secNumOnDisk, secArr) 
           == FAILED_READ_SECTOR)
         return FAILED_READ_SECTOR;
 
@@ -214,7 +214,7 @@ uint8_t fat_SetNextEntry(FatEntry *currEnt, const BPB *bpb)
             }
 
             // load next sector into nextSecArr[].
-            if (FATtoDisk_ReadSector(secNumOnDisk, nextSecArr) 
+            if (fatDisk_ReadSector(secNumOnDisk, nextSecArr) 
                 == FAILED_READ_SECTOR)
               return FAILED_READ_SECTOR;
             
@@ -720,7 +720,7 @@ static uint8_t pvt_SetDirToParent(FatDir *dir, const BPB *bpb)
                * bpb->secPerClus;
                 
   // load secArr with disk sector at secNumOnDisk
-  if (FATtoDisk_ReadSector(secNumOnDisk, secArr) == FAILED_READ_SECTOR)
+  if (fatDisk_ReadSector(secNumOnDisk, secArr) == FAILED_READ_SECTOR)
    return FAILED_READ_SECTOR;
 
   // load first cluster index of the parent directory.
@@ -847,7 +847,7 @@ static uint32_t pvt_GetNextClusIndex(uint32_t clusIndx, const BPB *bpb)
 
   // load current cluster's index sector into secArr
   uint8_t secArr[bpb->bytesPerSec];
-  FATtoDisk_ReadSector(fatSectorToRead, secArr);
+  fatDisk_ReadSector(fatSectorToRead, secArr);
 
   // Value at the current cluster index is the index of the next cluster.
   uint32_t nextClusIndx = 0;
@@ -1095,7 +1095,7 @@ static uint8_t pvt_PrintFile(const uint8_t snEnt[], const BPB *bpb)
 
       // read disk sector into the sector array
       uint8_t secArr[bpb->bytesPerSec];
-      if (FATtoDisk_ReadSector(secNumOnDisk, secArr) 
+      if (fatDisk_ReadSector(secNumOnDisk, secArr) 
           == FAILED_READ_SECTOR)
         return FAILED_READ_SECTOR;
 
