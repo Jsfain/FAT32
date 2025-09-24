@@ -22,27 +22,35 @@
  ******************************************************************************
  */
 
+ //
+ // The expected byte length of the FAT32 sector. Note (1) The Value must match
+ // the BPB struct's 'bytesPerSec' field and (2) This value should be set to 
+ // 512 for the current implementation to work.
+ //
+#ifndef SECTOR_LEN
+#define SECTOR_LEN                      512
+#endif//SECTOR_LEN
+
 //
-// If FatDisk_FindBootSector is successful it should return the address of 
-// the boot sector on the disk, i.e. it's block/sector address on the disk. If
-// the boot sector is NOT found it should return this value. This is set to the
-// highest possible 32-bit integer since the boot sector should never be 
-// expected to be found at this address.
+// If fatDisk_FindBootSector is successful it returns the address of the boot 
+// sector, i.e. it's block/sector address on the disk. If the boot sector is 
+// NOT found it returns this value set to the highest 32-bit integer since the
+// boot sector should never be expected to be found at this address.
 // 
 #define FAILED_FIND_BOOT_SECTOR        0xFFFFFFFF
 
-// values that can be returned by FATtoDisk_ReadSector. 
+// values that can be returned by fatDisk_ReadSector. 
 #define READ_SECTOR_SUCCESS     0     
 #ifndef FAILED_READ_SECTOR
-#define FAILED_READ_SECTOR      0x08        // This should be defined in fat.h
+#define FAILED_READ_SECTOR      0x08        // should be defined in fat.h
 #endif//FAILED_READ_SECTOR
 
-// Boot sector signature bytes. The last two bytes of BS should be these.
+// Boot sector signature bytes. These are values of the last two bytes of BS.
 #define BS_SIGN_1     0x55
 #define BS_SIGN_2     0xAA
 
 //
-// The first three bytes to the boot sector are the JUMP BOOT bytes. These can
+// First three bytes to the boot sector are the JUMP BOOT bytes. These can
 // be either of the following (X is 'don't care'):
 //   (1) type A : [0] = 0xEB [1] = X [2] = 0x90 OR
 //   (2) type B : [0] = 0xE9 [1] = X [2] = X

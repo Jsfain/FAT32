@@ -5,8 +5,8 @@
  * Author     : Joshua Fain
  * Copyright (c) 2020 - 2025
  * 
- * Interface for accessing and storing the values of the boot sector / bios 
- * parameter block of a FAT32 formatted volume.
+ * Interface for accessing and storing the necessary Boot Sector/Bios 
+ * Parameter Block of a FAT32 formatted volume.
  */
 
 #ifndef FAT_BPB_H
@@ -17,21 +17,6 @@
  *                                    MACROS      
  ******************************************************************************
  */
-
-/* 
- * ----------------------------------------------------------------------------
- *                                                                SECTOR LENGTH
- *
- * Description : The expected byte length of FAT32 sector. 
- *       
- * Notes       : (1) Value must match the BPB struct's 'bytesPerSec' field
- *               (2) This value should be set to 512 for the current
- *                   implementation to work.
- * ----------------------------------------------------------------------------
- */
-#ifndef SECTOR_LEN
-#define SECTOR_LEN                      512
-#endif//SECTOR_LEN
 
 /* 
  * ----------------------------------------------------------------------------
