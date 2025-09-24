@@ -45,7 +45,7 @@ uint8_t fat_SetBPB(BPB *bpb)
 {
   uint8_t bootSecArr[SECTOR_LEN], err; 
 
-  // Locate boot sector address on the disk. 
+  // locate boot sector address on the disk. 
   uint32_t bootSecAddr = fatDisk_FindBootSector();
   if (bootSecAddr != FAILED_FIND_BOOT_SECTOR)
   {

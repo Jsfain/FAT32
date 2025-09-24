@@ -5,7 +5,11 @@
  * Author     : Joshua Fain
  * Copyright (c) 2020 - 2025
  * 
- * Implementation of FAT_DISK_IF.H to access an FAT formatted SD card.
+ * This is an implementation of FAT_DISK_IF.H and is specific to the disk 
+ * module used for accessing the raw data on the FAT32 formatted disk. It 
+ * should include the definitions for the function prototypes in 
+ * FAT_DISK_IF.H as well as any additional definitions required by the disk 
+ * interface module itself. In the case here the disk module is the SD_SPI.
  */
 
 #include <stdint.h>
@@ -17,19 +21,23 @@
 
 /*
  ******************************************************************************
- *           "PRIVATE" FUNCTIONS, MACROS, and GLOBAL VARIABLES
+ *                         INTERFACE-SPECIFIC DEFINITIONS
+ * 
+ * This section is for additional global variables, macros, and functions
+ * that are needed in order for the required FAT_DISK_IF.H functions to work
+ * with the included disk module.
  ******************************************************************************
  */
 
 //
 // global static varible for the 'CardTypeVersion' struct defined in
-// SD_SPI_BASE. This is set from FindBootSector function below during SD card
+// SD_SPI_BASE. This is set in the FindBootSector function below during SD card
 // initialization but it is also needed for the read disk sector function.
 //
 static CTV ctv;
 
 // calls the SD card initialization routine.
-static void pvt_SDCardInit(CTV *cardTypeVers);
+// static void pvt_SDCardInit(CTV *cardTypeVers);
 
 // The number of times the module can attempt to initialize the SD card.
 #define SD_CARD_INIT_ATTEMPTS_MAX      5    // set to any value <= 255.
@@ -40,6 +48,54 @@ static void pvt_SDCardInit(CTV *cardTypeVers);
 //
 #define BS_SEARCH_START_BLOCK         0    // specifies starting block
 #define BS_MAX_NUM_BLKS_SEARCH_MAX    50   // specifies number of blocks
+
+/* 
+ * ----------------------------------------------------------------------------
+ *                                       SD CARD INIT and GET CARD TYPE\VERSION
+ *                                       
+ * Description : Initializes the SD Card into SPI mode and sets the 
+ *               CardTypeVersion ctv global variable. The card type is needed 
+ *               to determine if the SD card is block or byte addressable.
+ * 
+ * Arguments   : *ctv - pointer to CardTypeVersion struct variable.
+ * 
+ * Returns     : void
+ * 
+ * Notes       : Possible Card Type settings - SDSC, SDHC, GET_CARD_TYPE_ERROR
+ * ----------------------------------------------------------------------------
+ */
+static void pvt_SDCardInit(CTV *cardTypeVers)
+{
+//
+  // SD card initialization hosting the FAT volume.
+  //
+  uint32_t sdInitResp;          
+
+  // Loop will continue until SD card init succeeds or max attempts reached.
+  for (uint8_t att = 0; att < SD_CARD_INIT_ATTEMPTS_MAX; ++att)
+  {
+    print_Str("\n\n\r >> Initializing SD Card: Attempt "); 
+    print_Dec(att + 1);
+    sdInitResp = sd_InitSpiMode(cardTypeVers);      // init SD Card
+
+    if (sdInitResp != OUT_OF_IDLE)          // Fail to init if not OUT_OF_IDLE
+    {    
+      print_Str("\n\r >> FAILED to initialize SD Card."
+                "\n\r >> Error Response returned: "); 
+      sd_PrintInitErrorResponse(sdInitResp);
+      print_Str(" R1 Response: "); 
+      sd_PrintR1(sdInitResp);
+    }
+    else
+    {   
+      print_Str("\n\r >> SD Card Initialization Successful");
+      break;
+    }
+  }
+}
+ /********************** END INTERFACE-SPECIFIC SECTION **********************/ 
+
+
 
 /*
  ******************************************************************************
@@ -178,120 +234,4 @@ uint8_t fatDisk_ReadSector(uint32_t blkNum, uint8_t blkArr[])
     return READ_SECTOR_SUCCESS; 
   return FAILED_READ_SECTOR;
 };
-
-/*
- ******************************************************************************
- *                            "PRIVATE" FUNCTION        
- ******************************************************************************
- */
-
-/* 
- * ----------------------------------------------------------------------------
- *                                                             GET SD CARD TYPE
- *                                       
- * Description : Determines and returns the SD card type. The card type is used
- *               determine if the SD card is block or byte addressable.
- * 
- * Arguments   : void
- * 
- * Returns     : SD card type - SDSC or SDHC, or GET_CARD_TYPE_ERROR.
- * ----------------------------------------------------------------------------
- */
-static void pvt_SDCardInit(CTV *cardTypeVers)
-{
-//
-  // SD card initialization hosting the FAT volume.
-  //
-  uint32_t sdInitResp;          
-
-
-  // Loop will continue until SD card init succeeds or max attempts reached.
-  for (uint8_t att = 0; att < SD_CARD_INIT_ATTEMPTS_MAX; ++att)
-  {
-    print_Str("\n\n\r >> Initializing SD Card: Attempt "); 
-    print_Dec(att + 1);
-    sdInitResp = sd_InitSpiMode(cardTypeVers);      // init SD Card
-
-    if (sdInitResp != OUT_OF_IDLE)          // Fail to init if not OUT_OF_IDLE
-    {    
-      print_Str("\n\r >> FAILED to initialize SD Card."
-                "\n\r >> Error Response returned: "); 
-      sd_PrintInitErrorResponse(sdInitResp);
-      print_Str(" R1 Response: "); 
-      sd_PrintR1(sdInitResp);
-    }
-    else
-    {   
-      print_Str("\n\r >> SD Card Initialization Successful");
-      break;
-    }
-  }
-}
-
-
-//
-// Want to preserve these for now, but don't need these macros or function 
-// since adding call to SD INIT to this file which inherently determines the 
-// card type.
-//
-/*
-// macros used by pvt_GetCardType
-#define GET_CARD_TYPE_ERROR 0xFF
-#define CSD_STRUCT_MSK      0xC0
-#define CSD_VSN_1           0x00
-#define CSD_VSN_2           0x40
-#define CSD_BYTE_LEN        16
-
-static uint8_t pvt_GetCardType(void)
-{
-  uint8_t cardType;
-
-  CS_ASSERT;
-  sd_SendCommand(SEND_CSD, 0);
-  if (sd_GetR1() != OUT_OF_IDLE) 
-  { 
-    CS_DEASSERT; 
-    return GET_CARD_TYPE_ERROR;             // R1 error. Failed to get the CSD
-  }
-
-  //
-  // Get card type by reading the CSD register's CSD Structure field. This 
-  // field provides the version of CSD (0,1,2,3) and corresponds to the to determine the version of the card - either SDHC or SDSC
-  //
-  for (uint16_t attempt = 0; ; ++attempt)
-  {
-    //
-    // if max attempts reached without reading a valid CSD structure field
-    // then read in enough bytes to get the rest of the CSD register. These 
-    // fields are not used but this is just to clear them out of the response.
-    //
-    if (attempt >= MAX_CR_ATT)           // if max attempt exceeded
-    { 
-      // Read in rest of CSD bytes, though not used.
-      for(int byteNum = 0; byteNum < CSD_BYTE_LEN - 1; ++byteNum) 
-        sd_ReceiveByteSPI();
-      CS_DEASSERT;
-      return GET_CARD_TYPE_ERROR;           // max attempt limit fail                             
-    }
-
-    uint8_t resp = sd_ReceiveByteSPI();
-    if ((resp & CSD_STRUCT_MSK) == CSD_VSN_1)
-    { 
-      cardType = SDSC; 
-      break;
-    }
-    else if ((resp & CSD_STRUCT_MSK) == CSD_VSN_2) 
-    { 
-      cardType = SDHC; 
-      break; 
-    } 
-  }
-
-  // Read in rest of CSD, though not used.
-  for(int byteNum = 0; byteNum < CSD_BYTE_LEN - 1; ++byteNum) 
-    sd_ReceiveByteSPI();
-  CS_DEASSERT;
-  return cardType;                          // success
-}
-*/
 

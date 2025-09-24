@@ -3,7 +3,7 @@
  * Version    : 2.0
  * License    : GNU GPLv3
  * Author     : Joshua Fain
- * Copyright (c) 2020, 2021
+ * Copyright (c) 2020 - 2025
  * 
  * Interface providing macros, structs, and functions for navigating/accessing 
  * the contents of a FAT32 formatted volume. These only provide READ access to 

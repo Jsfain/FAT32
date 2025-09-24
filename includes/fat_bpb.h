@@ -122,17 +122,4 @@ BPB;
  */
 uint8_t fat_SetBPB(BPB *bpb);
 
-/*
- * ----------------------------------------------------------------------------
- *                                       PRINT BIOS PARAMETER BLOCK ERROR FLAGS 
- * 
- * Description : Print the Bios Parameter Block Error Flag. 
- * 
- * Arguments   : err     BPB error flag(s).
- * 
- * Returns     : void
- * ----------------------------------------------------------------------------
- */
-//void fat_PrintErrorBPB(uint8_t err);
-
 #endif // FAT_BPB_H

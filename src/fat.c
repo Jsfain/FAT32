@@ -3,7 +3,7 @@
  * Version    : 2.0
  * License    : GNU GPLv3
  * Author     : Joshua Fain
- * Copyright (c) 2020, 2021
+ * Copyright (c) 2020 - 2025
  * 
  * Implementation of FAT.H
  */
@@ -17,7 +17,7 @@
 
 /*
  ******************************************************************************
- *                 "PRIVATE" FUNCTION PROTOTYPES (and MACROS)  
+ *                 "PRIVATE" FUNCTION PROTOTYPES
  ******************************************************************************
  */
 
