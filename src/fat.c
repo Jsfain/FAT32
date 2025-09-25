@@ -10,7 +10,7 @@
 
 #include <stdint.h>
 #include <string.h>
-#include "prints.h"
+//#include "prints.h"
 #include "fat_bpb.h"
 #include "fat.h"
 #include "fat_disk_if.h"
@@ -29,8 +29,8 @@ static uint8_t pvt_SetDirToParent(FatDir *dir, const BPB *bpb);
 static void pvt_LoadLongName(int lnFirstEnt, int lnLastEnt, 
                              const uint8_t secArr[], char lnStr[]);
 static uint32_t pvt_GetNextClusIndex(uint32_t clusIndex, const BPB *bpb);
-static void pvt_PrintEntFields(const uint8_t *byte, uint8_t flags);
-static uint8_t pvt_PrintFile(const uint8_t snEnt[], const BPB *bpb);
+//static void pvt_PrintEntFields(const uint8_t *byte, uint8_t flags);
+//static uint8_t pvt_PrintFile(const uint8_t snEnt[], const BPB *bpb);
 
 /*
  ******************************************************************************
@@ -425,6 +425,8 @@ uint8_t fat_SetDir(FatDir *dir, const char newDirStr[], const BPB *bpb)
  *                  Once for the long name and once for the short name.
  * ----------------------------------------------------------------------------
  */
+
+/*
 uint8_t fat_PrintDir(const FatDir *dir, uint8_t entFlds, const BPB *bpb)
 {
   // for function return errors. This is the loop cond. and the return value.
@@ -472,6 +474,7 @@ uint8_t fat_PrintDir(const FatDir *dir, uint8_t entFlds, const BPB *bpb)
   // return END_OF_DIRECTORY if successful. Any other value returned is error.
   return err;
 }
+*/
 
 /*
  * ----------------------------------------------------------------------------
@@ -492,6 +495,7 @@ uint8_t fat_PrintDir(const FatDir *dir, uint8_t entFlds, const BPB *bpb)
  *               entry does not exist, in which case it must be a short name.
  * ----------------------------------------------------------------------------
  */
+/*
 uint8_t fat_PrintFile(const FatDir *dir, const char fileStr[], const BPB *bpb)
 {
   // for function return errors. This is the loop cond. and the return value.
@@ -534,6 +538,7 @@ uint8_t fat_PrintFile(const FatDir *dir, const char fileStr[], const BPB *bpb)
   }
   return err;                               // no matching file was found.
 }
+*/
 
 /*
  *-----------------------------------------------------------------------------
@@ -546,6 +551,7 @@ uint8_t fat_PrintFile(const FatDir *dir, const char fileStr[], const BPB *bpb)
  * Returns     : void
  * ----------------------------------------------------------------------------
  */
+/*
 void fat_PrintError (uint8_t err)
 {  
   switch(err)
@@ -578,6 +584,7 @@ void fat_PrintError (uint8_t err)
       print_Str("\n\rUNKNOWN_ERROR");
   }
 }
+*/
 
 /*
  ******************************************************************************
@@ -672,6 +679,7 @@ static void pvt_UpdateFatEntryMembers(FatEntry *ent, const char lnStr[],
  * Returns     : SUCCESS or INVALID_NAME
  * -----------------------------------------------------------------------------
  */
+
 static uint8_t pvt_CheckName(const char nameStr[])
 {
   // check that long name is not too large for current settings
@@ -695,6 +703,7 @@ static uint8_t pvt_CheckName(const char nameStr[])
       return SUCCESS;
   return INVALID_NAME;
 }
+
 
 /*
  * ----------------------------------------------------------------------------
@@ -865,6 +874,7 @@ static uint32_t pvt_GetNextClusIndex(uint32_t clusIndx, const BPB *bpb)
   return nextClusIndx;
 }
 
+
 /*
  * ----------------------------------------------------------------------------
  *                                      (PRIVATE) PRINT THE FIELDS OF FAT ENTRY
@@ -878,6 +888,7 @@ static uint32_t pvt_GetNextClusIndex(uint32_t clusIndx, const BPB *bpb)
  * Returns     : void 
  * ----------------------------------------------------------------------------
  */
+/*
 static void pvt_PrintEntFields(const uint8_t secArr[], uint8_t flags)
 {
   print_Str ("\n\r");
@@ -1056,6 +1067,7 @@ static void pvt_PrintEntFields(const uint8_t secArr[], uint8_t flags)
       print_Str(" <FILE>  ");
   }
 }
+*/
 
 /*
  * ----------------------------------------------------------------------------
@@ -1070,6 +1082,7 @@ static void pvt_PrintEntFields(const uint8_t secArr[], uint8_t flags)
  * Returns     : END_OF_FILE (success) or FAILED_READ_SECTOR fat error flag.
  * ----------------------------------------------------------------------------
  */
+/*
 static uint8_t pvt_PrintFile(const uint8_t snEnt[], const BPB *bpb)
 {
   //get FAT index for file's first cluster
@@ -1145,3 +1158,4 @@ static uint8_t pvt_PrintFile(const uint8_t snEnt[], const BPB *bpb)
   
   return END_OF_FILE;
 }
+*/

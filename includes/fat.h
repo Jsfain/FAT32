@@ -7,7 +7,7 @@
  * 
  * Interface providing macros, structs, and functions for navigating/accessing 
  * the contents of a FAT32 formatted volume. These only provide READ access to 
- * the volume's contents. No WRITE/ERASE access is currently implemented.
+ * the volume's contents. WRITE and ERASE access is NOT currently implemented.
  */
 
 #ifndef FAT_H
@@ -425,7 +425,7 @@ uint8_t fat_SetDir(FatDir *dir, const char newDirStr[], const BPB *bpb);
  *                  Once for the long name and once for the short name.
  * ----------------------------------------------------------------------------
  */
-uint8_t fat_PrintDir(const FatDir *dir, uint8_t entFlds, const BPB *bpb);
+//uint8_t fat_PrintDir(const FatDir *dir, uint8_t entFlds, const BPB *bpb);
 
 /*
  * ----------------------------------------------------------------------------
@@ -446,7 +446,7 @@ uint8_t fat_PrintDir(const FatDir *dir, uint8_t entFlds, const BPB *bpb);
  *               entry does not exist, in which case it must be a short name.
  * ----------------------------------------------------------------------------
  */
-uint8_t fat_PrintFile(const FatDir *dir, const char fileStr[], const BPB *bpb);
+//uint8_t fat_PrintFile(const FatDir *dir, const char fileStr[], const BPB *bpb);
 
 /*
  *-----------------------------------------------------------------------------
@@ -459,6 +459,6 @@ uint8_t fat_PrintFile(const FatDir *dir, const char fileStr[], const BPB *bpb);
  * Returns     : void
  * ----------------------------------------------------------------------------
  */
-void fat_PrintError(uint8_t err);
+//void fat_PrintError(uint8_t err);
 
 #endif //FAT_H
