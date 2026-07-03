@@ -8,7 +8,7 @@
  * Downloader : AVRDUDE 6.3
  * License    : GNU GPLv3
  * Author     : Joshua Fain
- * Copyright (c) 2020 - 2025
+ * Copyright (c) 2020 - 2026
  * 
  * DESCRIPTION: 
  * Implements a simple command line-like interface that can be used to navigate
