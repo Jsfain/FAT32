@@ -9,7 +9,8 @@
  */
 
 #include <stdint.h>
-#include "fat_bpb.h"
+//#include "fat_bpb.h"
+#include "fat.h"
 #include "fat_disk_if.h"
 
 /*
@@ -41,6 +42,7 @@
  * Limitation  : Currently will only work if Boot Sector is block 0 on SD Card.
  * ----------------------------------------------------------------------------
  */
+/*
 uint8_t fat_SetBPB(BPB *bpb)
 {
   uint8_t bootSecArr[SECTOR_LEN], err; 
@@ -117,3 +119,4 @@ uint8_t fat_SetBPB(BPB *bpb)
   else 
     return NOT_BPB;
 }
+*/

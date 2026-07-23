@@ -2,12 +2,10 @@
  *                           Test file for AVR-FAT Module
  *
  * File       : AVR_FAT_TEST.C
- * Author     : Joshua Fain
  * Target     : ATMega1280
  * Compiler   : AVR-GCC 9.3.0
  * Downloader : AVRDUDE 6.3
  * License    : GNU GPLv3
- * Author     : Joshua Fain
  * Copyright (c) 2020 - 2026
  * 
  * DESCRIPTION: 
@@ -57,7 +55,7 @@
 #include <string.h>
 #include "avr_usart.h"
 #include "prints.h"
-#include "fat_bpb.h"
+//#include "fat_bpb.h"
 #include "fat.h"
 #include "fat_print.h"
 
@@ -111,10 +109,8 @@ int main(void)
   }
 
   //
-  // Create and set a FatDir instance. Members of this instance are used for
-  // holding parameters of a FAT directory. This instance can be treated as
-  // the current working directory. The instance should be initialized to 
-  // the root directory with fat_SetDirToRoot() prior to using anywhere else.
+  // Create and set an instance of FatDir to hold the FAT directory parameters
+  // of the current working directory, and initialized to the root directory.
   //
   FatDir cwd;
   fat_SetDirToRoot(&cwd, &bpb);

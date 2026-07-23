@@ -9,6 +9,7 @@
  * Parameter Block of a FAT32 formatted volume.
  */
 
+ 
 #ifndef FAT_BPB_H
 #define FAT_BPB_H
 
@@ -25,6 +26,7 @@
  * Description : Flags returned by fat_SetBPB.
  * ----------------------------------------------------------------------------
  */
+/*
 #define CORRUPT_BPB                     0x01
 #define NOT_BPB                         0x02
 #define INVALID_BYTES_PER_SECTOR        0x04
@@ -32,6 +34,7 @@
 #define BPB_NOT_FOUND                   0x10
 #define BPB_VALID                       0x20
 #define FAILED_READ_BPB                 0x40
+*/
 
 /* 
  * ----------------------------------------------------------------------------
@@ -41,6 +44,7 @@
  *               fields necessary for the BPB struct are provided.
  * ----------------------------------------------------------------------------
  */
+/*
 #define BYTES_PER_SEC_POS_LSB  11
 #define BYTES_PER_SEC_POS_MSB  12
 #define SEC_PER_CLUS_POS       13
@@ -55,13 +59,14 @@
 #define ROOT_CLUS_POS2         45
 #define ROOT_CLUS_POS3         46
 #define ROOT_CLUS_POS4         47
-
+*/
 
 // Returns True if Sectors Per Cluster is a valid value and false otherwise.
+/*
 #define CHK_VLD_SEC_PER_CLUS(SPC)  ((SPC == 1)  || (SPC == 2)  || (SPC == 4)  \
                                  || (SPC == 8)  || (SPC == 16) || (SPC == 32) \
                                  || (SPC == 64) || (SPC == 128))
-
+*/
 /*
  ******************************************************************************
  *                                 STRUCTS      
@@ -79,7 +84,8 @@
  *               from the BPB values that is used frequently.
  * ----------------------------------------------------------------------------
  */
-typedef struct
+/*
+ typedef struct
 {
   uint8_t  secPerClus;
   uint8_t  numOfFats;
@@ -90,6 +96,7 @@ typedef struct
   uint32_t dataRegionFirstSector;
 } 
 BPB;
+*/
 
 /*
  ******************************************************************************
@@ -120,6 +127,7 @@ BPB;
  * Limitation  : Currently will only work if Boot Sector is block 0 on SD Card.
  * ----------------------------------------------------------------------------
  */
+/*
 uint8_t fat_SetBPB(BPB *bpb);
-
+*/
 #endif // FAT_BPB_H

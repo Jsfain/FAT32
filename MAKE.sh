@@ -56,19 +56,18 @@ else
     echo -e "Compiling FAT.C successful"
 fi
 
-
-echo -e "\n\r>> COMPILE: "${Compile[@]}" "$buildDir"/fat_bpb.o "$fatDir"/fat_bpb.c"
-"${Compile[@]}" $buildDir/fat_bpb.o $fatDir/fat_bpb.c
-status=$?
-sleep $t
-if [ $status -gt 0 ]
-then
-    echo -e "error compiling FAT_BPB.C"
-    echo -e "program exiting with code $status"
-    exit $status
-else
-    echo -e "Compiling FAT_BPB.C successful"
-fi
+##echo -e "\n\r>> COMPILE: "${Compile[@]}" "$buildDir"/fat_bpb.o "$fatDir"/fat_bpb.c"
+##"${Compile[@]}" $buildDir/fat_bpb.o $fatDir/fat_bpb.c
+##status=$?
+##sleep $t
+##if [ $status -gt 0 ]
+##then
+##    echo -e "error compiling FAT_BPB.C"
+##    echo -e "program exiting with code $status"
+##    exit $status
+##else
+##    echo -e "Compiling FAT_BPB.C successful"
+##fi
 
 echo -e "\n\r>> COMPILE: "${Compile[@]}" "$buildDir"/fat_print.o "$fatDir"/fat_print.c"
 "${Compile[@]}" $buildDir/fat_print.o $fatDir/fat_print.c
@@ -193,8 +192,11 @@ else
 fi
 
 
-echo -e "\n\r>> LINK: "${Link[@]}" "$buildDir"/avr_fat_test.elf "$buildDir"/avr_fat_test.o  "$buildDir"/avr_spi.o "$buildDir"/sd_spi_interface.o "$buildDir"/sd_spi_base.o "$buildDir"/sd_spi_rwe.o "$buildDir"/sd_spi_print.o "$buildDir"/avr_usart.o "$buildDir"/prints.o "$buildDir"/fat_bpb.o "$buildDir"/fat.o "$buildDir"/fat_print.o "$buildDir"/fat_sdcard_if.o"
-"${Link[@]}" $buildDir/avr_fat_test.elf $buildDir/avr_fat_test.o $buildDir/avr_spi.o $buildDir/sd_spi_interface.o $buildDir/sd_spi_base.o $buildDir/sd_spi_rwe.o $buildDir/sd_spi_print.o $buildDir/avr_usart.o $buildDir/prints.o $buildDir/fat.o $buildDir/fat_bpb.o $buildDir/fat_print.o $buildDir/fat_sdcard_if.o
+##$buildDir"/fat_bpb.o " add this back in if you want to compile the BPB code.
+## It is currently commented out because it is not being used in the test program.
+
+echo -e "\n\r>> LINK: "${Link[@]}" "$buildDir"/avr_fat_test.elf "$buildDir"/avr_fat_test.o  "$buildDir"/avr_spi.o "$buildDir"/sd_spi_interface.o "$buildDir"/sd_spi_base.o "$buildDir"/sd_spi_rwe.o "$buildDir"/sd_spi_print.o "$buildDir"/avr_usart.o "$buildDir"/prints.o "$buildDir"/fat.o "$buildDir"/fat_print.o "$buildDir"/fat_sdcard_if.o"
+"${Link[@]}" $buildDir/avr_fat_test.elf $buildDir/avr_fat_test.o $buildDir/avr_spi.o $buildDir/sd_spi_interface.o $buildDir/sd_spi_base.o $buildDir/sd_spi_rwe.o $buildDir/sd_spi_print.o $buildDir/avr_usart.o $buildDir/prints.o $buildDir/fat.o $buildDir/fat_print.o $buildDir/fat_sdcard_if.o
 status=$?
 sleep $t
 if [ $status -gt 0 ]

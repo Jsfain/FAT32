@@ -11,8 +11,7 @@
 #include <stdint.h>
 #include <string.h>
 #include "prints.h"
-#include "fat_bpb.h"
-#include "fat_bpb.h"
+//#include "fat_bpb.h"
 #include "fat.h"
 #include "fat_disk_if.h"
 
@@ -296,7 +295,7 @@ static uint8_t pvt_CheckName(const char nameStr[])
 
 /*
  * ----------------------------------------------------------------------------
- *                              (PRIVATE) GET THE FAT INDEX OF THE NEXT CLUSTER
+ *                                      (PRIVATE) GET FAT INDEX OF NEXT CLUSTER
  * 
  * Description : Finds and returns the next FAT cluster index.
  * 
