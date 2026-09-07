@@ -1,9 +1,9 @@
 /*
  * File       : FAT_PRINT.H
- * Version    : 2.0
+ * Version    : 0.1
  * License    : GNU GPLv3
  * Author     : Joshua Fain
- * Copyright (c) 2020 - 2025
+ * Copyright (c) 2020 - 2026
  * 
  * Provides printing functions for the FAT module.
  */
@@ -22,7 +22,7 @@
  * Returns     : void
  * ----------------------------------------------------------------------------
  */
-void fat_PrintErrorBPB(uint8_t err);
+void fat_PrintErrorBPB(uint8_t err, void (*outs)(uint8_t));
 
 /*
  * ----------------------------------------------------------------------------
@@ -37,7 +37,7 @@ void fat_PrintErrorBPB(uint8_t err);
  *               entFlds    - Any combination of the FAT ENTRY FIELD FLAGS.
  *                            These specify which entry types, and which of
  *                            their fields, will be printed to the screen.
- *               bpb        - Pointer to the BPB struct instance.
+ *               bpb        - Pointer to the FatBPB struct instance.
  *
  * Returns     : A FAT Error Flag. If any value other than END_OF_DIRECTORY is
  *               returned then there was an issue.
@@ -52,7 +52,8 @@ void fat_PrintErrorBPB(uint8_t err);
  *                  Once for the long name and once for the short name.
  * ----------------------------------------------------------------------------
  */
-uint8_t fat_PrintDir(const FatDir *dir, uint8_t entFlds, const BPB *bpb);
+uint8_t fat_PrintDir(const FatDir *dir, uint8_t entFlds, 
+                     const FatBPB *bpb, void (*outs)(uint8_t));
 
 /*
  * ----------------------------------------------------------------------------
@@ -64,7 +65,7 @@ uint8_t fat_PrintDir(const FatDir *dir, uint8_t entFlds, const BPB *bpb);
  *                            contain the entry for the file to be printed.
  *               fileStr    - Pointer to a string. This is the name of the file
  *                            who's contents will be printed.
- *               bpb        - Pointer to the BPB struct instance.
+ *               bpb        - Pointer to the FatBPB struct instance.
  *
  * Returns     : FAT Error Flag. If any value other than END_OF_FILE is 
  *               returned, then an issue has occurred.
@@ -73,7 +74,8 @@ uint8_t fat_PrintDir(const FatDir *dir, uint8_t entFlds, const BPB *bpb);
  *               entry does not exist, in which case it must be a short name.
  * ----------------------------------------------------------------------------
  */
-uint8_t fat_PrintFile(const FatDir *dir, const char fileStr[], const BPB *bpb);
+uint8_t fat_PrintFile(const FatDir *dir, const char fileStr[], 
+                      const FatBPB *bpb, void (*outs)(uint8_t));
 
 /*
  *-----------------------------------------------------------------------------
@@ -86,6 +88,6 @@ uint8_t fat_PrintFile(const FatDir *dir, const char fileStr[], const BPB *bpb);
  * Returns     : void
  * ----------------------------------------------------------------------------
  */
-void fat_PrintError(uint8_t err);
+void fat_PrintError(uint8_t err, void (*outs)(uint8_t));
 
 #endif // FAT_PRINT_H

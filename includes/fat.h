@@ -1,6 +1,6 @@
 /*
  * File       : FAT.H
- * Version    : 2.0
+ * Version    : 0.1
  * License    : GNU GPLv3
  * Author     : Joshua Fain
  * Copyright (c) 2020 - 2026
@@ -41,7 +41,8 @@
  *                                         BIOS PARAMETER BLOCK FIELD POSITIONS
  *
  * Description : Positions in the BPB of the corresponding fields. Only those
- *               fields necessary for the BPB struct are provided.
+ *               fields necessary for the BPB struct and validation are 
+ *               included here.
  * ----------------------------------------------------------------------------
  */
 #define BYTES_PER_SEC_POS_LSB  11
@@ -58,7 +59,6 @@
 #define ROOT_CLUS_POS2         45
 #define ROOT_CLUS_POS3         46
 #define ROOT_CLUS_POS4         47
-
 
 // True if BPB Sectors Per Cluster is a valid value. False otherwise.
 #define CHK_VLD_SEC_PER_CLUS(SPC)  ((SPC == 1)  || (SPC == 2)  || (SPC == 4)  \
@@ -87,11 +87,11 @@
  * ----------------------------------------------------------------------------
  *                                                ENTRY and SECTOR BYTE LENGTHS
  *
- * Description : Defines byte lengths of a FAT32 sector and directory entry.
+ * Description : Defines byte lengths of a FAT sector and directory entry.
  *       
  * Notes       : 1) ENTRY_LEN must always be 32.
  *               2) SECTOR_LEN should match the bios parameter block's 'bytes 
- *                  per sector' (BPS) field.
+ *                  per sector' (BPS) field. Currently must always be 512.
  * 
  * Warning     : Though the BPS field value can be different than 512, in this 
  *               implementation, anything other than 512 will not work. 
@@ -225,7 +225,7 @@
 
 /* 
  * ----------------------------------------------------------------------------
- *                                                    MISC BYTES, MASKS, TOKENS
+ *                                                      MISC BYTES/MASKS/TOKENS
  * ----------------------------------------------------------------------------
  */
 // If the first byte of entry is set to this, then entry is marked for deletion 
@@ -306,13 +306,14 @@
 
 /* 
  * ----------------------------------------------------------------------------
- *                                                  BIOS PARAMETER BLOCK STRUCT
+ *                                            FAT32 BIOS PARAMETER BLOCK STRUCT
  *
  * Description : The members of this struct correspond to the Bios Parameter 
  *               Block fields needed by this module.
  * 
- * Notes       : dataRegionFirstSector is not a BPB field is a value calculated
- *               from the BPB values that is used frequently.
+ * Notes       : dataRegionFirstSector is not a BPB field. It is a frequently 
+ *               used value calculated from BPB values and points to the 
+ *               first sector of the data region.
  * ----------------------------------------------------------------------------
  */
 typedef struct
@@ -325,26 +326,19 @@ typedef struct
   uint32_t rootClus;
   uint32_t dataRegionFirstSector;
 } 
-BPB;
+FatBPB;
 
 /* 
  * ----------------------------------------------------------------------------
  *                                                         FAT DIRECTORY STRUCT
  *
- * Description : Struct used to hold some parameters corresponding to a FAT
- *               directory. An instance of this struct can be used as the 
- *               current working directory.
+ * Description : Struct to hold selected parameters of a FAT directory.
  *       
- * Notes       : 1) Any instance of this struct must first be initialized by 
- *                  passing it to fat_SetDirToRoot.
- *               2) Most FAT functions require an instance of this struct to be
- *                  previously set and passed to it.
+ * Notes       : 1) Any instance must first be initialized by fat_SetDirToRoot.
+ *               2) An instance is required by most FAT functions.
  * 
- * Warnings    : All members of an instance of this struct must correspond to
- *               the same valid FAT directory. If not, then unexpected results 
- *               will occur when trying to navigate and/or print directory 
- *               names, contents, entries, and files. As such, members of an 
- *               instance of this struct should only be set through the FAT
+ * Warnings    : All set members must correspond to the same valid FAT       
+ *               directory. Members should only be set through the FAT
  *               functions declared here.
  * ----------------------------------------------------------------------------
  */
@@ -386,40 +380,29 @@ FatEntry;
 
 /*
  ******************************************************************************
- *                           FUNCTION PROTOTYPES
- ******************************************************************************
- */
-
-/*
- ******************************************************************************
  *                             FUNCTION PROTOTYPES      
  ******************************************************************************
  */
 
 /*
  * ----------------------------------------------------------------------------
- *                                                       SET BPB STRUCT MEMBERS 
+ *                                                    SET FatBPB STRUCT MEMBERS 
  *                                         
- * Description : Gets values of the Bios Parameter Block / Boot Sector fields 
- *               from a FAT volume and sets the corresponding members of an
- *               instance of the BPB struct accordingly.
+ * Description : Finds and reads FAT Bios Parameter Block/Boot Sector fields 
+ *               and sets members of FatBPB instance accordingly.
  * 
- * Arguments   : bpb   - Pointer to an instance of a BPB struct. This function
- *                       will set the members of this instance.
+ * Arguments   : bpb   - Pointer to FatBPB instance whose members will be set.
  * 
  * Returns     : Boot Sector Error Flag. If any value other than BPB_VALID is
- *               returned then setting the BPB instance failed. To print, pass
- *               the returned value to fat_PrintErrorBPB().
+ *               returned then setting the FatBPB instance failed. To print, 
+ *               error pass returned value to fat_PrintErrorBPB().
  * 
- * Notes       : A valid BPB struct instance is a required argument of many 
- *               functions that access the FAT volume, therefore this function 
- *               should be called first, before implementing any other parts of
- *               the FAT module.
- * 
- * Limitation  : Currently will only work if Boot Sector is block 0 on SD Card.
+ * Notes       : This function must be called before any other FAT function, 
+ *               as an instance of the FatBPB struct with valid set members is
+ *               required by all the other public FAT module functions.
  * ----------------------------------------------------------------------------
  */
-uint8_t fat_SetBPB(BPB *bpb);
+uint8_t fat_SetBPB(FatBPB *bpb);
 
 /* 
  * ----------------------------------------------------------------------------
@@ -428,44 +411,42 @@ uint8_t fat_SetBPB(BPB *bpb);
  * Description : Sets instance of FatDir to the root directory.
  *
  * Arguments   : dir   - Pointer to FatDir instance to be set to root dir.
- *               bpb   - Pointer to the BPB struct instance.
+ *               bpb   - Pointer to valid FatBPB struct instance.
  *
  * Returns     : void
  * ----------------------------------------------------------------------------
  */
-void fat_SetDirToRoot(FatDir *dir, const BPB *bpb);
+void fat_SetDirToRoot(FatDir *dir, const FatBPB *bpb);
 
 /*
  * ----------------------------------------------------------------------------
- *                                                         INITIALIZE FAT ENTRY
+ *                                                          INITIALIZE FatEntry
  *                                      
- * Description : Initializin an instance of a FatEntry struct will set it to 
- *               the first entry of the root directory.
+ * Description : FatEntry initialization sets it to first entry in root dir.
  * 
  * Arguments   : ent   - Pointer to the FatEntry instance to be initialized.           
- *               bpb   - Pointer to the BPB struct instance.
+ *               bpb   - Pointer to valid FatBPB instance.
  * 
  * Returns     : void
  * ----------------------------------------------------------------------------
  */
-void fat_InitEntry(FatEntry *ent, const BPB *bpb);
+void fat_InitEntry(FatEntry *ent, const FatBPB *bpb);
 
 /*
  * ----------------------------------------------------------------------------
- *                                                  SET FAT ENTRY TO NEXT ENTRY 
+ *                                                   SET FatEntry TO NEXT ENTRY 
  *                                      
- * Description : Updates a FatEntry instance to point to the next entry in its
- *               directory.
+ * Description : Update a FatEntry to point to the next entry in the directory. 
  * 
- * Arguments   : currEnt   - Pointer to a FatEntry instance. Its members will 
+ * Arguments   : currEnt   - Pointer to FatEntry instance whose members will 
  *                           be updated to point to the next entry. 
- *               bpb       - Pointer to the BPB struct instance.
+ *               bpb       - Pointer to valid FatBPB instance.
  *
- * Returns     : A FAT Error Flag. If any value other than SUCCESS is returned 
+ * Returns     : FAT Error Flag. If any value other than SUCCESS is returned 
  *               then the function was unable to update the FatEntry.
  * ----------------------------------------------------------------------------
  */
-uint8_t fat_SetNextEntry(FatEntry *currEntry, const BPB *bpb);
+uint8_t fat_SetNextEntry(FatEntry *currEntry, const FatBPB *bpb);
 
 /*
  * ----------------------------------------------------------------------------
@@ -477,7 +458,7 @@ uint8_t fat_SetNextEntry(FatEntry *currEntry, const BPB *bpb);
  *                             new directory.             
  *               newDirStr   - Pointer to a string that specifies the name of 
  *                             the new directory.
- *               bpb         - Pointer to the BPB struct instance.
+ *               bpb         - Pointer to the FatBPB instance.
  * 
  * Returns     : A FAT Error Flag. If any value other than SUCCESS is returned 
  *               then the function was unable to update the FatEntry. 
@@ -496,6 +477,6 @@ uint8_t fat_SetNextEntry(FatEntry *currEntry, const BPB *bpb);
  *                  exist for a directory, only then can it be a short name.
  * ----------------------------------------------------------------------------
  */
-uint8_t fat_SetDir(FatDir *dir, const char newDirStr[], const BPB *bpb);
+uint8_t fat_SetDir(FatDir *dir, const char newDirStr[], const FatBPB *bpb);
 
 #endif //FAT_H

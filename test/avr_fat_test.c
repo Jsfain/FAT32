@@ -55,7 +55,6 @@
 #include <string.h>
 #include "avr_usart.h"
 #include "prints.h"
-//#include "fat_bpb.h"
 #include "fat.h"
 #include "fat_print.h"
 
@@ -64,9 +63,10 @@
 // at the end of the test file as well as the necessary local functions and
 // macros used by this section.
 //
-#define SD_CARD_READ_DATA              0
+#define SD_CARD_READ_DATA              1
 
 #if SD_CARD_READ_DATA
+
 
 // required SPI includes if running the raw data SD read by exiting the CL. 
 #include "avr_spi.h"
@@ -80,9 +80,15 @@
 static uint32_t enterBlockNumber();          
 #endif // SD_CARD_READ_DATA    
 
+// The number of times the module can attempt to initialize the SD card.
+#define SD_CARD_INIT_ATTEMPTS_MAX      5    // set to any value <= 255.
+
 #define CMD_LINE_MAX_CHAR              100  // max num of chars of a cmd/arg
 #define MAX_ARG_CNT                    10   // max num of CL arguments
 #define BACKSPACE                      127  // used for keyboard backspace here     
+
+// global variable for the ostream pointer for print
+static void (*g_outs)(uint8_t) = usart_Transmit; 
 
 int main(void)
 {
@@ -91,31 +97,31 @@ int main(void)
 
   //
   // Implement command line
-  //
-      
+  //      
   uint8_t err;                            // for returned errors
-  uint8_t quitCL = 0;                     // flag used to exit cmd line  
+  uint8_t quitCL = 0;                     // flag used to exit cmd line
+
   //
-  // Create and set Bios Parameter Block instance. Members of this instance
-  // are used to calculate where on the disk, the FAT sectors are located. 
-  // This should only be set here.
+  // Create and set the FatBPB instance. It's members hold certain parameters
+  // of the Bios Parameter Block used to calculate location of the FAT sectors
+  // on disk. This should only be set once, here.
   //
-  BPB bpb;
+  FatBPB bpb;
   err = fat_SetBPB(&bpb);
   if (err != BPB_VALID)
   {
-    print_Str("\n\r fat_SetBPB() returned ");
-    fat_PrintErrorBPB(err);
+    print_Str("\n\r fat_SetBPB() returned ", g_outs);
+    fat_PrintErrorBPB(err, g_outs);
   }
-
+  
   //
-  // Create and set an instance of FatDir to hold the FAT directory parameters
-  // of the current working directory, and initialized to the root directory.
+  // Create instance of FatDir to hold FAT directory parameters of a current
+  // working directory and initialize it to the root directory.
   //
   FatDir cwd;
   fat_SetDirToRoot(&cwd, &bpb);
 
-  print_Str("\n\n\n\r");
+  print_Str("\n\n\n\r", g_outs);
   do
   {
     char inputChar;                       // for input chars of cmd/arg
@@ -126,9 +132,9 @@ int main(void)
     uint8_t fieldFlags = 0;               // fields printed with 'ls' cmd
 
     // print cmd prompt to screen with cwd
-    print_Str("\n\r");
-    print_Str(cwd.lnStr);
-    print_Str(" > ");
+    print_Str("\n\r", g_outs);
+    print_Str(cwd.lnStr, g_outs);
+    print_Str(" > ", g_outs);
 
     // 
     // get (from user) and parse command and arguments
@@ -145,7 +151,7 @@ int main(void)
       // 
       if (inputChar == BACKSPACE)         // if backspace entered  
       {
-        print_Str ("\b \b");              // perform backspace 'delete' op.
+        print_Str ("\b \b", g_outs);        // perform backspace 'delete' op.
         if (charCnt > 0)                  // reduce char count if > 0
           --charCnt;
       }
@@ -184,7 +190,7 @@ int main(void)
       {   
         err = fat_SetDir(&cwd, argStr, &bpb);
         if (err != SUCCESS) 
-          fat_PrintError (err);
+          fat_PrintError (err, g_outs);
       }
       //
       // Command: "ls" (list dir contents)
@@ -199,7 +205,6 @@ int main(void)
             lastArgFlag = 1;
           else
             *argStrPtr = '\0';             // null-term for substring args.
-          
           // set flags to print fields according to the arguments specified
           if (strcmp (argStr, "/LN") == 0) 
             fieldFlags |= LONG_NAME;
@@ -222,29 +227,27 @@ int main(void)
           
           strcpy(argStr, ++argStrPtr);    // start argStr at next arg 
         }
-
         // Send LONG_NAME as default argument.
         if ((fieldFlags & SHORT_NAME) != SHORT_NAME) 
           fieldFlags |= LONG_NAME;
         
         // Print column headings
-        print_Str("\n\n\r");
+        print_Str("\n\n\r", g_outs);
         if (CREATION & fieldFlags) 
-          print_Str(" CREATION DATE & TIME,");
+          print_Str(" CREATION DATE & TIME,", g_outs);
         if (LAST_ACCESS & fieldFlags) 
-          print_Str(" LAST ACCESS DATE,");
+          print_Str(" LAST ACCESS DATE,", g_outs);
         if (LAST_MODIFIED & fieldFlags) 
-          print_Str(" LAST MODIFIED DATE & TIME,");
+          print_Str(" LAST MODIFIED DATE & TIME,", g_outs);
         if (FILE_SIZE & fieldFlags) 
-          print_Str(" SIZE (Bytes),");
+          print_Str(" SIZE (Bytes),", g_outs);
         if (TYPE & fieldFlags) 
-          print_Str(" TYPE,");
-        print_Str(" NAME");
-        print_Str("\n\r");
-
-        err = fat_PrintDir(&cwd, fieldFlags, &bpb);
+          print_Str(" TYPE,", g_outs);
+        print_Str(" NAME", g_outs);
+        print_Str("\n\r", g_outs);
+        err = fat_PrintDir(&cwd, fieldFlags, &bpb, g_outs);
         if (err != END_OF_DIRECTORY) 
-          fat_PrintError (err);
+          fat_PrintError (err, g_outs);
       }
       
       //
@@ -252,9 +255,9 @@ int main(void)
       //
       else if (!strcmp(cmdStr, "open")) 
       { 
-        err = fat_PrintFile(&cwd, argStr, &bpb);
+        err = fat_PrintFile(&cwd, argStr, &bpb, g_outs);
         if (err != END_OF_FILE) 
-          fat_PrintError(err);
+          fat_PrintError(err, g_outs);
       }
       
       //
@@ -262,9 +265,9 @@ int main(void)
       //
       else if (!strcmp(cmdStr, "pwd"))
       {
-        print_Str("\n\r");
-        print_Str(cwd.lnPathStr);
-        print_Str(cwd.lnStr);
+        print_Str("\n\r", g_outs);
+        print_Str(cwd.lnPathStr, g_outs);
+        print_Str(cwd.lnStr, g_outs);
       }
 
       //
@@ -272,7 +275,7 @@ int main(void)
       //
       else if (cmdStr[0] == 'q') 
       { 
-        print_Str("\n\rquit\n\r"); 
+        print_Str("\n\rquit\n\r", g_outs); 
         quitCL = 1; 
       }
       
@@ -280,9 +283,9 @@ int main(void)
       // Invalid Command
       //
       else
-        print_Str("\n\rInvalid command\n\r");
+        print_Str("\n\rInvalid command\n\r", g_outs);
     }
-    print_Str("\n\r");
+    print_Str("\n\r", g_outs);
   
     // Flush Usart Data Register
     usart_Flush();
@@ -307,48 +310,48 @@ int main(void)
 
     do
     {
-      print_Str("\n\n\n\rEnter Start Block\n\r");
+      print_Str("\n\n\n\rEnter Start Block\n\r", g_outs);
       startBlck = enterBlockNumber();
-      print_Str("\n\rHow many blocks do you want to print?\n\r");
+      print_Str("\n\rHow many blocks do you want to print?\n\r", g_outs);
       numOfBlcks = enterBlockNumber();
-      print_Str("\n\rYou have selected to print "); 
-      print_Dec(numOfBlcks);
-      print_Str(" blocks beginning at block number "); 
-      print_Dec(startBlck);
-      print_Str("\n\rIs this correct? (y/n)");
+      print_Str("\n\rYou have selected to print ", g_outs); 
+      print_Num(numOfBlcks, 10, g_outs);
+      print_Str(" blocks beginning at block number ", g_outs); 
+      print_Num(startBlck, 10, g_outs);
+      print_Str("\n\rIs this correct? (y/n)", g_outs);
       answer = usart_Receive();
       usart_Transmit(answer);
-      print_Str("\n\r");
+      print_Str("\n\r", g_outs);
     }
     while (answer != 'y');
 
     // Print blocks
     for (uint32_t blck = startBlck; blck < startBlck + numOfBlcks; ++blck)
     {
-      print_Str("\n\rBLOCK: ");
-      print_Dec(blck);
-      if (ctv.type == SDHC)               // SDHC is block addressable
+      print_Str("\n\rBLOCK: ", g_outs);
+      print_Num(blck, 10, g_outs);
+      //if (cardTypeVers.type == SDHC)               // SDHC is block addressable
         sdErr = sd_ReadSingleBlock(blck, blckArr);
-      else                                // SDSC is byte addressable
-        sdErr = sd_ReadSingleBlock(blck * BLOCK_LEN, blckArr);
+      //else                                // SDSC is byte addressable
+      //  sdErr = sd_ReadSingleBlock(blck * BLOCK_LEN, blckArr);
       
       if (sdErr != READ_SUCCESS)
       { 
-        print_Str("\n\r >> sd_ReadSingleBlock returned ");
+        print_Str("\n\r >> sd_ReadSingleBlock returned ", g_outs);
         if (sdErr & R1_ERROR)
         {
-          print_Str("R1 error: ");
-          sd_PrintR1(sdErr);
+          print_Str("R1 error: ", g_outs);
+          sd_PrintR1(sdErr, g_outs);
         }
         else 
         { 
-          print_Str(" error "); 
-          sd_PrintReadError(sdErr);
+          print_Str(" error ", g_outs); 
+          sd_PrintReadError(sdErr, g_outs);
         }
       }
-      sd_PrintSingleBlock(blckArr);
+      sd_PrintSingleBlock(blckArr, g_outs);
     }
-    print_Str("\n\rPress 'q' to quit: ");
+    print_Str("\n\rPress 'q' to quit: ", g_outs);
     answer = usart_Receive();
     usart_Transmit(answer);
   }
@@ -396,18 +399,18 @@ static uint32_t enterBlockNumber()
     }
     else if (asciiChar == BACKSPACE)        // if backspace on keyboard entered
     {
-      print_Str("\b ");                     // print backspace and space chars
+      print_Str("\b ", g_outs);                     // print backspace and space chars
       blkNum = blkNum / radix;       // reduce current blkNum by factor of 10
     }
-    print_Str("\r");
-    print_Dec(blkNum);
+    print_Str("\r", g_outs);
+    print_Num(blkNum, 10, g_outs);
     
     if (blkNum >= MAX_BLOCK_NUM_32_BIT)
     {
       blkNum = 0;                           // reset block number
-      print_Str("\n\rblock number too large. Enter value < ");
-      print_Dec(MAX_BLOCK_NUM_32_BIT);
-      print_Str("\n\r");  
+      print_Str("\n\rblock number too large. Enter value < ", g_outs);
+      print_Num(MAX_BLOCK_NUM_32_BIT, 10, g_outs);
+      print_Str("\n\r", g_outs);
     }
     asciiChar = usart_Receive();
   }

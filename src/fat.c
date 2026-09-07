@@ -1,18 +1,23 @@
 /*
  * File       : FAT.C
- * Version    : 2.0
+ * Version    : 0.1
  * License    : GNU GPLv3
  * Author     : Joshua Fain
- * Copyright (c) 2020 - 2025
+ * Copyright (c) 2020 - 2026
  * 
  * Implementation of FAT.H
  */
 
 #include <stdint.h>
 #include <string.h>
-//#include "fat_bpb.h"
 #include "fat.h"
 #include "fat_disk_if.h"
+
+/*
+#include "avr_usart.h"
+#include "prints.h"
+static void (*s_outs)(uint8_t) = usart_Transmit;
+*/
 
 /*
  ******************************************************************************
@@ -20,14 +25,14 @@
  ******************************************************************************
  */
 
-static void pvt_UpdateFatEntryMembers(FatEntry *ent, const char lnStr[], 
+static void pvt_UpdateFatEntry(FatEntry *ent, const char lnStr[], 
                 const uint8_t secArr[], uint16_t snPos,
                 uint8_t snEntSecNumInClus, uint32_t snEntClusIndx);
 static uint8_t pvt_CheckName(const char nameStr[]);
-static uint8_t pvt_SetDirToParent(FatDir *dir, const BPB *bpb);
+static uint8_t pvt_SetDirToParent(FatDir *dir, const FatBPB *bpb);
 static void pvt_LoadLongName(int lnFirstEnt, int lnLastEnt, 
                              const uint8_t secArr[], char lnStr[]);
-static uint32_t pvt_GetNextClusIndex(uint32_t clusIndex, const BPB *bpb);
+static uint32_t pvt_GetNextClusIndex(uint32_t clusIndex, const FatBPB *bpb);
 
 /*
  ******************************************************************************
@@ -38,28 +43,23 @@ static uint32_t pvt_GetNextClusIndex(uint32_t clusIndex, const BPB *bpb);
 
 /*
  * ----------------------------------------------------------------------------
- *                                                       SET BPB STRUCT MEMBERS 
+ *                                                    SET FatBPB STRUCT MEMBERS 
  *                                         
- * Description : Gets values of the Bios Parameter Block / Boot Sector fields 
- *               from a FAT volume and sets the corresponding members of the
- *               BPB struct's instance accordingly.
+ * Description : Finds and reads FAT Bios Parameter Block/Boot Sector fields 
+ *               and sets members of FatBPB instance accordingly.
  * 
- * Arguments   : bpb   - Pointer to an BPB struct's instance. This function
- *                       will set the members of this instance.
+ * Arguments   : bpb   - Pointer to FatBPB instance whose members will be set.
  * 
  * Returns     : Boot Sector Error Flag. If any value other than BPB_VALID is
- *               returned then setting the BPB instance failed. To print, pass
- *               the returned value to fat_PrintErrorBPB().
+ *               returned then setting the FatBPB instance failed. To print, 
+ *               error pass returned value to fat_PrintErrorBPB().
  * 
- * Notes       : A valid BPB struct instance is a required argument of many 
- *               functions that access the FAT volume, therefore this function 
- *               should be called first before calling any other parts of the 
- *               FAT module.
- * 
- * Limitation  : Currently will only work if Boot Sector is block 0 on SD Card.
+ * Notes       : This function must be called before any other FAT function, 
+ *               as an instance of the FatBPB struct with valid set members is
+ *               required by all the other public FAT module functions.
  * ----------------------------------------------------------------------------
  */
-uint8_t fat_SetBPB(BPB *bpb)
+uint8_t fat_SetBPB(FatBPB *bpb)
 {
   uint8_t bootSecArr[SECTOR_LEN], err; 
 
@@ -76,24 +76,23 @@ uint8_t fat_SetBPB(BPB *bpb)
     return BPB_NOT_FOUND;
   
   // 
-  // Confirm the sector loaded is the Boot Sector by checking the signature
-  // bytes - the last two bytes of sector. If true, then begin loading the 
-  // necessary BPB field values into their respective BPB struct members.
+  // Confirm the array contains Boot Sector by checking the signature bytes.
+  // If true, begin loading BPB fields into their respective FatBPB members.
   // 
-  if (bootSecArr[SECTOR_LEN - 2] == BS_SIGN_1 
-      && bootSecArr[SECTOR_LEN - 1] == BS_SIGN_2)
+  if (bootSecArr[BS_SIGN_MSB_POS] == BS_SIGN_MSB 
+      && bootSecArr[BS_SIGN_LSB_POS] == BS_SIGN_LSB)
   {
     bpb->bytesPerSec = bootSecArr[BYTES_PER_SEC_POS_MSB];      
     bpb->bytesPerSec <<= 8;                 
     bpb->bytesPerSec |= bootSecArr[BYTES_PER_SEC_POS_LSB];
     
-    // Bytes Per Sector must be the same as SECTOR_LEN
+    // Bytes Per Sector must equal SECTOR_LEN in current implementation.
     if (bpb->bytesPerSec != SECTOR_LEN)
       return INVALID_BYTES_PER_SECTOR;
 
     bpb->secPerClus = bootSecArr[SEC_PER_CLUS_POS];
 
-    // check that secPerClus is a valid value.   
+    // Verify Sectors Per Cluster is a valid value.  
     if (!CHK_VLD_SEC_PER_CLUS(bpb->secPerClus))
       return INVALID_SECTORS_PER_CLUSTER;
     
@@ -124,9 +123,9 @@ uint8_t fat_SetBPB(BPB *bpb)
     bpb->rootClus |= bootSecArr[ROOT_CLUS_POS1];
 
     //
-    // The disk's sector address corresponding to the first sector of the FAT32
-    // volume's Data Region. Since the first cluster of the Data Region is the 
-    // Root Directory, this value points to the sector number of the Root Dir.
+    // The disk sector address to the first sector of the Data Region of the
+    // FAT32 volume. The first cluster of the Data Region is the Root Directory
+    // so this address inherently points to the first sector of Root Dir.
     //
     bpb->dataRegionFirstSector = bootSecAddr + bpb->rsvdSecCnt 
                                + bpb->numOfFats * bpb->fatSize32;
@@ -143,12 +142,12 @@ uint8_t fat_SetBPB(BPB *bpb)
  * Description : Sets instance of FatDir to the root directory.
  *
  * Arguments   : dir   - Pointer to FatDir instance to be set to root dir.
- *               bpb   - Pointer to the BPB struct instance.
+ *               bpb   - Pointer to valid FatBPB struct instance.
  *
  * Returns     : void
  * ----------------------------------------------------------------------------
  */
-void fat_SetDirToRoot(FatDir *dir, const BPB *bpb)
+void fat_SetDirToRoot(FatDir *dir, const FatBPB *bpb)
 {
   // set string members to indicate root cluster
   strcpy(dir->snStr, "/");
@@ -162,18 +161,17 @@ void fat_SetDirToRoot(FatDir *dir, const BPB *bpb)
 
 /*
  * ----------------------------------------------------------------------------
- *                                                         INITIALIZE FAT ENTRY
+ *                                                          INITIALIZE FatEntry
  *                                      
- * Description : Initializin an instance of a FatEntry struct will set it to 
- *               the first entry of the root directory.
+ * Description : FatEntry initialization sets it to first entry in root dir.
  * 
  * Arguments   : ent   - Pointer to the FatEntry instance to be initialized.           
- *               bpb   - Pointer to the BPB struct instance.
+ *               bpb   - Pointer to valid FatBPB instance.
  * 
  * Returns     : void
  * ----------------------------------------------------------------------------
  */
-void fat_InitEntry(FatEntry *ent, const BPB *bpb)
+void fat_InitEntry(FatEntry *ent, const FatBPB *bpb)
 {
   // set long and short names to empty strings
   strcpy(ent->lnStr, "");
@@ -193,40 +191,36 @@ void fat_InitEntry(FatEntry *ent, const BPB *bpb)
 
 /*
  * ----------------------------------------------------------------------------
- *                                                  SET FAT ENTRY TO NEXT ENTRY 
+ *                                                   SET FatEntry TO NEXT ENTRY 
  *                                      
- * Description : Updates a FatEntry instance to point to the next entry in its
- *               directory.
+ * Description : Update a FatEntry to point to the next entry in the directory. 
  * 
- * Arguments   : currEnt   - Pointer to a FatEntry instance. Its members will 
+ * Arguments   : currEnt   - Pointer to FatEntry instance whose members will 
  *                           be updated to point to the next entry. 
- *               bpb       - Pointer to the BPB struct instance.
+ *               bpb       - Pointer to valid FatBPB instance.
  *
- * Returns     : A FAT Error Flag. If any value other than SUCCESS is returned 
+ * Returns     : FAT Error Flag. If any value other than SUCCESS is returned 
  *               then the function was unable to update the FatEntry.
  * ----------------------------------------------------------------------------
  */
-uint8_t fat_SetNextEntry(FatEntry *currEnt, const BPB *bpb)
+uint8_t fat_SetNextEntry(FatEntry *currEnt, const FatBPB *bpb)
 {  
   //
-  // this section sets the initial values of the different nested loop
-  // counters for the first time they are entered during a single function 
-  // call. These are set according to the state of the currEnt members.
+  // Initial values of nested loop counters set according to state of currEnt. 
   //
 
-  // index of the cluster where the previous short name entry was found
+  // cluster index of previous short name entry
   uint32_t clusIndx = currEnt->snEntClusIndx;
-  // sector num in the cluster where the previous short name entry was found
+  // sector number in cluster of the previous short name entry
   uint8_t  secNumInClus = currEnt->snEntSecNumInClus;
-  // position of entry following previous short name entry in the sector
+  // entry position entry following previous short name entry in the sector
   uint16_t entPos = currEnt->nextEntPos;
 
   //
-  // if previous short name entry occupied the last entry position of a sector
-  // then increment secNumInClus and set entPos to 0 so that the search for the
-  // next entry will begin on this function call at the first entry of the next
-  // sector. For the case when the the next sector is beyond the cluster limit 
-  // it will be handled in the nested loops.
+  // if previous short name entry occupied the last entry position of a sector,
+  // increment secNumInClus and set entPos to 0 so next entry search will begin
+  // at the first entry of the next sector. The nested loops will handle the 
+  // case when the next sector is beyond the cluster limit.
   //
   if (entPos == SECTOR_LEN)
   {
@@ -234,15 +228,20 @@ uint8_t fat_SetNextEntry(FatEntry *currEnt, const BPB *bpb)
     entPos = 0;
   }
 
-  // loop over clusters beginning at clusIndx  to search for next entry.
+  //
+  // CLUSTERS LOOP: 
+  // loop through clusters, beginning at clusIndx to search for next entry.
+  //
   do 
   {
     //
-    // loop over sectors in the cluster to find the next entry. If this loop is
-    // re-entered in a single function call then secNumInClus will be reset to
-    // 0 in the outer cluser loop. The first time it is entered it should be
-    // initialized to the value of the snEntSecNumInClus member of the currEnt
-    // instance of FatEntry.
+    // SECTORS LOOP:
+    // loop through sectors in the cluster to find the next entry. Note, the
+    // first iteration of the outer cluster loop, secNumInClus is initialized
+    // to the value of currEnt->snEntNumInClus and search begins there. On  
+    // subsequent iterations of the cluster loop, secNumInClus is initialized to 
+    // FIRST_SEC_POS_IN_CLUS (i.e. 0) in order to restart the search at the 
+    // first sector of the next cluster.
     //
     for (; secNumInClus < bpb->secPerClus; ++secNumInClus)
     {
@@ -250,7 +249,6 @@ uint8_t fat_SetNextEntry(FatEntry *currEnt, const BPB *bpb)
       uint32_t secNumOnDisk = secNumInClus + bpb->dataRegionFirstSector
                             + (clusIndx - bpb->rootClus) 
                             * bpb->secPerClus;
-      
       // create and load array with data bytes from the disk sector
       uint8_t secArr[bpb->bytesPerSec];  
       if (fatDisk_ReadSector(secNumOnDisk, secArr) 
@@ -258,28 +256,42 @@ uint8_t fat_SetNextEntry(FatEntry *currEnt, const BPB *bpb)
         return FAILED_READ_SECTOR;
 
       //
-      // loop over entries in the sector to search for the next entry. If this 
-      // loop is re-entered in a single function call then entPos will be reset 
-      // to 0 in the sector loop. The first time it is entered entPos should be
-      // initialized to the value of the nextEntPos member of the currEnt
-      // instance of FatEntry.
+      // ENTRIES LOOP:
+      // loop through the entries in the sector to search for the next entry.
+      // Note, the first iteration of the outer cluster loop, entPos is set to
+      // the initial value currEnt->nextEntPos and search begins there. On 
+      // subsequent iterations of the cluster loop, entPos is initialized to
+      // FIRST_ENT_POS_IN_SEC (i.e. 0) in order to restart the search at the
+      // first entry of the next sector.
       //
       for (; entPos < bpb->bytesPerSec; entPos += ENTRY_LEN)
       {
         // if first byte of an entry is 0, remaining entries should be empty
         if (!secArr[entPos])                                                       
-          return END_OF_DIRECTORY;
-
+          return END_OF_DIRECTORY; 
         if (secArr[entPos] == DELETED_ENTRY_TOKEN)
           continue;
+        
+        //
+        // LONG FILE NAME CHECK:
+        // An LFN the directory occupies a disk as consectutive, reverse
+        // -ordered, 32-byte, Long Name entries. The number of entries required 
+        // for the LFN is dictated by its character length. A single long name  
+        // entry holds up to 13 characters. The associated Short File Name entry 
+        // occupies the 32-byte entry immediately following the LFN.
+        //
 
         // check attribute byte to see if entPos points to a long name entry
         if ((secArr[entPos + ATTR_BYTE_OFFSET] & LN_ATTR_MASK) == LN_ATTR_MASK)
         {
-          // entPos must be pointing to the last entry of a long name here.
+       
+          //
+          // entPos must be pointing to the last entry of a long name here
+          // since LN entries occupy the disk in reverse order.
+          //
           if (!(secArr[entPos] & LN_LAST_ENTRY_FLAG))
             return CORRUPT_FAT_ENTRY;
-          
+ 
           // initialize empty long name string 
           char lnStr[LN_STR_LEN_MAX] = {'\0'};   
 
@@ -292,9 +304,9 @@ uint8_t fat_SetNextEntry(FatEntry *currEnt, const BPB *bpb)
             uint8_t nextSecArr[bpb->bytesPerSec]; 
 
             //
-            // locate next sector. Depending on the number of the sector in the 
-            // cluster, the next sector will either be in the next cluster or 
-            // it will be the next sector in the cluster and on the disk.
+            // locate next sector. Depending on the current cluster sector 
+            // number, the next sector will either be in the next cluster or 
+            // the next sector in the current cluster.
             //
             if (secNumInClus == bpb->secPerClus - 1)  // next sec in next clus
             {
@@ -305,20 +317,20 @@ uint8_t fat_SetNextEntry(FatEntry *currEnt, const BPB *bpb)
                            * bpb->secPerClus;
               secNumInClus = 0;
             }
-            else                  // next sector is the next physical sector 
+            else // next sector is the next disk sector 
             {
               ++secNumOnDisk;
               ++secNumInClus;
             }
 
-            // load next sector into nextSecArr[].
+            // load next sector into nextSecArr.
             if (fatDisk_ReadSector(secNumOnDisk, nextSecArr) 
                 == FAILED_READ_SECTOR)
               return FAILED_READ_SECTOR;
             
             // snPos to point to sn entry relative to first byte of next sector
             snPos -= bpb->bytesPerSec;
-            
+
             // verify snPos does not point to long name
             if ((nextSecArr[snPos + ATTR_BYTE_OFFSET] & LN_ATTR_MASK) 
                  == LN_ATTR_MASK)
@@ -327,15 +339,15 @@ uint8_t fat_SetNextEntry(FatEntry *currEnt, const BPB *bpb)
             //
             // check if a ln spans the sector boundary. At this point, sn is in
             // next sector, but if sn is not first entry (i.e. snPos != 0) then 
-            // entries for ln are in the current sector and next sector.
+            // entries for ln are in the current and next sector as well.
             //
             if (snPos)
             {
-              // Entry preceeding short name must be first entry of long name      
+              // Entry preceeding SN must be first entry of long name      
               if ((nextSecArr[snPos - ENTRY_LEN] & LN_ORD_MASK) != 1)
                 return CORRUPT_FAT_ENTRY;
 
-              // Call twice for both current and next sector.
+              // Call twice for current and next sector.
               pvt_LoadLongName(snPos - ENTRY_LEN, FIRST_ENT_POS_IN_SEC,
                                nextSecArr, lnStr);
               pvt_LoadLongName(LAST_ENTRY_POS_IN_SEC, entPos, secArr, lnStr);
@@ -348,7 +360,7 @@ uint8_t fat_SetNextEntry(FatEntry *currEnt, const BPB *bpb)
 
               pvt_LoadLongName(LAST_ENTRY_POS_IN_SEC, entPos, secArr, lnStr);
             }
-            pvt_UpdateFatEntryMembers(currEnt, lnStr, nextSecArr, snPos,
+            pvt_UpdateFatEntry(currEnt, lnStr, nextSecArr, snPos,
                                       secNumInClus, clusIndx);
             return SUCCESS;
           }
@@ -358,13 +370,13 @@ uint8_t fat_SetNextEntry(FatEntry *currEnt, const BPB *bpb)
             if ((secArr[snPos + ATTR_BYTE_OFFSET] & LN_ATTR_MASK) 
                  == LN_ATTR_MASK)
               return CORRUPT_FAT_ENTRY;
-    
+            
             // entry preceeding short name must be first entry of long name
             if ((secArr[snPos - ENTRY_LEN] & LN_ORD_MASK) != 1)
               return CORRUPT_FAT_ENTRY;
             
             pvt_LoadLongName(snPos - ENTRY_LEN, entPos, secArr, lnStr);
-            pvt_UpdateFatEntryMembers(currEnt, lnStr, secArr, snPos, 
+            pvt_UpdateFatEntry(currEnt, lnStr, secArr, snPos, 
                                       secNumInClus, clusIndx);
             return SUCCESS;                          
           }                   
@@ -372,14 +384,14 @@ uint8_t fat_SetNextEntry(FatEntry *currEnt, const BPB *bpb)
         else            // Long name does not exist. Use short name instead.
         {
           // passing empty string for long name
-          pvt_UpdateFatEntryMembers(currEnt, "", secArr, entPos,
+          pvt_UpdateFatEntry(currEnt, "", secArr, entPos,
                                     secNumInClus, clusIndx);
           return SUCCESS;  
         }
       }
       entPos = FIRST_ENT_POS_IN_SEC;      // reset counter for entry loop
     }
-    secNumInClus = FIRST_SEC_POS_IN_CLUS;// reset counter for sector loop
+    secNumInClus = FIRST_SEC_POS_IN_CLUS; // reset counter for sector loop
   }
   // get index of next cluster and continue looping if not last cluster
   while ((clusIndx = pvt_GetNextClusIndex(clusIndx, bpb)) != END_CLUSTER);
@@ -392,37 +404,36 @@ uint8_t fat_SetNextEntry(FatEntry *currEnt, const BPB *bpb)
  * ----------------------------------------------------------------------------
  *                                                            SET FAT DIRECTORY
  *                                       
- * Description : Set FatDir instance to the directory specified by newDirStr.
+ * Description : Set FatDir instance to directory specified by newDirStr.
  * 
  * Arguments   : dir         - Pointer to the FatDir instance to be set to the
  *                             new directory.             
  *               newDirStr   - Pointer to a string that specifies the name of 
  *                             the new directory.
- *               bpb         - Pointer to the BPB struct instance.
+ *               bpb         - Pointer to the FatBPB instance.
  * 
  * Returns     : A FAT Error Flag. If any value other than SUCCESS is returned 
  *               then the function was unable to update the FatEntry. 
  *  
  * Notes       : 1) This function can only set the directory to a child or the
- *                  parent of the FatDir instance (dir) when the function is
- *                  called, or reset the instance to the root directory.
- *               2) Paths (relative or absolute) should not be included in the 
- *                  newDirStr. newDirStr must only be a directory name which
- *                  must be the name of a child, or the parent directory of
- *                  the current directory.
- *               3) If ".." is passed as the newDirStr then the new directory
- *                  will be set to the parent of the current directory.               
+ *                  parent of the current FatDir instance (dir), or reset the
+ *                  instance to the root directory.
+ *               2) As currently implemented absolute and relative paths should
+ *                  not be included in newDirStr. This will reslt in no change
+ *                  of FatDir.
+ *               3) If ".." is passed as the newDirStr the new directory will 
+ *                  be set to the parent of the current directory.
  *               4) newDirStr is case-sensitive.
  *               5) newDirStr must be a long name, unless a long name does not
  *                  exist for a directory, only then can it be a short name.
  * ----------------------------------------------------------------------------
  */
-uint8_t fat_SetDir(FatDir *dir, const char newDirStr[], const BPB *bpb)
+uint8_t fat_SetDir(FatDir *dir, const char newDirStr[], const FatBPB *bpb)
 {
   // for return errors. This is the loop cond. and the return value.
   uint8_t err;                              
 
-  // Initial checks before running the searching the FAT 
+  // Initial checks before searching the FAT 
   if (pvt_CheckName(newDirStr) == INVALID_NAME)  // if newDirStr is illegal
     return INVALID_NAME;
   else if (!strcmp(newDirStr, "."))         // if newDirStr is current dir
@@ -503,20 +514,19 @@ uint8_t fat_SetDir(FatDir *dir, const char newDirStr[], const BPB *bpb)
 
 /*
  * ----------------------------------------------------------------------------
- *                                                (PRIVATE) SET FAT ENTRY STATE
+ *                                                   (PRIVATE) UPDATE FAT ENTRY
  * 
- * Description : Sets the FatEntry instance struct members to the values of the 
+ * Description : Updates members of the FatEntry instance to the values of the 
  *               arguments passed in.
  * 
- * Arguments   : ent                 - ptr to FatEntry instance whose members 
- *                                     will be updated.
- *               lnStr               - ptr to array holding long name string.
- *               secArr              - ptr to array holding the data of the 
- *                                     sector that contains the short name
+ * Arguments   : ent                 - ptr to FatEntry to be updated.
+ *               lnStr               - ptr to long name string array.
+ *               secArr              - ptr to array holding contents of the
+ *                                     disk sector containing the short name
  *                                     entry that will update ent.
- *               snPos               - position in secArr of the first byte of
- *                                     the short name entry.
- *               snEntSecNumInClus   - Sector number where the short name is
+ *               snPos               - position of the first byte of the short
+ *                                     name entry in secArr.
+ *               snEntSecNumInClus   - sector number where the short name is
  *                                     located relative to the first sector of   
  *                                     the cluster.
  *               snEntClusIndx       - Fat cluster index where short name entry
@@ -525,7 +535,7 @@ uint8_t fat_SetDir(FatDir *dir, const char newDirStr[], const BPB *bpb)
  * Returns     : void
  * ----------------------------------------------------------------------------
  */
-static void pvt_UpdateFatEntryMembers(FatEntry *ent, const char lnStr[], 
+static void pvt_UpdateFatEntry(FatEntry *ent, const char lnStr[], 
                 const uint8_t secArr[], uint16_t snPos,
                 uint8_t snEntSecNumInClus, uint32_t snEntClusIndx)
 {
@@ -620,14 +630,14 @@ static uint8_t pvt_CheckName(const char nameStr[])
  *  
  *  Description : Sets a FatDir instance to its parent directory. 
  * 
- *  Arguments   : dir   - Pointer to a FatDir struct instance. The members of
- *                        this instance will be set to its parent directory.
- *                bpb   - Pointer to the BPB struct instance.
+ *  Arguments   : dir   - Pointer to a FatDir instance. Members of this 
+ *                        instance will be set to its parent directory.
+ *                bpb   - Pointer to the FatBPB instance.
  * 
  *  Returns     : SUCCESS or FAILED_READ_SECTOR
  * ----------------------------------------------------------------------------
  */
-static uint8_t pvt_SetDirToParent(FatDir *dir, const BPB *bpb)
+static uint8_t pvt_SetDirToParent(FatDir *dir, const FatBPB *bpb)
 {
   uint32_t parentDirFirstClus, secNumOnDisk;
   uint8_t  secArr[bpb->bytesPerSec];
@@ -698,10 +708,13 @@ static uint8_t pvt_SetDirToParent(FatDir *dir, const BPB *bpb)
  *                              sector of a dir from a FAT-formatted disk.
  *               lnStr        - Pointer to a string array that will be loaded
  *                              with the characters from a long name entry.
+ *                              
  * 
  * Returns     : void 
  * 
- * Notes       : Must be called twice if long name crosses sector boundary.
+ * Notes       : 1) Must be called twice if long name crosses sector boundary.
+ *               2) lnStr is initialized as an array of null '\0' characters
+ *                  in the calling routine. 
  * ----------------------------------------------------------------------------
  */
 static void pvt_LoadLongName(int lnFirstEnt, int lnLastEnt,
@@ -715,12 +728,12 @@ static void pvt_LoadLongName(int lnFirstEnt, int lnLastEnt,
   for (; *lnStr; ++lnStr)
     ;
   
-  // loop over the entries in the sector containing the long name
+  // loop through entries in the sector containing the long name chars
   for (int entPos = lnFirstEnt; entPos >= lnLastEnt; entPos -= ENTRY_LEN)
   {                                              
     //
-    // loops to load long name chars from a single entry. Skips any nulls and 
-    // any characters outside of the standard ascii range.
+    // loops to load long name chars from a single entry. Skips nulls and 
+    // any chars outside of standard ascii range.
     // 
     for (uint16_t byteNum = entPos + LN_CHAR_RANGE_1_BEGIN; 
          byteNum < entPos + LN_CHAR_RANGE_1_END; byteNum++)
@@ -746,7 +759,7 @@ static void pvt_LoadLongName(int lnFirstEnt, int lnLastEnt,
  * Description : Finds and returns the index of the next FAT cluster.
  * 
  * Arguments   : clusIndex   - The current cluster's FAT index.
- *               bpb         - Pointer to the BPB struct instance.
+ *               bpb         - Pointer to the FatBPB instance.
  * 
  * Returns     : A file or dir's next FAT cluster index. If END_CLUSTER is 
  *               returned, the current cluster is the last of the file or dir.
@@ -757,7 +770,7 @@ static void pvt_LoadLongName(int lnFirstEnt, int lnLastEnt,
  *               region, but its FAT index is 2 or higher.
  * ----------------------------------------------------------------------------
  */
-static uint32_t pvt_GetNextClusIndex(uint32_t clusIndx, const BPB *bpb)
+static uint32_t pvt_GetNextClusIndex(uint32_t clusIndx, const FatBPB *bpb)
 {
   // calculate address of sector containing the current cluster index
   uint16_t fatIndxsPerSec = bpb->bytesPerSec / BYTES_PER_INDEX;

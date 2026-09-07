@@ -1,11 +1,11 @@
 /*
  * File       : FAT_DISK_IF.H
- * Version    : 2.0
+ * Version    : 0.1
  * License    : GNU GPLv3
  * Author     : Joshua Fain
- * Copyright (c) 2020 - 2025
+ * Copyright (c) 2020 - 2026
  *
- * This is the interface between the FAT module and a disk module capable of
+ * The interface between the FAT module and disk module/driver capable of
  * accessing the raw data from a disk. In this current implementation, the disk
  * module only needs to be capable of reading single data sectors/blocks by
  * specifying the desired data block address. The raw block data must be read 
@@ -45,9 +45,15 @@
 #define FAILED_READ_SECTOR      0x08        // should be defined in fat.h
 #endif//FAILED_READ_SECTOR
 
-// Boot sector signature bytes. These are values of the last two bytes of BS.
-#define BS_SIGN_1     0x55
-#define BS_SIGN_2     0xAA
+//
+// Boot sector signature byte values and positions. 
+// These are values of the last two bytes of BS.
+//
+#define BS_SIGN_LSB            0x55
+#define BS_SIGN_MSB            0xAA
+
+#define BS_SIGN_LSB_POS        510
+#define BS_SIGN_MSB_POS        511
 
 //
 // First three bytes to the boot sector are the JUMP BOOT bytes. These can

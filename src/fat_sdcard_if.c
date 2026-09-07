@@ -1,9 +1,9 @@
 /*
  * File       : FAT_SD_IF.C
- * Version    : 2.0
+ * Version    : 0.1
  * License    : GNU GPLv3
  * Author     : Joshua Fain
- * Copyright (c) 2020 - 2025
+ * Copyright (c) 2020 - 2026
  * 
  * This is an implementation of FAT_DISK_IF.H and is specific to the disk 
  * module used for accessing the raw data on the FAT32 formatted disk. It 
@@ -13,15 +13,19 @@
  */
 
 #include <stdint.h>
-#include "prints.h"
 #include "fat_disk_if.h"
 #include "sd_spi_base.h"
 #include "sd_spi_rwe.h"
 #include "sd_spi_print.h"
 
 /*
+#include "avr_usart.h"
+#include "prints.h"
+static void (*g_outs)(uint8_t) = usart_Transmit;
+*/
+/*
  ******************************************************************************
- *                         INTERFACE-SPECIFIC DEFINITIONS
+ *                 DISK IMPLEMENTATION-SPECIFIC DEFINITIONS
  * 
  * This section is for additional global variables, macros, and functions
  * that are needed in order for the required FAT_DISK_IF.H functions to work
@@ -30,14 +34,16 @@
  */
 
 //
-// global static varible for the 'CardTypeVersion' struct defined in
+// "global" static varible for the 'CardTypeVersion' struct defined in
 // SD_SPI_BASE. This is set in the FindBootSector function below during SD card
-// initialization but it is also needed for the read disk sector function.
+// initialization but is needed for the read disk sector function.
 //
-static CTV ctv;
+static CTV g_ctv;
 
-// calls the SD card initialization routine.
-// static void pvt_SDCardInit(CTV *cardTypeVers);
+//
+// "global" static variable for the initialization response of the SD Card 
+//
+static uint32_t g_sdInitResp;
 
 // The number of times the module can attempt to initialize the SD card.
 #define SD_CARD_INIT_ATTEMPTS_MAX      5    // set to any value <= 255.
@@ -64,36 +70,18 @@ static CTV ctv;
  * Notes       : Possible Card Type settings - SDSC, SDHC, GET_CARD_TYPE_ERROR
  * ----------------------------------------------------------------------------
  */
+
 static void pvt_SDCardInit(CTV *cardTypeVers)
 {
-//
-  // SD card initialization hosting the FAT volume.
-  //
-  uint32_t sdInitResp;          
-
-  // Loop will continue until SD card init succeeds or max attempts reached.
+  // Loop until SD card init succeeds or max attempts reached.
   for (uint8_t att = 0; att < SD_CARD_INIT_ATTEMPTS_MAX; ++att)
   {
-    print_Str("\n\n\r >> Initializing SD Card: Attempt "); 
-    print_Dec(att + 1);
-    sdInitResp = sd_InitSpiMode(cardTypeVers);      // init SD Card
-
-    if (sdInitResp != OUT_OF_IDLE)          // Fail to init if not OUT_OF_IDLE
-    {    
-      print_Str("\n\r >> FAILED to initialize SD Card."
-                "\n\r >> Error Response returned: "); 
-      sd_PrintInitErrorResponse(sdInitResp);
-      print_Str(" R1 Response: "); 
-      sd_PrintR1(sdInitResp);
-    }
-    else
-    {   
-      print_Str("\n\r >> SD Card Initialization Successful");
+    g_sdInitResp = sd_InitSpiMode(cardTypeVers); // init SD Card
+    if (g_sdInitResp == OUT_OF_IDLE)             // If init fails try again
       break;
-    }
   }
 }
- /********************** END INTERFACE-SPECIFIC SECTION **********************/ 
+/*************** END DISK IMPLEMENTATION-SPECIFIC DEFINITIONS ****************/ 
 
 
 
@@ -107,11 +95,10 @@ static void pvt_SDCardInit(CTV *cardTypeVers)
  * ----------------------------------------------------------------------------
  *                                                             FIND BOOT SECTOR
  *                                 
- * Description : Finds the address of the boot sector on the FAT32-formatted 
- *               SD card. This function is required by fat_SetBPB in fat_bpb.c.
- *               This is implemented by performing a search for the block 
- *               containing the Jump Boot and Boot Signature bits and returns 
- *               this block address. 
+ * Description : Finds address of the boot sector on a FAT-formatted SD card.
+ *               This function is required by fat_SetBPB in fat.c. It
+ *               performs a search for the block containing the Jump Boot and 
+ *               Boot Signature bits and returns this block address. 
  * 
  * Arguments   : void
  * 
@@ -125,20 +112,19 @@ static void pvt_SDCardInit(CTV *cardTypeVers)
 uint32_t fatDisk_FindBootSector(void)
 {
   // Initialize the FAT formatted SD card 
-  pvt_SDCardInit(&ctv);
+  pvt_SDCardInit(&g_ctv);
 
   //
-  // For SD cards, addressing is determined by the card type. If the card type 
-  // is SDHC then it is block (sector) addressable. If it is SDSC then it is
-  // byte addressable. The assumed default is SDHC, and the block is addressed
-  // by the block number. If SDSC then the block number is multiplied by the
-  // block length to deterime the byte address of the first by in the block.
-  // 
-  uint16_t addrMult = 1;                    // init for SDHC.
-  if (ctv.type == SDSC)
+  // SD cards addressing is determined by card type. If type is SDHC then it is
+  // block (sector) addressable. If SDSC then byte addressable. If SDSC, the 
+  // block number is multiplied by the block length giving the address of the 
+  // first byte in the block.
+  //
+  uint16_t addrMult = 1;                    // init for SDHC (assumed).
+  if (g_ctv.type == SDSC)
     addrMult = SECTOR_LEN;
 
-  // Send the READ MULTIPLE BLOCK command and confirm R1 Response is good.
+  // Send the READ_MULTIPLE_BLOCK command to confirm R1 Response is good.
   CS_ASSERT;
   sd_SendCommand(READ_MULTIPLE_BLOCK, BS_SEARCH_START_BLOCK * addrMult); 
   if (sd_GetR1() != OUT_OF_IDLE)
@@ -152,7 +138,7 @@ uint32_t fatDisk_FindBootSector(void)
        blkNum < BS_SEARCH_START_BLOCK + BS_MAX_NUM_BLKS_SEARCH_MAX;
        ++blkNum)
   {   
-    uint8_t  blckArr[SECTOR_LEN];            // to hold the block data bytes
+    uint8_t blckArr[SECTOR_LEN];            // to hold the block data bytes
 
     //
     // loop until the 'Start Block Token' has been received from the SD card,
@@ -162,7 +148,7 @@ uint32_t fatDisk_FindBootSector(void)
       if (++attempt >= MAX_CR_ATT)
       {
         CS_DEASSERT;
-        print_Str("\n\rFailed to receive START_BLOCK_TOKEN from SD card.");
+        //print_Str("\n\rFailed receive START_BLOCK_TOKEN from SD card.", outs);
         return FAILED_FIND_BOOT_SECTOR;
       }
 
@@ -180,8 +166,8 @@ uint32_t fatDisk_FindBootSector(void)
     //
     if ((blckArr[0] == JMP_BOOT_1A && blckArr[2] == JMP_BOOT_3A) ||
          blckArr[0] == JMP_BOOT_1B)
-          if (blckArr[SECTOR_LEN - 2] == BS_SIGN_1 &&
-             blckArr[SECTOR_LEN - 1] == BS_SIGN_2)
+          if (blckArr[BS_SIGN_LSB_POS] == BS_SIGN_LSB &&
+             blckArr[BS_SIGN_MSB_POS] == BS_SIGN_MSB)
           {
             // Boot Sector has been found!
             sd_SendCommand(STOP_TRANSMISSION, 0); // stop sending data blocks.
@@ -226,7 +212,7 @@ uint8_t fatDisk_ReadSector(uint32_t blkNum, uint8_t blkArr[])
   // block length to deterime the byte address of the first by in the block.
   // 
   uint16_t addrMult = 1;                    // init for SDHC.
-  if (ctv.type == SDSC)
+  if (g_ctv.type == SDSC)
     addrMult = SECTOR_LEN;
 
   // Load data block into array by passing the array to the Read Block function

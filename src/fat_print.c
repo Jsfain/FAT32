@@ -1,9 +1,9 @@
 /*
  * File       : FAT_PRINT.C
- * Version    : 2.0
+ * Version    : 0.1
  * License    : GNU GPLv3
  * Author     : Joshua Fain
- * Copyright (c) 2025
+ * Copyright (c) 2025-2026
  * 
  * Implementation of FAT_PRINT.H
  */
@@ -11,14 +11,15 @@
 #include <stdint.h>
 #include <string.h>
 #include "prints.h"
-//#include "fat_bpb.h"
 #include "fat.h"
 #include "fat_disk_if.h"
 
 static uint8_t pvt_CheckName(const char nameStr[]);
-static uint32_t pvt_GetNextClusIndex(uint32_t clusIndex, const BPB *bpb);
-static void pvt_PrintEntFields(const uint8_t *byte, uint8_t flags);
-static uint8_t pvt_PrintFile(const uint8_t snEnt[], const BPB *bpb);
+static uint32_t pvt_GetNextClusIndex(uint32_t clusIndex, const FatBPB *bpb);
+static void pvt_PrintEntFields(const uint8_t *byte, uint8_t flags, 
+                               void (*outs)(uint8_t));
+static uint8_t pvt_PrintFile(const uint8_t snEnt[], const FatBPB *bpb, 
+                             void (*outs)(uint8_t));
 
 /*
  ******************************************************************************
@@ -37,33 +38,33 @@ static uint8_t pvt_PrintFile(const uint8_t snEnt[], const BPB *bpb);
  * Returns     : void
  * ----------------------------------------------------------------------------
  */
-void fat_PrintErrorBPB(uint8_t err)
+void fat_PrintErrorBPB(uint8_t err, void (*outs)(uint8_t))
 {  
   switch(err)
   {
     case BPB_VALID:
-      print_Str("BPB_VALID ");
+      print_Str("BPB_VALID ", outs);
       break;
     case CORRUPT_BPB:
-      print_Str("CORRUPT_BPB ");
+      print_Str("CORRUPT_BPB ", outs);
       break;
     case NOT_BPB:
-      print_Str("NOT_BPB ");
+      print_Str("NOT_BPB ", outs);
       break;
     case INVALID_BYTES_PER_SECTOR:
-      print_Str("INVALID_BYTES_PER_SECTOR");
+      print_Str("INVALID_BYTES_PER_SECTOR", outs);
       break;
     case INVALID_SECTORS_PER_CLUSTER:
-      print_Str("INVALID_SECTORS_PER_CLUSTER");
+      print_Str("INVALID_SECTORS_PER_CLUSTER", outs);
       break;
     case BPB_NOT_FOUND:
-      print_Str("BPB_NOT_FOUND");
+      print_Str("BPB_NOT_FOUND", outs);
       break;
     case FAILED_READ_BPB:
-      print_Str("FAILED_READ_BPB");
+      print_Str("FAILED_READ_BPB", outs);
       break;
     default:
-      print_Str("UNKNOWN_ERROR");
+      print_Str("UNKNOWN_ERROR", outs);
       break;
   }
 }
@@ -81,7 +82,7 @@ void fat_PrintErrorBPB(uint8_t err)
  *               entFlds    - Any combination of the FAT ENTRY FIELD FLAGS.
  *                            These specify which entry types, and which of
  *                            their fields, will be printed to the screen.
- *               bpb        - Pointer to the BPB struct instance.
+ *               bpb        - Pointer to the FatBPB struct instance.
  *
  * Returns     : A FAT Error Flag. If any value other than END_OF_DIRECTORY is
  *               returned then there was an issue.
@@ -96,7 +97,8 @@ void fat_PrintErrorBPB(uint8_t err)
  *                  Once for the long name and once for the short name.
  * ----------------------------------------------------------------------------
  */
-uint8_t fat_PrintDir(const FatDir *dir, uint8_t entFlds, const BPB *bpb)
+uint8_t fat_PrintDir(const FatDir *dir, uint8_t entFlds, 
+                     const FatBPB *bpb, void (*outs)(uint8_t))
 {
   // for function return errors. This is the loop cond. and the return value.
   uint8_t err;
@@ -129,15 +131,15 @@ uint8_t fat_PrintDir(const FatDir *dir, uint8_t entFlds, const BPB *bpb)
     // Print short names if the SHORT_NAME filter flag is set.
     if ((entFlds & SHORT_NAME) == SHORT_NAME)
     {
-      pvt_PrintEntFields(ent.snEnt, entFlds);
-      print_Str(ent.snStr);
+      pvt_PrintEntFields(ent.snEnt, entFlds, outs);
+      print_Str(ent.snStr, outs);
     }
 
     // Print long names if the LONG_NAME filter flag is set.
     if ((entFlds & LONG_NAME) == LONG_NAME)
     {
-      pvt_PrintEntFields(ent.snEnt, entFlds);
-      print_Str(ent.lnStr);
+      pvt_PrintEntFields(ent.snEnt, entFlds, outs);
+      print_Str(ent.lnStr, outs);
     }
   }
   // return END_OF_DIRECTORY if successful. Any other value returned is error.
@@ -154,7 +156,7 @@ uint8_t fat_PrintDir(const FatDir *dir, uint8_t entFlds, const BPB *bpb)
  *                            contain the entry for the file to be printed.
  *               fileStr    - Pointer to a string. This is the name of the file
  *                            who's contents will be printed.
- *               bpb        - Pointer to the BPB struct instance.
+ *               bpb        - Pointer to the FatBPB struct instance.
  *
  * Returns     : FAT Error Flag. If any value other than END_OF_FILE is 
  *               returned, then an issue has occurred.
@@ -163,7 +165,8 @@ uint8_t fat_PrintDir(const FatDir *dir, uint8_t entFlds, const BPB *bpb)
  *               entry does not exist, in which case it must be a short name.
  * ----------------------------------------------------------------------------
  */
-uint8_t fat_PrintFile(const FatDir *dir, const char fileStr[], const BPB *bpb)
+uint8_t fat_PrintFile(const FatDir *dir, const char fileStr[], 
+                      const FatBPB *bpb, void (*outs)(uint8_t))
 {
   // for function return errors. This is the loop cond. and the return value.
   uint8_t err;
@@ -198,8 +201,8 @@ uint8_t fat_PrintFile(const FatDir *dir, const char fileStr[], const BPB *bpb)
     // if matching file is found print its contents
     if (!strcmp(ent.lnStr, fileStr))
     {
-      print_Str("\n\n\r");
-      err = pvt_PrintFile(ent.snEnt, bpb);  //END_OF_FILE or FAILED_READ_SECTOR
+      print_Str("\n\n\r", outs);
+      err = pvt_PrintFile(ent.snEnt, bpb, outs);  //END_OF_FILE or FAILED_READ_SECTOR
       return err;
     }
   }
@@ -218,36 +221,36 @@ uint8_t fat_PrintFile(const FatDir *dir, const char fileStr[], const BPB *bpb)
  * Returns     : void
  * ----------------------------------------------------------------------------
  */
-void fat_PrintError (uint8_t err)
+void fat_PrintError (uint8_t err, void (*outs)(uint8_t))
 {  
   switch(err)
   {
     case SUCCESS: 
-      print_Str("\n\rSUCCESS");
+      print_Str("\n\rSUCCESS", outs);
       break;
     case END_OF_DIRECTORY:
-      print_Str("\n\rEND_OF_DIRECTORY");
+      print_Str("\n\rEND_OF_DIRECTORY", outs);
       break;
     case INVALID_NAME:
-      print_Str("\n\rINVALID_NAME");
+      print_Str("\n\rINVALID_NAME", outs);
       break;
     case FILE_NOT_FOUND:
-      print_Str("\n\rFILE_NOT_FOUND");
+      print_Str("\n\rFILE_NOT_FOUND", outs);
       break;
     case DIR_NOT_FOUND:
-      print_Str("\n\rDIR_NOT_FOUND");
+      print_Str("\n\rDIR_NOT_FOUND", outs);
       break;
     case CORRUPT_FAT_ENTRY:
-      print_Str("\n\rCORRUPT_FAT_ENTRY");
+      print_Str("\n\rCORRUPT_FAT_ENTRY", outs);
       break;
     case END_OF_FILE:
-      print_Str("\n\rEND_OF_FILE");
+      print_Str("\n\rEND_OF_FILE", outs);
       break;
     case FAILED_READ_SECTOR:
-      print_Str("\n\rFAILED_READ_SECTOR");
+      print_Str("\n\rFAILED_READ_SECTOR", outs);
       break;
     default:
-      print_Str("\n\rUNKNOWN_ERROR");
+      print_Str("\n\rUNKNOWN_ERROR", outs);
   }
 }
 
@@ -300,7 +303,7 @@ static uint8_t pvt_CheckName(const char nameStr[])
  * Description : Finds and returns the next FAT cluster index.
  * 
  * Arguments   : clusIndex   - The current cluster's FAT index.
- *               bpb         - Pointer to the BPB struct instance.
+ *               bpb         - Pointer to the FatBPB struct instance.
  * 
  * Returns     : A file or dir's next FAT cluster index. If END_CLUSTER is 
  *               returned, the current cluster is the last of the file or dir.
@@ -311,7 +314,7 @@ static uint8_t pvt_CheckName(const char nameStr[])
  *               region, but its FAT index is 2 or higher.
  * ----------------------------------------------------------------------------
  */
-static uint32_t pvt_GetNextClusIndex(uint32_t clusIndx, const BPB *bpb)
+static uint32_t pvt_GetNextClusIndex(uint32_t clusIndx, const FatBPB *bpb)
 {
   // calculate address of sector containing the current cluster index
   uint16_t fatIndxsPerSec = bpb->bytesPerSec / BYTES_PER_INDEX;
@@ -350,9 +353,10 @@ static uint32_t pvt_GetNextClusIndex(uint32_t clusIndx, const BPB *bpb)
  * Returns     : void 
  * ----------------------------------------------------------------------------
  */
-static void pvt_PrintEntFields(const uint8_t secArr[], uint8_t flags)
+static void pvt_PrintEntFields(const uint8_t secArr[], 
+                               uint8_t flags, void (*outs)(uint8_t))
 {
-  print_Str ("\n\r");
+  print_Str ("\n\r", outs);
 
   // Print creation date and time 
   if (CREATION & flags)
@@ -369,43 +373,43 @@ static void pvt_PrintEntFields(const uint8_t secArr[], uint8_t flags)
     createTime |= secArr[CREATION_TIME_BYTE_OFFSET_0];
 
     // print month
-    print_Str("    ");
+    print_Str("    ", outs);
     uint8_t month = MONTH_CALC(createDate);
     if (month < 10)
-      print_Str("0");    
-    print_Dec(month);
-    print_Str("/");
+      print_Str("0", outs);    
+    print_Num(month, 10, outs);
+    print_Str("/", outs);
 
     // print day
     uint8_t day = DAY_CALC(createDate);
     if (day < 10)
-      print_Str("0");
-    print_Dec(day);
-    print_Str("/");
+      print_Str("0", outs);
+    print_Num(day, 10, outs);
+    print_Str("/", outs);
 
     // print year
-    print_Dec((uint16_t)YEAR_CALC(createDate));
-    print_Str("  ");
+    print_Num((uint16_t)YEAR_CALC(createDate), 10, outs);
+    print_Str("  ", outs);
 
     // print hours
     uint8_t hour = HOUR_CALC(createTime);
     if (hour < 10) 
-      print_Str("0");
-    print_Dec(hour);
-    print_Str(":");
+      print_Str("0", outs);
+    print_Num(hour, 10, outs);
+    print_Str(":", outs);
 
     // print minutes
     uint8_t min = MIN_CALC(createTime);
     if (min < 10)
-      print_Str("0");
-    print_Dec(min);
-    print_Str(":");
+      print_Str("0", outs);
+    print_Num(min,10, outs);
+    print_Str(":", outs);
 
     // print seconds (resolution is 2 seconds).
     uint8_t sec = SEC_CALC(createTime);
     if (sec < 10) 
-      print_Str("0");
-    print_Dec(sec);
+      print_Str("0", outs);
+    print_Num(sec, 10, outs);
   }
 
   // Print last access date
@@ -419,22 +423,22 @@ static void pvt_PrintEntFields(const uint8_t secArr[], uint8_t flags)
     lastAccDate |= secArr[LAST_ACCESS_DATE_BYTE_OFFSET_0];
 
     // print month
-    print_Str("     ");
+    print_Str("     ", outs);
     uint8_t month = MONTH_CALC(lastAccDate);
     if (month < 10)
-      print_Str("0");
-    print_Dec(month);
-    print_Str("/");
+      print_Str("0", outs);
+    print_Num(month, 10, outs);
+    print_Str("/", outs);
 
     // print day
     uint8_t day = DAY_CALC(lastAccDate);
     if (day < 10)
-      print_Str("0");
-    print_Dec(day);
-    print_Str("/");
+      print_Str("0", outs);
+    print_Num(day, 10, outs);
+    print_Str("/", outs);
 
     // print year
-    print_Dec((uint16_t)YEAR_CALC(lastAccDate));
+    print_Num((uint16_t)YEAR_CALC(lastAccDate), 10, outs);
   }
 
   // Print last modified date / time
@@ -453,45 +457,45 @@ static void pvt_PrintEntFields(const uint8_t secArr[], uint8_t flags)
     writeTime |= secArr[WRITE_TIME_BYTE_OFFSET_0];
   
     // print month
-    print_Str("     ");
+    print_Str("     ", outs);
     uint8_t month = MONTH_CALC(writeDate);
     if (month < 10) 
-      print_Str("0");
-    print_Dec(month);
-    print_Str("/");
+      print_Str("0", outs);
+    print_Num(month, 10, outs);
+    print_Str("/", outs);
     
     // print day
     uint8_t day = DAY_CALC(writeDate);
     if (day < 10) 
-      print_Str("0");
-    print_Dec(day);
-    print_Str("/");
+      print_Str("0", outs);
+    print_Num(day, 10, outs);
+    print_Str("/", outs);
 
     // print year
-    print_Dec((uint16_t)YEAR_CALC(writeDate));
-    print_Str("  ");
+    print_Num((uint16_t)YEAR_CALC(writeDate), 10, outs);
+    print_Str("  ", outs);
 
     // print hour
     uint8_t hour = HOUR_CALC(writeTime);
     if (hour < 10)
-      print_Str("0");
-    print_Dec(hour);
-    print_Str(":");
+      print_Str("0", outs);
+    print_Num(hour, 10, outs);
+    print_Str(":", outs);
 
     // print minute
     uint8_t min = MIN_CALC(writeTime);   
     if (min < 10) 
-      print_Str("0");
-    print_Dec(min);
-    print_Str(":");
+      print_Str("0", outs);
+    print_Num(min, 10, outs);
+    print_Str(":", outs);
 
     // print second
     uint8_t sec = SEC_CALC(writeTime);
     if (sec < 10) 
-      print_Str("0");
-    print_Dec(sec);
+      print_Str("0", outs);
+    print_Num(sec, 10, outs);
   }
-  print_Str("     ");
+  print_Str("     ", outs);
 
   // Print file size in bytes
   if (FILE_SIZE & flags)
@@ -509,23 +513,23 @@ static void pvt_PrintEntFields(const uint8_t secArr[], uint8_t flags)
 
     // Print spaces for formatting output. Add 1 to prevent starting at 0.
     for (uint64_t sp = 1 + fileSize / FS_UNIT; sp < GIGA / FS_UNIT; sp *= 10)
-      print_Str(" ");
+      print_Str(" ", outs);
 
     // print file size and selected units
-    print_Dec(fileSize / FS_UNIT);
+    print_Num(fileSize / FS_UNIT, 10, outs);
     if (FS_UNIT == KILO)                               
-      print_Str("KB  ");
+      print_Str("KB  ", outs);
     else  
-      print_Str("B  ");
+      print_Str("B  ", outs);
   }
 
   // print entry type
   if (TYPE & flags)
   {
     if (secArr[ATTR_BYTE_OFFSET] & DIR_ENTRY_ATTR) 
-      print_Str(" <DIR>   ");
+      print_Str(" <DIR>   ", outs);
     else 
-      print_Str(" <FILE>  ");
+      print_Str(" <FILE>  ", outs);
   }
 }
 
@@ -538,12 +542,13 @@ static void pvt_PrintEntFields(const uint8_t secArr[], uint8_t flags)
  *               of any file to the screen.
  * 
  * Arguments   : snEnt   - Pointer to 32 byte array holding the sn entry.
- *               bpb     - Pointer to the BPB struct instance.
+ *               bpb     - Pointer to the FatBPB struct instance.
  * 
  * Returns     : END_OF_FILE (success) or FAILED_READ_SECTOR fat error flag.
  * ----------------------------------------------------------------------------
  */
-static uint8_t pvt_PrintFile(const uint8_t snEnt[], const BPB *bpb)
+static uint8_t pvt_PrintFile(const uint8_t snEnt[], const FatBPB *bpb, 
+                             void (*outs)(uint8_t))
 {
   //get FAT index for file's first cluster
   uint32_t clus; 
@@ -582,14 +587,14 @@ static uint8_t pvt_PrintFile(const uint8_t snEnt[], const BPB *bpb)
         // is not automatically printed when "\n" is present by itself.
         //
         if (secArr[byteNum] == '\n') 
-          print_Str ("\n\r");
+          print_Str ("\n\r", outs);
         
         // else if not 0, just print the character directly to the screen.
         else if (secArr[byteNum])
         {
           // two byte array for single char string, to use print_Str.
           char str[2] = {secArr[byteNum], '\0'};
-          print_Str(str);
+          print_Str(str, outs);
         }
         // else character is zero. Possible indicatin of eof.
         else 
