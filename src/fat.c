@@ -29,10 +29,11 @@ static void pvt_UpdateFatEntry(FatEntry *ent, const char lnStr[],
                 const uint8_t secArr[], uint16_t snPos,
                 uint8_t snEntSecNumInClus, uint32_t snEntClusIndx);
 static uint8_t pvt_CheckName(const char nameStr[]);
-static uint8_t pvt_SetDirToParent(FatDir *dir, const FatBPB *bpb);
+static uint8_t pvt_SetDirToParent(FatDir *dir, const FatBPB *const bpb);
 static void pvt_LoadLongName(int lnFirstEnt, int lnLastEnt, 
                              const uint8_t secArr[], char lnStr[]);
-static uint32_t pvt_GetNextClusIndex(uint32_t clusIndex, const FatBPB *bpb);
+static uint32_t pvt_GetNextClusIndex(uint32_t clusIndex, 
+                                     const FatBPB * const bpb);
 
 /*
  ******************************************************************************
@@ -59,7 +60,7 @@ static uint32_t pvt_GetNextClusIndex(uint32_t clusIndex, const FatBPB *bpb);
  *               required by all the other public FAT module functions.
  * ----------------------------------------------------------------------------
  */
-uint8_t fat_SetBPB(FatBPB *bpb)
+uint8_t fat_SetBPB(FatBPB * const bpb)
 {
   uint8_t bootSecArr[SECTOR_LEN], err; 
 
@@ -147,7 +148,7 @@ uint8_t fat_SetBPB(FatBPB *bpb)
  * Returns     : void
  * ----------------------------------------------------------------------------
  */
-void fat_SetDirToRoot(FatDir *dir, const FatBPB *bpb)
+void fat_SetDirToRoot(FatDir *dir, const FatBPB * const bpb)
 {
   // set string members to indicate root cluster
   strcpy(dir->snStr, "/");
@@ -171,7 +172,7 @@ void fat_SetDirToRoot(FatDir *dir, const FatBPB *bpb)
  * Returns     : void
  * ----------------------------------------------------------------------------
  */
-void fat_InitEntry(FatEntry *ent, const FatBPB *bpb)
+void fat_InitEntry(FatEntry *ent, const FatBPB * const bpb)
 {
   // set long and short names to empty strings
   strcpy(ent->lnStr, "");
@@ -203,7 +204,7 @@ void fat_InitEntry(FatEntry *ent, const FatBPB *bpb)
  *               then the function was unable to update the FatEntry.
  * ----------------------------------------------------------------------------
  */
-uint8_t fat_SetNextEntry(FatEntry *currEnt, const FatBPB *bpb)
+uint8_t fat_SetNextEntry(FatEntry *currEnt, const FatBPB * const bpb)
 {  
   //
   // Initial values of nested loop counters set according to state of currEnt. 
@@ -428,7 +429,8 @@ uint8_t fat_SetNextEntry(FatEntry *currEnt, const FatBPB *bpb)
  *                  exist for a directory, only then can it be a short name.
  * ----------------------------------------------------------------------------
  */
-uint8_t fat_SetDir(FatDir *dir, const char newDirStr[], const FatBPB *bpb)
+uint8_t fat_SetDir(FatDir *dir, const char newDirStr[], 
+                   const FatBPB * const bpb)
 {
   // for return errors. This is the loop cond. and the return value.
   uint8_t err;                              
@@ -637,7 +639,7 @@ static uint8_t pvt_CheckName(const char nameStr[])
  *  Returns     : SUCCESS or FAILED_READ_SECTOR
  * ----------------------------------------------------------------------------
  */
-static uint8_t pvt_SetDirToParent(FatDir *dir, const FatBPB *bpb)
+static uint8_t pvt_SetDirToParent(FatDir *dir, const FatBPB * const bpb)
 {
   uint32_t parentDirFirstClus, secNumOnDisk;
   uint8_t  secArr[bpb->bytesPerSec];
@@ -770,7 +772,7 @@ static void pvt_LoadLongName(int lnFirstEnt, int lnLastEnt,
  *               region, but its FAT index is 2 or higher.
  * ----------------------------------------------------------------------------
  */
-static uint32_t pvt_GetNextClusIndex(uint32_t clusIndx, const FatBPB *bpb)
+static uint32_t pvt_GetNextClusIndex(uint32_t clusIndx, const FatBPB * const bpb)
 {
   // calculate address of sector containing the current cluster index
   uint16_t fatIndxsPerSec = bpb->bytesPerSec / BYTES_PER_INDEX;

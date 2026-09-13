@@ -402,7 +402,7 @@ FatEntry;
  *               required by all the other public FAT module functions.
  * ----------------------------------------------------------------------------
  */
-uint8_t fat_SetBPB(FatBPB *bpb);
+uint8_t fat_SetBPB(FatBPB * const bpb);
 
 /* 
  * ----------------------------------------------------------------------------
@@ -416,7 +416,7 @@ uint8_t fat_SetBPB(FatBPB *bpb);
  * Returns     : void
  * ----------------------------------------------------------------------------
  */
-void fat_SetDirToRoot(FatDir *dir, const FatBPB *bpb);
+void fat_SetDirToRoot(FatDir *dir, const FatBPB * const bpb);
 
 /*
  * ----------------------------------------------------------------------------
@@ -430,7 +430,7 @@ void fat_SetDirToRoot(FatDir *dir, const FatBPB *bpb);
  * Returns     : void
  * ----------------------------------------------------------------------------
  */
-void fat_InitEntry(FatEntry *ent, const FatBPB *bpb);
+void fat_InitEntry(FatEntry *ent, const FatBPB * const bpb);
 
 /*
  * ----------------------------------------------------------------------------
@@ -446,7 +446,7 @@ void fat_InitEntry(FatEntry *ent, const FatBPB *bpb);
  *               then the function was unable to update the FatEntry.
  * ----------------------------------------------------------------------------
  */
-uint8_t fat_SetNextEntry(FatEntry *currEntry, const FatBPB *bpb);
+uint8_t fat_SetNextEntry(FatEntry *currEntry, const FatBPB * const bpb);
 
 /*
  * ----------------------------------------------------------------------------
@@ -477,6 +477,7 @@ uint8_t fat_SetNextEntry(FatEntry *currEntry, const FatBPB *bpb);
  *                  exist for a directory, only then can it be a short name.
  * ----------------------------------------------------------------------------
  */
-uint8_t fat_SetDir(FatDir *dir, const char newDirStr[], const FatBPB *bpb);
+uint8_t fat_SetDir(FatDir *dir, const char newDirStr[], 
+                   const FatBPB * const bpb);
 
 #endif //FAT_H
