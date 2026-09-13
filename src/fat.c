@@ -25,11 +25,13 @@ static void (*s_outs)(uint8_t) = usart_Transmit;
  ******************************************************************************
  */
 
-static void pvt_UpdateFatEntry(FatEntry *ent, const char lnStr[], 
-                const uint8_t secArr[], uint16_t snPos,
-                uint8_t snEntSecNumInClus, uint32_t snEntClusIndx);
+static void pvt_UpdateFatEntry(FatEntry * const ent, const char lnStr[], 
+                               const uint8_t secArr[], uint16_t snPos,
+                               uint8_t snEntSecNumInClus, 
+                               uint32_t snEntClusIndx);
 static uint8_t pvt_CheckName(const char nameStr[]);
-static uint8_t pvt_SetDirToParent(FatDir *dir, const FatBPB *const bpb);
+static uint8_t pvt_SetDirToParent(FatDir * const dir, 
+                                  const FatBPB *const bpb);
 static void pvt_LoadLongName(int lnFirstEnt, int lnLastEnt, 
                              const uint8_t secArr[], char lnStr[]);
 static uint32_t pvt_GetNextClusIndex(uint32_t clusIndex, 
@@ -148,7 +150,7 @@ uint8_t fat_SetBPB(FatBPB * const bpb)
  * Returns     : void
  * ----------------------------------------------------------------------------
  */
-void fat_SetDirToRoot(FatDir *dir, const FatBPB * const bpb)
+void fat_SetDirToRoot(FatDir * const dir, const FatBPB * const bpb)
 {
   // set string members to indicate root cluster
   strcpy(dir->snStr, "/");
@@ -172,7 +174,7 @@ void fat_SetDirToRoot(FatDir *dir, const FatBPB * const bpb)
  * Returns     : void
  * ----------------------------------------------------------------------------
  */
-void fat_InitEntry(FatEntry *ent, const FatBPB * const bpb)
+void fat_InitEntry(FatEntry * const ent, const FatBPB * const bpb)
 {
   // set long and short names to empty strings
   strcpy(ent->lnStr, "");
@@ -204,8 +206,10 @@ void fat_InitEntry(FatEntry *ent, const FatBPB * const bpb)
  *               then the function was unable to update the FatEntry.
  * ----------------------------------------------------------------------------
  */
-uint8_t fat_SetNextEntry(FatEntry *currEnt, const FatBPB * const bpb)
+uint8_t fat_SetNextEntry(FatEntry * const currEnt, const FatBPB * const bpb)
 {  
+  
+  
   //
   // Initial values of nested loop counters set according to state of currEnt. 
   //
@@ -429,7 +433,7 @@ uint8_t fat_SetNextEntry(FatEntry *currEnt, const FatBPB * const bpb)
  *                  exist for a directory, only then can it be a short name.
  * ----------------------------------------------------------------------------
  */
-uint8_t fat_SetDir(FatDir *dir, const char newDirStr[], 
+uint8_t fat_SetDir(FatDir * const dir, const char newDirStr[], 
                    const FatBPB * const bpb)
 {
   // for return errors. This is the loop cond. and the return value.
@@ -448,6 +452,8 @@ uint8_t fat_SetDir(FatDir *dir, const char newDirStr[],
     return SUCCESS;
   }
 
+  
+   
   // 
   // Create and initialize a FatEntry. Sets the snEntClusIndx member to root
   // and all other members to 0 or null strings. Updates the snEntClusIndx 
@@ -537,18 +543,18 @@ uint8_t fat_SetDir(FatDir *dir, const char newDirStr[],
  * Returns     : void
  * ----------------------------------------------------------------------------
  */
-static void pvt_UpdateFatEntry(FatEntry *ent, const char lnStr[], 
-                const uint8_t secArr[], uint16_t snPos,
-                uint8_t snEntSecNumInClus, uint32_t snEntClusIndx)
+static void pvt_UpdateFatEntry(FatEntry * const ent, const char lnStr[], 
+                               const uint8_t secArr[], uint16_t snPos,
+                               uint8_t snEntSecNumInClus, 
+                               uint32_t snEntClusIndx)
 {
   // copy short name entry bytes into *snEnt FatEntry member
   for (uint8_t byteNum = 0; byteNum < ENTRY_LEN; ++byteNum)
     ent->snEnt[byteNum] = secArr[snPos + byteNum];
   
   //
-  // The section parses the short name name + ext chars in the short name 
-  // entry of the sector and then loads them into the snStr FatEntry member as
-  // a string.
+  // The section parses the short name + ext chars in the short name entry of 
+  // the sector and loads them into the snStr FatEntry member as a string.
   //
 
   // vars to assist loading short name
@@ -615,7 +621,7 @@ static uint8_t pvt_CheckName(const char nameStr[])
   const char illCharsArr[] = {'\\','/',':','*','?','"','<','>','|','\0'};
   for (const char *namePtr = nameStr; *namePtr; ++namePtr)
     for (const char *illPtr = illCharsArr; *illPtr;)
-      if (*nameStr == *illPtr++)
+      if (*namePtr == *illPtr++)
         return INVALID_NAME;
 
   // illegal if all space characters
@@ -639,7 +645,7 @@ static uint8_t pvt_CheckName(const char nameStr[])
  *  Returns     : SUCCESS or FAILED_READ_SECTOR
  * ----------------------------------------------------------------------------
  */
-static uint8_t pvt_SetDirToParent(FatDir *dir, const FatBPB * const bpb)
+static uint8_t pvt_SetDirToParent(FatDir * const dir, const FatBPB * const bpb)
 {
   uint32_t parentDirFirstClus, secNumOnDisk;
   uint8_t  secArr[bpb->bytesPerSec];
